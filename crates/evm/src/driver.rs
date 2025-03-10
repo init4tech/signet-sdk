@@ -1023,7 +1023,6 @@ mod test {
         let mut extracts = Extracts::empty(&block);
         extracts.enters.push(ExtractedEvent {
             tx: &fake_tx,
-            tx_hash: Default::default(),
             receipt: &fake_receipt,
             log_index: 0,
             event: enter,
@@ -1075,14 +1074,12 @@ mod test {
         let mut extracts = Extracts::empty(&block);
         extracts.enters.push(ExtractedEvent {
             tx: &fake_tx,
-            tx_hash: Default::default(),
             receipt: &fake_receipt,
             log_index: 0,
             event: enter,
         });
         extracts.transacts.push(ExtractedEvent {
             tx: &fake_tx,
-            tx_hash: Default::default(),
             receipt: &fake_receipt,
             log_index: 0,
             event: transact,
