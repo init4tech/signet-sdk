@@ -17,7 +17,7 @@ pub use bundle::{SignetCallBundle, SignetEthBundle};
 
 mod config;
 pub use config::{
-    env_utils, ConfigError, HostConfig, PermissionedToken, PredeployTokens, RollupConfig,
+    ConfigError, HostConfig, PermissionedToken, PredeployTokens, RollupConfig,
     SignetSystemConstants, MINTER_ADDRESS,
 };
 

@@ -1,6 +1,3 @@
-/// Utilities for working with the environment.
-pub mod env_utils;
-
 mod error;
 pub use error::ConfigError;
 
