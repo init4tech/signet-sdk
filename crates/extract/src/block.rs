@@ -28,7 +28,9 @@ pub struct Extracts<'a> {
 impl Extracts<'_> {
     /// Get the header of the block that was submitted (if any).
     pub fn ru_header(&self) -> Option<Zenith::BlockHeader> {
-        self.submitted.as_ref().map(|s| s.ru_header(self.host_block_number()))
+        self.submitted
+            .as_ref()
+            .map(|s| s.ru_header(self.host_block_number()))
     }
 
     /// Get the host block number.

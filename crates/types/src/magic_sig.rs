@@ -56,7 +56,9 @@ impl MagicSigInfo {
         match s[8] {
             FLAG_ENTER => Some(Self::Enter),
             FLAG_ENTER_TOKENS => Some(Self::EnterToken),
-            FLAG_TRANSACT => Some(Self::Transact { sender: Address::from_slice(&s[12..]) }),
+            FLAG_TRANSACT => Some(Self::Transact {
+                sender: Address::from_slice(&s[12..]),
+            }),
             _ => None,
         }
     }
@@ -131,22 +133,38 @@ impl MagicSig {
         buf.copy_from_slice(&s_bytes[4..8]);
         let event_idx = u32::from_be_bytes(buf) as usize;
 
-        Some(Self { ty, txid, event_idx })
+        Some(Self {
+            ty,
+            txid,
+            event_idx,
+        })
     }
 
     /// Create a new [`MagicSig`] for an enter event.
     pub const fn enter(txid: B256, event_idx: usize) -> Self {
-        Self { ty: MagicSigInfo::Enter, txid, event_idx }
+        Self {
+            ty: MagicSigInfo::Enter,
+            txid,
+            event_idx,
+        }
     }
 
     /// Create a new [`MagicSig`] for an enter token event.
     pub const fn enter_token(txid: B256, event_idx: usize) -> Self {
-        Self { ty: MagicSigInfo::EnterToken, txid, event_idx }
+        Self {
+            ty: MagicSigInfo::EnterToken,
+            txid,
+            event_idx,
+        }
     }
 
     /// Create a new [`MagicSig`] for a transact event.
     pub const fn transact(txid: B256, event_idx: usize, sender: Address) -> Self {
-        Self { ty: MagicSigInfo::Transact { sender }, txid, event_idx }
+        Self {
+            ty: MagicSigInfo::Transact { sender },
+            txid,
+            event_idx,
+        }
     }
 
     /// Get the sender of the magic signature.

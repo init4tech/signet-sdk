@@ -20,14 +20,20 @@ pub struct Framed<T> {
 
 impl<T> Default for Framed<T> {
     fn default() -> Self {
-        Self { events: Default::default(), frame_boundaries: Default::default() }
+        Self {
+            events: Default::default(),
+            frame_boundaries: Default::default(),
+        }
     }
 }
 
 impl<T> Framed<T> {
     /// Make a new `FramedOrders` with the given capacity for orders.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { events: Vec::with_capacity(capacity), frame_boundaries: Vec::new() }
+        Self {
+            events: Vec::with_capacity(capacity),
+            frame_boundaries: Vec::new(),
+        }
     }
 
     /// Returns the number of events found, including those that may yet be

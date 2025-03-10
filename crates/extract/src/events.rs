@@ -57,7 +57,9 @@ impl From<Transactor::Transact> for Events {
 impl Events {
     /// Decode a [`Passage`] event from a log.
     pub fn decode_passage(log: &Log<LogData>, filter_chain_id: u64) -> Option<Self> {
-        let event = PassageEvents::decode_log(log, true).ok().map(|log| log.data)?;
+        let event = PassageEvents::decode_log(log, true)
+            .ok()
+            .map(|log| log.data)?;
 
         match event {
             PassageEvents::Enter(e) if e.rollup_chain_id() == filter_chain_id => {
@@ -72,7 +74,9 @@ impl Events {
 
     /// Decode a [`Zenith`] event from a log.
     pub fn decode_zenith(log: &Log<LogData>, filter_chain_id: u64) -> Option<Self> {
-        let event = ZenithEvents::decode_log(log, true).ok().map(|log| log.data)?;
+        let event = ZenithEvents::decode_log(log, true)
+            .ok()
+            .map(|log| log.data)?;
 
         match event {
             ZenithEvents::BlockSubmitted(e) if e.rollup_chain_id() == filter_chain_id => {
@@ -84,7 +88,9 @@ impl Events {
 
     /// Decode a [`Transactor`] event from a log.
     pub fn decode_transactor(log: &Log<LogData>, filter_chain_id: u64) -> Option<Self> {
-        let event = TransactorEvents::decode_log(log, true).ok().map(|log| log.data)?;
+        let event = TransactorEvents::decode_log(log, true)
+            .ok()
+            .map(|log| log.data)?;
 
         match event {
             TransactorEvents::Transact(e) if e.rollup_chain_id() == filter_chain_id => {
@@ -96,7 +102,9 @@ impl Events {
 
     /// Decode an [`RollupOrders`] event from a log.
     pub fn decode_orders(log: &Log<LogData>, filter_chain_id: u64) -> Option<Self> {
-        let event = RollupOrdersEvents::decode_log(log, true).ok().map(|log| log.data)?;
+        let event = RollupOrdersEvents::decode_log(log, true)
+            .ok()
+            .map(|log| log.data)?;
 
         match event {
             RollupOrdersEvents::Filled(mut e) => {

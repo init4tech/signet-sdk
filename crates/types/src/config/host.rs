@@ -2,7 +2,7 @@ use crate::{ConfigError, PredeployTokens};
 use alloy::{genesis::Genesis, primitives::Address};
 use serde_json::Value;
 
-/// System addresses on the host chain
+/// System addresses and other configuration details on the host chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostConfig {
@@ -43,7 +43,15 @@ impl HostConfig {
         transactor: Address,
         tokens: PredeployTokens,
     ) -> Self {
-        Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
+        Self {
+            chain_id,
+            deploy_height,
+            zenith,
+            orders,
+            passage,
+            transactor,
+            tokens,
+        }
     }
 
     /// Load the constants from a [`Genesis`].
