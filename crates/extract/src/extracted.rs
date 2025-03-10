@@ -1,6 +1,6 @@
 use alloy::{
     eips::Typed2718,
-    primitives::{Log, TxHash, B256, U256},
+    primitives::{Log, TxHash, U256},
 };
 use reth::primitives::{Receipt, TransactionSigned};
 use zenith_types::{Passage, RollupOrders, Transactor, Zenith};
@@ -30,7 +30,7 @@ impl<T> std::ops::Deref for ExtractedEvent<'_, T> {
 
 impl<T> ExtractedEvent<'_, T> {
     /// Get the transaction hash of the extracted event.
-    pub const fn tx_hash(&self) -> TxHash {
+    pub fn tx_hash(&self) -> TxHash {
         *self.tx.hash()
     }
 
@@ -118,7 +118,6 @@ impl<'a> ExtractedEvent<'a, Events> {
         match self.event {
             Events::BlockSubmitted(event) => Ok(ExtractedEvent {
                 tx: self.tx,
-                tx_hash: self.tx_hash,
                 receipt: self.receipt,
                 log_index: self.log_index,
                 event,

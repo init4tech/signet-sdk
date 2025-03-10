@@ -55,11 +55,8 @@ impl Extractor {
         receipts: &'b [Receipt],
     ) -> impl Iterator<Item = ExtractedEvent<'c>> {
         block.body().transactions.iter().zip(receipts.iter()).flat_map(|(tx, receipt)| {
-            let tx_hash = tx.hash();
-
             self.extract_receipt(receipt).map(move |(log_index, event)| ExtractedEvent {
                 tx,
-                tx_hash: *tx_hash,
                 receipt,
                 log_index,
                 event,
