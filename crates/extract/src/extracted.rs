@@ -12,11 +12,6 @@ use crate::Events;
 pub struct ExtractedEvent<'a, T = Events> {
     /// The transaction that caused the event
     pub tx: &'a TransactionSigned,
-    /// The transaction hash.
-    ///
-    /// NB: this is memoized here because reth doesn't produce a hash for the
-    /// transaction during historical sync
-    pub tx_hash: B256,
     /// The receipt that the event was extracted from.
     pub receipt: &'a Receipt,
     /// The index of the log in the receipt's logs.
@@ -36,7 +31,7 @@ impl<T> std::ops::Deref for ExtractedEvent<'_, T> {
 impl<T> ExtractedEvent<'_, T> {
     /// Get the transaction hash of the extracted event.
     pub const fn tx_hash(&self) -> TxHash {
-        self.tx_hash
+        *self.tx.hash()
     }
 
     /// Borrow the raw log from the receipt.
@@ -65,7 +60,6 @@ impl<'a> ExtractedEvent<'a, Events> {
         match self.event {
             Events::EnterToken(event) => Ok(ExtractedEvent {
                 tx: self.tx,
-                tx_hash: self.tx_hash,
                 receipt: self.receipt,
                 log_index: self.log_index,
                 event,
@@ -94,7 +88,6 @@ impl<'a> ExtractedEvent<'a, Events> {
         match self.event {
             Events::Enter(event) => Ok(ExtractedEvent {
                 tx: self.tx,
-                tx_hash: self.tx_hash,
                 receipt: self.receipt,
                 log_index: self.log_index,
                 event,
@@ -152,7 +145,6 @@ impl<'a> ExtractedEvent<'a, Events> {
         match self.event {
             Events::Transact(event) => Ok(ExtractedEvent {
                 tx: self.tx,
-                tx_hash: self.tx_hash,
                 receipt: self.receipt,
                 log_index: self.log_index,
                 event,
@@ -178,7 +170,6 @@ impl<'a> ExtractedEvent<'a, Events> {
         match self.event {
             Events::Filled(event) => Ok(ExtractedEvent {
                 tx: self.tx,
-                tx_hash: self.tx_hash,
                 receipt: self.receipt,
                 log_index: self.log_index,
                 event,
