@@ -9,11 +9,11 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-alloy.workspace = true
-
 signet-types.workspace = true
 
 zenith-types.workspace = true
 
+alloy.workspace = true
 reth.workspace = true
+
 tracing.workspace = true

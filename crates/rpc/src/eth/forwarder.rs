@@ -1,7 +1,7 @@
 use alloy::consensus::TxEnvelope;
 use reth::rpc::server_types::eth::EthResult;
 use serde::Serialize;
-use signet_types::SignetEthBundle;
+use signet_bundle::SignetEthBundle;
 use tracing::warn;
 use zenith_types::SignedOrder;
 

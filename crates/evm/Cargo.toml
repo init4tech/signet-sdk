@@ -9,16 +9,16 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-alloy.workspace = true
 
+signet-bundle.workspace = true
 signet-extract.workspace = true
 signet-types.workspace = true
 
-reth.workspace = true
-
 trevm.workspace = true
-
 zenith-types.workspace = true
+
+alloy.workspace = true
+reth.workspace = true
 
 thiserror.workspace = true
 tracing.workspace = true

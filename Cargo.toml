@@ -34,11 +34,12 @@ debug = false
 incremental = false
 
 [workspace.dependencies]
-signet-types = { path = "crates/types" }
-signet-extract = { path = "crates/extract" }
+signet-bundle = { path = "crates/bundle" }
 signet-evm = { path = "crates/evm" }
+signet-extract = { path = "crates/extract" }
 signet-node = { path = "crates/node" }
 signet-rpc = { path = "crates/rpc" }
+signet-types = { path = "crates/types" }
 
 # ajj
 ajj = { version = "0.3.1" }
