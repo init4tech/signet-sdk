@@ -8,7 +8,7 @@ on:
 # simplest example of using the rust-base action
 jobs:
   rust-base:
-    uses: init4tech/actions/.github/workflows/rust-base.yml@main
+    uses: init4tech/actions/.github/workflows/rust-library-base.yml@main
     with:
       require-lockfile: true
-      rust-profile: 'ci-rust'
+      rust-profile: "ci-rust"
