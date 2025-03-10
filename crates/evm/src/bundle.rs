@@ -113,17 +113,17 @@ impl<R> SignetBundleDriver<SignetCallBundle, R> {
 
 impl<B, R> SignetBundleDriver<B, R> {
     /// Get a reference to the bundle.
-    pub fn bundle(&self) -> &B {
+    pub const fn bundle(&self) -> &B {
         &self.bundle
     }
 
     /// Get a reference to the response.
-    pub fn response(&self) -> &R {
+    pub const fn response(&self) -> &R {
         &self.response
     }
 
     /// Get a reference to the market context.
-    pub fn context(&self) -> &MarketContext {
+    pub const fn context(&self) -> &MarketContext {
         &self.context
     }
 

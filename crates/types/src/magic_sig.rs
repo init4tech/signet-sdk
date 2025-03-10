@@ -6,14 +6,14 @@ use zenith_types::MINTER_ADDRESS;
 /// supporting EIP-2.
 ///
 /// [EIP-2]: https://eips.ethereum.org/EIPS/eip-2
-pub const MAGIC_SIG_SENTINEL: [u8; 4] = [0xff, 0xee, 0xdd, 0xcc];
+pub(crate) const MAGIC_SIG_SENTINEL: [u8; 4] = [0xff, 0xee, 0xdd, 0xcc];
 
 /// Flags used to identify Enters
-pub const FLAG_ENTER: u8 = 0x01;
+pub(crate) const FLAG_ENTER: u8 = 0x01;
 /// Flags used to identify the type of magic signature.
-pub const FLAG_ENTER_TOKENS: u8 = 0x02;
+pub(crate) const FLAG_ENTER_TOKENS: u8 = 0x02;
 /// Flags used to identify the type of magic signature.
-pub const FLAG_TRANSACT: u8 = 0x03;
+pub(crate) const FLAG_TRANSACT: u8 = 0x03;
 
 /// Type flag used to
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -64,7 +64,7 @@ impl MagicSigInfo {
     /// Get the sender from the magic signature info. For enter and enter token
     /// events, this is the [`MINTER_ADDRESS`]. For transact events, this is the
     /// sender.
-    pub fn sender(&self) -> Address {
+    pub const fn sender(&self) -> Address {
         match self {
             Self::Transact { sender } => *sender,
             _ => MINTER_ADDRESS,
@@ -135,22 +135,22 @@ impl MagicSig {
     }
 
     /// Create a new [`MagicSig`] for an enter event.
-    pub fn enter(txid: B256, event_idx: usize) -> Self {
+    pub const fn enter(txid: B256, event_idx: usize) -> Self {
         Self { ty: MagicSigInfo::Enter, txid, event_idx }
     }
 
     /// Create a new [`MagicSig`] for an enter token event.
-    pub fn enter_token(txid: B256, event_idx: usize) -> Self {
+    pub const fn enter_token(txid: B256, event_idx: usize) -> Self {
         Self { ty: MagicSigInfo::EnterToken, txid, event_idx }
     }
 
     /// Create a new [`MagicSig`] for a transact event.
-    pub fn transact(txid: B256, event_idx: usize, sender: Address) -> Self {
+    pub const fn transact(txid: B256, event_idx: usize, sender: Address) -> Self {
         Self { ty: MagicSigInfo::Transact { sender }, txid, event_idx }
     }
 
     /// Get the sender of the magic signature.
-    pub fn sender(&self) -> Address {
+    pub const fn sender(&self) -> Address {
         self.ty.sender()
     }
 }

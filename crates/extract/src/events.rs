@@ -108,12 +108,12 @@ impl Events {
     }
 
     /// True if this event is an [`Passage::EnterToken`] event.
-    pub fn is_enter_token(&self) -> bool {
+    pub const fn is_enter_token(&self) -> bool {
         matches!(self, Events::EnterToken(_))
     }
 
     /// Falllible cast to an [`Passage::EnterToken`] event.
-    pub fn as_enter_token(&self) -> Option<&Passage::EnterToken> {
+    pub const fn as_enter_token(&self) -> Option<&Passage::EnterToken> {
         match &self {
             Events::EnterToken(e) => Some(e),
             _ => None,
@@ -121,12 +121,12 @@ impl Events {
     }
 
     /// True if this event is an [`Passage::Enter`] event.
-    pub fn is_enter(&self) -> bool {
+    pub const fn is_enter(&self) -> bool {
         matches!(self, Events::Enter(_))
     }
 
     /// Falllible cast to an [`Passage::Enter`] event.
-    pub fn as_enter(&self) -> Option<&Passage::Enter> {
+    pub const fn as_enter(&self) -> Option<&Passage::Enter> {
         match &self {
             Events::Enter(e) => Some(e),
             _ => None,
@@ -134,12 +134,12 @@ impl Events {
     }
 
     /// True if this event is an [`Zenith::BlockSubmitted`] event.
-    pub fn is_block_submitted(&self) -> bool {
+    pub const fn is_block_submitted(&self) -> bool {
         matches!(self, Events::BlockSubmitted(_))
     }
 
     /// Falllible cast to an [`Zenith::BlockSubmitted`] event
-    pub fn as_block_submitted(&self) -> Option<&Zenith::BlockSubmitted> {
+    pub const fn as_block_submitted(&self) -> Option<&Zenith::BlockSubmitted> {
         match &self {
             Events::BlockSubmitted(e) => Some(e),
             _ => None,
@@ -147,12 +147,12 @@ impl Events {
     }
 
     /// True if this event is an [`Transactor::Transact`] event
-    pub fn is_transact(&self) -> bool {
+    pub const fn is_transact(&self) -> bool {
         matches!(self, Events::Transact(_))
     }
 
     /// Falllible cast to an [`Transactor::Transact`] event
-    pub fn as_transact(&self) -> Option<&Transactor::Transact> {
+    pub const fn as_transact(&self) -> Option<&Transactor::Transact> {
         match &self {
             Events::Transact(e) => Some(e),
             _ => None,
@@ -160,12 +160,12 @@ impl Events {
     }
 
     /// True if this event is an [`RollupOrders::Filled`] event
-    pub fn is_filled(&self) -> bool {
+    pub const fn is_filled(&self) -> bool {
         matches!(self, Events::Filled(_))
     }
 
     /// Falllible cast to an [`RollupOrders::Filled`] event
-    pub fn as_filled(&self) -> Option<&RollupOrders::Filled> {
+    pub const fn as_filled(&self) -> Option<&RollupOrders::Filled> {
         match &self {
             Events::Filled(e) => Some(e),
             _ => None,

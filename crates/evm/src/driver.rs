@@ -202,7 +202,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Get the rollup height of the current block.
-    pub fn ru_height(&self) -> u64 {
+    pub const fn ru_height(&self) -> u64 {
         self.extracts.ru_height
     }
 
@@ -212,7 +212,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Base fee beneficiary of the current block.
-    pub fn base_fee_recipient(&self) -> Address {
+    pub const fn base_fee_recipient(&self) -> Address {
         self.constants.base_fee_recipient()
     }
 
@@ -235,7 +235,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
     /// Get the cumulative gas used in the block (so far). This excludes gas
     /// used by enters and enter token events.
-    pub fn payable_gas_used(&self) -> u64 {
+    pub const fn payable_gas_used(&self) -> u64 {
         self.payable_gas_used
     }
 
@@ -770,7 +770,7 @@ mod test {
     use trevm::NoopCfg;
 
     /// Make a fake block with a specific number.
-    pub fn fake_block(number: u64) -> RecoveredBlock<Block> {
+    pub(super) fn fake_block(number: u64) -> RecoveredBlock<Block> {
         let header = Header {
             difficulty: U256::from(0x4000_0000),
             number,
@@ -792,7 +792,7 @@ mod test {
     }
 
     /// Make a simple send transaction.
-    pub fn simple_send(to: Address, amount: U256, nonce: u64) -> reth::primitives::Transaction {
+    pub(super) fn simple_send(to: Address, amount: U256, nonce: u64) -> reth::primitives::Transaction {
         TxEip1559 {
             nonce,
             gas_limit: 21_000,
@@ -807,13 +807,13 @@ mod test {
     }
 
     /// Sign a transaction with a wallet.
-    pub fn sign_tx_with_key_pair(wallet: &PrivateKeySigner, tx: Transaction) -> TransactionSigned {
+    pub(super) fn sign_tx_with_key_pair(wallet: &PrivateKeySigner, tx: Transaction) -> TransactionSigned {
         let signature = wallet.sign_hash_sync(&tx.signature_hash()).unwrap();
         TransactionSigned::new_unhashed(tx, signature)
     }
 
     /// Make a wallet with a deterministic keypair.
-    pub fn make_wallet(i: u8) -> PrivateKeySigner {
+    pub(super) fn make_wallet(i: u8) -> PrivateKeySigner {
         PrivateKeySigner::from_bytes(&B256::repeat_byte(i)).unwrap()
     }
 

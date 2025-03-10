@@ -5,9 +5,14 @@ use alloy::{
 };
 use serde_json::Value;
 
-/// System address with permission to mint tokens.
-const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e61646d696e");
+/// System address with permission to mint tokens. This is the address from
+/// which the node will issue transactions to mint ETH or ERC20 tokens.
+// NB: the hex is: tokenadmin
+pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e61646d696e");
 
+/// Configuration details for the rollup chain.
+///
+/// These are system constants which may vary
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RollupConfig {
@@ -32,7 +37,13 @@ impl RollupConfig {
         base_fee_recipient: Address,
         tokens: PredeployTokens,
     ) -> Self {
-        Self { chain_id, orders, passage, base_fee_recipient, tokens }
+        Self {
+            chain_id,
+            orders,
+            passage,
+            base_fee_recipient,
+            tokens,
+        }
     }
 
     /// Load the constants from a [`Genesis`].

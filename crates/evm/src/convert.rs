@@ -42,7 +42,7 @@ pub(crate) struct Transact<'a, 'b> {
 impl Transact<'_, '_> {
     /// Get the magic signature for the transact event, containing sender
     /// information.
-    pub fn magic_sig(&self) -> MagicSig {
+    pub(crate) fn magic_sig(&self) -> MagicSig {
         MagicSig {
             ty: MagicSigInfo::Transact { sender: self.transact.sender() },
             txid: self.transact.tx_hash(),
@@ -51,7 +51,7 @@ impl Transact<'_, '_> {
     }
 
     /// Get the reth transaction signature for the transact event.
-    pub fn signature(&self) -> Signature {
+    pub(crate) fn signature(&self) -> Signature {
         self.magic_sig().into()
     }
 }
@@ -89,7 +89,7 @@ pub(crate) struct Enter<'a, 'b> {
 
 impl Enter<'_, '_> {
     /// Get the magic signature for the enter event.
-    pub fn magic_sig(&self) -> MagicSig {
+    pub(crate) const fn magic_sig(&self) -> MagicSig {
         MagicSig {
             ty: MagicSigInfo::Enter,
             txid: self.enter.tx_hash(),
@@ -98,7 +98,7 @@ impl Enter<'_, '_> {
     }
 
     /// Get the reth transaction signature for the enter event.
-    pub fn signature(&self) -> Signature {
+    pub(crate) fn signature(&self) -> Signature {
         self.magic_sig().into()
     }
 }
@@ -138,7 +138,7 @@ pub(crate) struct EnterToken<'a, 'b> {
 
 impl EnterToken<'_, '_> {
     /// Get the magic signature for the enter token event.
-    pub fn magic_sig(&self) -> MagicSig {
+    pub(crate) const fn magic_sig(&self) -> MagicSig {
         MagicSig {
             ty: MagicSigInfo::EnterToken,
             txid: self.enter_token.tx_hash(),
@@ -147,7 +147,7 @@ impl EnterToken<'_, '_> {
     }
 
     /// Get the reth transaction signature for the enter token event.
-    pub fn signature(&self) -> Signature {
+    pub(crate) fn signature(&self) -> Signature {
         self.magic_sig().into()
     }
 }

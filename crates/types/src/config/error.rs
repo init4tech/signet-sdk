@@ -1,3 +1,4 @@
+/// Error type for config module.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     /// Missing `signetConstants` genesis field.

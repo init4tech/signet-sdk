@@ -13,7 +13,7 @@ pub struct SlotCalculator {
 
 impl SlotCalculator {
     /// Creates a new slot calculator.
-    pub fn new(start_timestamp: u64, slot_offset: u64, slot_duration: u64) -> Self {
+    pub const fn new(start_timestamp: u64, slot_offset: u64, slot_duration: u64) -> Self {
         Self { start_timestamp, slot_offset, slot_duration }
     }
 
@@ -28,7 +28,7 @@ impl SlotCalculator {
     }
 
     /// Calculates the slot for a given timestamp.
-    pub fn calculate_slot(&self, timestamp: u64) -> u64 {
+    pub const fn calculate_slot(&self, timestamp: u64) -> u64 {
         let elapsed = timestamp - self.start_timestamp;
         let slots = elapsed.saturating_div(self.slot_duration);
         slots + self.slot_offset

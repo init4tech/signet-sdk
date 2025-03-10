@@ -5,8 +5,22 @@ use alloy::primitives::{Address, U256};
 pub enum MarketError {
     /// Insufficient balance to settle a trade.
     #[error("Insufficient balance when taking from context")]
-    InsufficientBalance { chain_id: u64, asset: Address, recipient: Address, amount: U256 },
+    InsufficientBalance {
+        /// The chain ID on which the asset is deployed.
+        chain_id: u64,
+        /// The asset we expected to be in the context.
+        asset: Address,
+        /// The recipient account we tried to take from.
+        recipient: Address,
+        /// The amount we tried to take.
+        amount: U256,
+    },
     /// Missing asset in the context.
     #[error("No recipients of asset when taking from context")]
-    MissingAsset { chain_id: u64, asset: Address },
+    MissingAsset {
+        /// The chain ID on which the asset is deployed.
+        chain_id: u64,
+        /// The asset we expected to be in the context.
+        asset: Address,
+    },
 }

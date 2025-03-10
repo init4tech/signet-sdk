@@ -26,7 +26,7 @@ pub struct SignetCallBundle {
 
 impl SignetCallBundle {
     /// Returns the host fills for this bundle.
-    pub fn host_fills(&self) -> &BTreeMap<Address, BTreeMap<Address, U256>> {
+    pub const fn host_fills(&self) -> &BTreeMap<Address, BTreeMap<Address, U256>> {
         &self.host_fills
     }
 
@@ -36,32 +36,32 @@ impl SignetCallBundle {
     }
 
     /// Returns the block number for this bundle.
-    pub fn block_number(&self) -> u64 {
+    pub const fn block_number(&self) -> u64 {
         self.bundle.block_number
     }
 
     /// Returns the state block number for this bundle.
-    pub fn state_block_number(&self) -> BlockNumberOrTag {
+    pub const fn state_block_number(&self) -> BlockNumberOrTag {
         self.bundle.state_block_number
     }
 
     /// Returns the timestamp for this bundle.
-    pub fn timestamp(&self) -> Option<u64> {
+    pub const fn timestamp(&self) -> Option<u64> {
         self.bundle.timestamp
     }
 
     /// Returns the gas limit for this bundle.
-    pub fn gas_limit(&self) -> Option<u64> {
+    pub const fn gas_limit(&self) -> Option<u64> {
         self.bundle.gas_limit
     }
 
     /// Returns the difficulty for this bundle.
-    pub fn difficulty(&self) -> Option<U256> {
+    pub const fn difficulty(&self) -> Option<U256> {
         self.bundle.difficulty
     }
 
     /// Returns the base fee for this bundle.
-    pub fn base_fee(&self) -> Option<u128> {
+    pub const fn base_fee(&self) -> Option<u128> {
         self.bundle.base_fee
     }
 
@@ -279,17 +279,17 @@ impl SignetEthBundle {
     }
 
     /// Returns the block number for this bundle.
-    pub fn block_number(&self) -> u64 {
+    pub const fn block_number(&self) -> u64 {
         self.bundle.block_number
     }
 
     /// Returns the minimum timestamp for this bundle.
-    pub fn min_timestamp(&self) -> Option<u64> {
+    pub const fn min_timestamp(&self) -> Option<u64> {
         self.bundle.min_timestamp
     }
 
     /// Returns the maximum timestamp for this bundle.
-    pub fn max_timestamp(&self) -> Option<u64> {
+    pub const fn max_timestamp(&self) -> Option<u64> {
         self.bundle.max_timestamp
     }
 
@@ -305,11 +305,12 @@ impl SignetEthBundle {
 }
 
 /// Response for `signet_sendBundle`
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignetEthBundleResponse {
     /// The bundle hash of the sent bundle.
     ///
-    /// This is calculated as keccak256(tx_hashes) where tx_hashes are the concatenated transaction hashes.
+    /// This is calculated as keccak256(tx_hashes) where tx_hashes are the
+    /// concatenated transaction hashes.
     pub bundle_hash: B256,
 }

@@ -82,12 +82,12 @@ impl<T> OrderDetector<T> {
     }
 
     /// Get a reference to the framed [`RollupOrders::Order`] events.
-    pub fn orders(&self) -> &FramedOrders {
+    pub const fn orders(&self) -> &FramedOrders {
         &self.orders
     }
 
     /// Get a reference to the framed [`RollupOrders::Filled`] events.
-    pub fn filleds(&self) -> &FramedFilleds {
+    pub const fn filleds(&self) -> &FramedFilleds {
         &self.filleds
     }
 
@@ -97,7 +97,7 @@ impl<T> OrderDetector<T> {
     }
 
     /// Get a reference to the inner inspector.
-    pub fn inner(&self) -> &T {
+    pub const fn inner(&self) -> &T {
         &self.inner
     }
 }

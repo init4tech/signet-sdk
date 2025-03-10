@@ -12,7 +12,7 @@ pub struct PairedHeights {
 
 impl PairedHeights {
     /// Create a new [`PairedHeights`] instance.
-    pub fn new(host: u64, rollup: u64) -> Self {
+    pub const fn new(host: u64, rollup: u64) -> Self {
         Self { host, rollup }
     }
 }

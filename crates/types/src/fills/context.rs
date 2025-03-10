@@ -52,7 +52,7 @@ impl MarketContext {
     }
 
     /// Create a new market context with fills.
-    pub fn with_fills(fills: HashMap<(u64, Address), HashMap<Address, U256>>) -> Self {
+    pub const fn with_fills(fills: HashMap<(u64, Address), HashMap<Address, U256>>) -> Self {
         Self { fills }
     }
 
@@ -208,7 +208,7 @@ impl MarketContext {
     }
 
     /// Borrow the current fill mapping.
-    pub fn fills(&self) -> &HashMap<(u64, Address), HashMap<Address, U256>> {
+    pub const fn fills(&self) -> &HashMap<(u64, Address), HashMap<Address, U256>> {
         &self.fills
     }
 

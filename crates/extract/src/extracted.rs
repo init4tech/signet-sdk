@@ -35,7 +35,7 @@ impl<T> std::ops::Deref for ExtractedEvent<'_, T> {
 
 impl<T> ExtractedEvent<'_, T> {
     /// Get the transaction hash of the extracted event.
-    pub fn tx_hash(&self) -> TxHash {
+    pub const fn tx_hash(&self) -> TxHash {
         self.tx_hash
     }
 
@@ -47,13 +47,13 @@ impl<T> ExtractedEvent<'_, T> {
 
 impl<'a> ExtractedEvent<'a, Events> {
     /// True if the event is an [`Passage::EnterToken`].
-    pub fn is_enter_token(&self) -> bool {
+    pub const fn is_enter_token(&self) -> bool {
         self.event.is_enter_token()
     }
 
     /// Attempt to convert this event into an [`Passage::EnterToken`]. If the
     /// event is not an [`Passage::EnterToken`], it will return `None`.
-    pub fn as_enter_token(&self) -> Option<&Passage::EnterToken> {
+    pub const fn as_enter_token(&self) -> Option<&Passage::EnterToken> {
         self.event.as_enter_token()
     }
 
@@ -75,14 +75,14 @@ impl<'a> ExtractedEvent<'a, Events> {
     }
 
     /// True if the event is an [`Passage::Enter`].
-    pub fn is_enter(&self) -> bool {
+    pub const fn is_enter(&self) -> bool {
         self.event.is_enter()
     }
 
     /// Get a refernce to the inner event, if it is an [`Enter`].
     ///
     /// [`Enter`]: Passage::Enter
-    pub fn as_enter(&self) -> Option<&Passage::Enter> {
+    pub const fn as_enter(&self) -> Option<&Passage::Enter> {
         self.event.as_enter()
     }
 
@@ -104,14 +104,14 @@ impl<'a> ExtractedEvent<'a, Events> {
     }
 
     /// True if the event is an [`Zenith::BlockSubmitted`].
-    pub fn is_block_submitted(&self) -> bool {
+    pub const fn is_block_submitted(&self) -> bool {
         self.event.is_block_submitted()
     }
 
     /// Get a refernce to the inner event, if it is an [`BlockSubmitted`].
     ///
     /// [`BlockSubmitted`]: Zenith::BlockSubmitted
-    pub fn as_block_submitted(&self) -> Option<&Zenith::BlockSubmitted> {
+    pub const fn as_block_submitted(&self) -> Option<&Zenith::BlockSubmitted> {
         self.event.as_block_submitted()
     }
 
@@ -135,12 +135,12 @@ impl<'a> ExtractedEvent<'a, Events> {
     }
 
     /// True if the event is an [`Transactor::Transact`].
-    pub fn is_transact(&self) -> bool {
+    pub const fn is_transact(&self) -> bool {
         self.event.is_transact()
     }
 
     /// Get a refernce to the inner event, if it is an [`Transactor::Transact`].
-    pub fn as_transact(&self) -> Option<&Transactor::Transact> {
+    pub const fn as_transact(&self) -> Option<&Transactor::Transact> {
         self.event.as_transact()
     }
 
@@ -162,12 +162,12 @@ impl<'a> ExtractedEvent<'a, Events> {
     }
 
     /// True if the event is an [`RollupOrders::Filled`].
-    pub fn is_filled(&self) -> bool {
+    pub const fn is_filled(&self) -> bool {
         self.event.is_filled()
     }
 
     /// Get a refernce to the inner event, if it is an [`RollupOrders::Filled`].
-    pub fn as_filled(&self) -> Option<&RollupOrders::Filled> {
+    pub const fn as_filled(&self) -> Option<&RollupOrders::Filled> {
         self.event.as_filled()
     }
 

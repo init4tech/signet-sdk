@@ -44,7 +44,7 @@ impl Extracts<'_> {
     /// True if the host block contains a [`BlockSubmitted`] event.
     ///
     /// [`BlockSubmitted`]: Zenith::BlockSubmitted
-    pub fn contains_block(&self) -> bool {
+    pub const fn contains_block(&self) -> bool {
         self.submitted.is_some()
     }
 
