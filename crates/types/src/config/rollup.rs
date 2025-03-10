@@ -37,13 +37,7 @@ impl RollupConfig {
         base_fee_recipient: Address,
         tokens: PredeployTokens,
     ) -> Self {
-        Self {
-            chain_id,
-            orders,
-            passage,
-            base_fee_recipient,
-            tokens,
-        }
+        Self { chain_id, orders, passage, base_fee_recipient, tokens }
     }
 
     /// Load the constants from a [`Genesis`].

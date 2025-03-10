@@ -173,13 +173,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let (receipts, senders, _) = self.output.into_parts();
 
         let block = RecoveredBlock::new(
-            Block::new(
-                header,
-                BlockBody {
-                    transactions: self.processed,
-                    ..Default::default()
-                },
-            ),
+            Block::new(header, BlockBody { transactions: self.processed, ..Default::default() }),
             senders,
             hash,
         );
@@ -214,10 +208,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
     /// Coinbase of the current block.
     pub fn beneficiary(&self) -> Address {
-        self.extracts
-            .ru_header()
-            .map(|h| h.rewardAddress)
-            .unwrap_or(self.parent.beneficiary)
+        self.extracts.ru_header().map(|h| h.rewardAddress).unwrap_or(self.parent.beneficiary)
     }
 
     /// Base fee beneficiary of the current block.
@@ -227,10 +218,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
     /// Gas limit of the current block.
     pub fn gas_limit(&self) -> u64 {
-        self.extracts
-            .ru_header()
-            .map(|h| h.gas_limit())
-            .unwrap_or(self.parent.gas_limit)
+        self.extracts.ru_header().map(|h| h.gas_limit()).unwrap_or(self.parent.gas_limit)
     }
 
     /// Base fee of the current block.
@@ -275,11 +263,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// Make a receipt for an enter.
     fn make_enter_receipt(&self) -> alloy::consensus::Receipt {
         let cumulative_gas_used = self.cumulative_gas_used().saturating_add(BASE_GAS as u64);
-        alloy::consensus::Receipt {
-            status: true.into(),
-            cumulative_gas_used,
-            logs: vec![],
-        }
+        alloy::consensus::Receipt { status: true.into(), cumulative_gas_used, logs: vec![] }
     }
 
     /// Construct a block header for DB and evm execution.
@@ -325,17 +309,13 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         tx: TransactionSigned,
     ) -> RunTxResult<'c, Db, Self, Ext> {
         // Taking these clears the context for reuse.
-        let (aggregate, market_context) = trevm
-            .inner_mut_unchecked()
-            .context
-            .external
-            .take_aggregate();
+        let (aggregate, market_context) =
+            trevm.inner_mut_unchecked().context.external.take_aggregate();
 
         // We check the market context here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
-        if let Err(err) = self
-            .working_context
-            .checked_remove_ru_tx_events(&market_context, &aggregate)
+        if let Err(err) =
+            self.working_context.checked_remove_ru_tx_events(&market_context, &aggregate)
         {
             tracing::debug!(%err, "Discarding transaction outcome due to market error");
             return Ok(trevm.reject());
@@ -441,9 +421,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         // Doing it this way is slightly more efficient than incrementing the
         // nonce in the loop.
         let nonce = unwrap_or_trevm_err!(
-            trevm
-                .try_read_nonce(MINTER_ADDRESS)
-                .map_err(EVMError::Database),
+            trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database),
             trevm
         );
         unwrap_or_trevm_err!(
@@ -459,9 +437,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
             // Increase the balance
             unwrap_or_trevm_err!(
-                trevm
-                    .try_increase_balance_unchecked(recipient, amount)
-                    .map_err(EVMError::Database),
+                trevm.try_increase_balance_unchecked(recipient, amount).map_err(EVMError::Database),
                 trevm
             );
 
@@ -508,9 +484,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
         // Load the nonce as well
         let nonce = unwrap_or_trevm_err!(
-            trevm
-                .try_read_nonce(MINTER_ADDRESS)
-                .map_err(EVMError::Database),
+            trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database),
             trevm
         );
 
@@ -566,15 +540,10 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         };
 
         let sender = self.extracts.transacts[idx].event.sender;
-        let nonce = unwrap_or_trevm_err!(
-            trevm.try_read_nonce(sender).map_err(EVMError::Database),
-            trevm
-        );
+        let nonce =
+            unwrap_or_trevm_err!(trevm.try_read_nonce(sender).map_err(EVMError::Database), trevm);
 
-        let to_execute = Transact {
-            transact: &self.extracts.transacts[idx],
-            nonce,
-        };
+        let to_execute = Transact { transact: &self.extracts.transacts[idx], nonce };
 
         let mut t = run_tx_early_return!(self, trevm, &self.extracts.transacts[idx].event, sender);
 
@@ -686,11 +655,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
 impl trevm::Cfg for SignetDriver<'_, '_> {
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnv) {
-        let CfgEnv {
-            chain_id,
-            perf_analyse_created_bytecodes,
-            ..
-        } = cfg_env;
+        let CfgEnv { chain_id, perf_analyse_created_bytecodes, .. } = cfg_env;
         *chain_id = self.extracts.chain_id;
         *perf_analyse_created_bytecodes = AnalysisKind::Analyse;
     }
@@ -782,10 +747,8 @@ impl trevm::Block for SignetDriver<'_, '_> {
         *basefee = U256::from(self.base_fee());
         *difficulty = self.extracts.host_block.difficulty;
         *prevrandao = Some(self.extracts.host_block.mix_hash);
-        *blob_excess_gas_and_price = Some(BlobExcessGasAndPrice {
-            excess_blob_gas: 0,
-            blob_gasprice: 0,
-        });
+        *blob_excess_gas_and_price =
+            Some(BlobExcessGasAndPrice { excess_blob_gas: 0, blob_gasprice: 0 });
     }
 }
 
@@ -821,11 +784,7 @@ mod test {
         RecoveredBlock::new(
             Block::new(
                 header,
-                BlockBody {
-                    transactions: vec![],
-                    ommers: vec![],
-                    withdrawals: None,
-                },
+                BlockBody { transactions: vec![], ommers: vec![], withdrawals: None },
             ),
             vec![],
             hash,
@@ -875,11 +834,7 @@ mod test {
         fn new() -> Self {
             let wallets = (1..=10).map(make_wallet).collect::<Vec<_>>();
 
-            Self {
-                wallets,
-                nonces: [0; 10],
-                sequence: 1,
-            }
+            Self { wallets, nonces: [0; 10], sequence: 1 }
         }
 
         fn driver<'a, 'b>(
@@ -887,12 +842,8 @@ mod test {
             extracts: &'a mut Extracts<'b>,
             txns: Vec<TransactionSigned>,
         ) -> SignetDriver<'a, 'b> {
-            let (header, hash) = Header {
-                gas_limit: 30_000_000,
-                ..Default::default()
-            }
-            .seal_slow()
-            .into_parts();
+            let (header, hash) =
+                Header { gas_limit: 30_000_000, ..Default::default() }.seal_slow().into_parts();
             SignetDriver::new(
                 extracts,
                 txns.into(),
@@ -1003,10 +954,7 @@ mod test {
 
         // Assert that the EVM balance increased
         assert_eq!(sealed_block.senders().len(), 2);
-        assert_eq!(
-            sealed_block.body().transactions().collect::<Vec<_>>(),
-            vec![&tx1, &tx2]
-        );
+        assert_eq!(sealed_block.body().transactions().collect::<Vec<_>>(), vec![&tx1, &tx2]);
         assert_eq!(receipts.len(), 2);
 
         assert_eq!(trevm.read_balance(to), U256::from(100));
@@ -1031,10 +979,7 @@ mod test {
         let (sealed_block, receipts) = driver.finish();
 
         assert_eq!(sealed_block.senders().len(), 1);
-        assert_eq!(
-            sealed_block.body().transactions().collect::<Vec<_>>(),
-            vec![&tx]
-        );
+        assert_eq!(sealed_block.body().transactions().collect::<Vec<_>>(), vec![&tx]);
         assert_eq!(receipts.len(), 1);
         assert_eq!(trevm.read_balance(to), U256::from(100));
         assert_eq!(trevm.read_nonce(sender), 1);
@@ -1053,10 +998,7 @@ mod test {
         let (sealed_block, receipts) = driver.finish();
 
         assert_eq!(sealed_block.senders().len(), 1);
-        assert_eq!(
-            sealed_block.body().transactions().collect::<Vec<_>>(),
-            vec![&tx]
-        );
+        assert_eq!(sealed_block.body().transactions().collect::<Vec<_>>(), vec![&tx]);
         assert_eq!(receipts.len(), 1);
         assert_eq!(trevm.read_balance(to), U256::from(200));
     }
@@ -1095,11 +1037,7 @@ mod test {
         assert_eq!(sealed_block.senders().len(), 1);
         assert_eq!(
             sealed_block.body().transactions().collect::<Vec<_>>(),
-            vec![&Enter {
-                enter: &extracts.enters[0],
-                nonce: 0
-            }
-            .to_reth()]
+            vec![&Enter { enter: &extracts.enters[0], nonce: 0 }.to_reth()]
         );
         assert_eq!(receipts.len(), 1);
         assert_eq!(trevm.read_balance(user), U256::from(100));
@@ -1160,16 +1098,8 @@ mod test {
         assert_eq!(
             sealed_block.body().transactions().collect::<Vec<_>>(),
             vec![
-                &Enter {
-                    enter: &extracts.enters[0],
-                    nonce: 0
-                }
-                .to_reth(),
-                &Transact {
-                    transact: &extracts.transacts[0],
-                    nonce: 0
-                }
-                .to_reth()
+                &Enter { enter: &extracts.enters[0], nonce: 0 }.to_reth(),
+                &Transact { transact: &extracts.transacts[0], nonce: 0 }.to_reth()
             ]
         );
         assert_eq!(receipts.len(), 2);

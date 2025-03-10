@@ -58,11 +58,7 @@ impl MarketContext {
 
     /// Get the fill balance a specific asset for a specific user.
     pub fn filled(&self, output_asset: &(u64, Address), recipient: Address) -> U256 {
-        self.fills
-            .get(output_asset)
-            .and_then(|m| m.get(&recipient))
-            .copied()
-            .unwrap_or_default()
+        self.fills.get(output_asset).and_then(|m| m.get(&recipient)).copied().unwrap_or_default()
     }
 
     /// Check if the context has enough filled for the asset, recipient, and
@@ -93,12 +89,7 @@ impl MarketContext {
         recipient: Address,
         amount: U256,
     ) {
-        let entry = self
-            .fills
-            .entry((chain_id, asset))
-            .or_default()
-            .entry(recipient)
-            .or_default();
+        let entry = self.fills.entry((chain_id, asset)).or_default().entry(recipient).or_default();
         *entry = entry.saturating_add(amount);
     }
 
@@ -115,9 +106,7 @@ impl MarketContext {
     /// This uses saturating arithmetic to avoid panics. If filling more than
     /// [`U256::MAX`], re-examine life choices and don't do that.
     pub fn add_fill(&mut self, chain_id: u64, fill: &RollupOrders::Filled) {
-        fill.outputs
-            .iter()
-            .for_each(|o| self.add_fill_output(chain_id, o));
+        fill.outputs.iter().for_each(|o| self.add_fill_output(chain_id, o));
     }
 
     /// Absorb the fills from another context.
@@ -158,12 +147,10 @@ impl MarketContext {
     ) -> Result<(), MarketError> {
         for (output_asset, recipients) in aggregate.outputs.iter() {
             let context_recipients =
-                self.fills
-                    .get_mut(output_asset)
-                    .ok_or(MarketError::MissingAsset {
-                        chain_id: output_asset.0,
-                        asset: output_asset.1,
-                    })?;
+                self.fills.get_mut(output_asset).ok_or(MarketError::MissingAsset {
+                    chain_id: output_asset.0,
+                    asset: output_asset.1,
+                })?;
 
             for (recipient, amount) in recipients {
                 let filled = context_recipients.get_mut(recipient).unwrap();
@@ -183,10 +170,8 @@ impl MarketContext {
         self.check_aggregate(aggregate)?;
 
         for (output_asset, recipients) in aggregate.outputs.iter() {
-            let context_recipients = self
-                .fills
-                .get_mut(output_asset)
-                .expect("checked in check_aggregate");
+            let context_recipients =
+                self.fills.get_mut(output_asset).expect("checked in check_aggregate");
 
             for (recipient, amount) in recipients {
                 let filled = context_recipients.get_mut(recipient).unwrap();
@@ -241,10 +226,7 @@ impl MarketContext {
         aggregate: &AggregateOrders,
     ) -> Result<(), MarketError> {
         // Check the aggregate against the combined contexts.
-        let combined = CombinedContext {
-            context: self,
-            extra: fills,
-        };
+        let combined = CombinedContext { context: self, extra: fills };
 
         combined.check_aggregate(aggregate)?;
 
@@ -324,94 +306,47 @@ mod test {
         let asset_b = Address::with_last_byte(4);
 
         // The orders contain the minimum amount for the fill.
-        let a_to_a = Output {
-            token: asset_a,
-            amount: U256::from(100),
-            recipient: user_a,
-            chainId: 1,
-        };
-        let b_to_b = Output {
-            token: asset_b,
-            amount: U256::from(200),
-            recipient: user_b,
-            chainId: 1,
-        };
-        let a_to_b = Output {
-            token: asset_a,
-            amount: U256::from(300),
-            recipient: user_b,
-            chainId: 1,
-        };
+        let a_to_a =
+            Output { token: asset_a, amount: U256::from(100), recipient: user_a, chainId: 1 };
+        let b_to_b =
+            Output { token: asset_b, amount: U256::from(200), recipient: user_b, chainId: 1 };
+        let a_to_b =
+            Output { token: asset_a, amount: U256::from(300), recipient: user_b, chainId: 1 };
 
-        let fill = Filled {
-            outputs: vec![a_to_a, b_to_b, a_to_b],
-        };
+        let fill = Filled { outputs: vec![a_to_a, b_to_b, a_to_b] };
 
-        let order = Order {
-            deadline: U256::ZERO,
-            inputs: vec![],
-            outputs: vec![a_to_a, b_to_b, a_to_b],
-        };
+        let order =
+            Order { deadline: U256::ZERO, inputs: vec![], outputs: vec![a_to_a, b_to_b, a_to_b] };
 
         let mut context = MarketContext::default();
         context.add_fill(1, &fill);
 
         assert_eq!(context.fills().len(), 2);
         assert_eq!(
-            context
-                .fills()
-                .get(&(1, asset_a))
-                .unwrap()
-                .get(&user_a)
-                .unwrap(),
+            context.fills().get(&(1, asset_a)).unwrap().get(&user_a).unwrap(),
             &U256::from(100)
         );
         assert_eq!(
-            context
-                .fills()
-                .get(&(1, asset_b))
-                .unwrap()
-                .get(&user_b)
-                .unwrap(),
+            context.fills().get(&(1, asset_b)).unwrap().get(&user_b).unwrap(),
             &U256::from(200)
         );
         assert_eq!(
-            context
-                .fills()
-                .get(&(1, asset_a))
-                .unwrap()
-                .get(&user_b)
-                .unwrap(),
+            context.fills().get(&(1, asset_a)).unwrap().get(&user_b).unwrap(),
             &U256::from(300)
         );
 
         context.checked_remove_order(&order).unwrap();
         assert_eq!(context.fills().len(), 2);
         assert_eq!(
-            context
-                .fills()
-                .get(&(1, asset_a))
-                .unwrap()
-                .get(&user_a)
-                .unwrap(),
+            context.fills().get(&(1, asset_a)).unwrap().get(&user_a).unwrap(),
             &U256::from(0)
         );
         assert_eq!(
-            context
-                .fills()
-                .get(&(1, asset_b))
-                .unwrap()
-                .get(&user_b)
-                .unwrap(),
+            context.fills().get(&(1, asset_b)).unwrap().get(&user_b).unwrap(),
             &U256::from(0)
         );
         assert_eq!(
-            context
-                .fills()
-                .get(&(1, asset_a))
-                .unwrap()
-                .get(&user_b)
-                .unwrap(),
+            context.fills().get(&(1, asset_a)).unwrap().get(&user_b).unwrap(),
             &U256::from(0)
         );
     }

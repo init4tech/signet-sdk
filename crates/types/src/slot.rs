@@ -14,29 +14,17 @@ pub struct SlotCalculator {
 impl SlotCalculator {
     /// Creates a new slot calculator.
     pub const fn new(start_timestamp: u64, slot_offset: u64, slot_duration: u64) -> Self {
-        Self {
-            start_timestamp,
-            slot_offset,
-            slot_duration,
-        }
+        Self { start_timestamp, slot_offset, slot_duration }
     }
 
     /// Creates a new slot calculator for Holesky.
     pub const fn holesky() -> Self {
-        Self {
-            start_timestamp: 1695902400,
-            slot_offset: 0,
-            slot_duration: 12,
-        }
+        Self { start_timestamp: 1695902400, slot_offset: 0, slot_duration: 12 }
     }
 
     /// Creates a new slot calculator for Ethereum mainnet.
     pub const fn mainnet() -> Self {
-        Self {
-            start_timestamp: 1663224179,
-            slot_offset: 4700013,
-            slot_duration: 12,
-        }
+        Self { start_timestamp: 1663224179, slot_offset: 4700013, slot_duration: 12 }
     }
 
     /// Calculates the slot for a given timestamp.

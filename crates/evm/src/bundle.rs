@@ -70,12 +70,7 @@ impl SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse> {
             })
         });
 
-        Self {
-            bundle,
-            response: Default::default(),
-            context,
-            host_chain_id,
-        }
+        Self { bundle, response: Default::default(), context, host_chain_id }
     }
 
     /// Take the response from the bundle driver. This consumes
@@ -141,9 +136,7 @@ impl<B, R> SignetBundleDriver<B, R> {
         execution_result: ExecutionResult,
     ) -> Result<(EthCallBundleTransactionResult, U256), SignetBundleError<Db>> {
         if let TxEnvelope::Eip4844(_) = tx {
-            return Err(SignetBundleError::BundleError(
-                BundleError::UnsupportedTransactionType,
-            ));
+            return Err(SignetBundleError::BundleError(BundleError::UnsupportedTransactionType));
         }
 
         let from_address = tx.recover_signer().map_err(|e| {
@@ -218,22 +211,12 @@ impl<I> BundleDriver<OrderDetector<I>>
         );
 
         // Check if the bundle has any transactions
-        trevm_ensure!(
-            !self.bundle.bundle.txs.is_empty(),
-            trevm,
-            BundleError::BundleEmpty.into()
-        );
+        trevm_ensure!(!self.bundle.bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
 
         // Check if the state block number is valid (not 0, and not a tag)
         trevm_ensure!(
             self.bundle.bundle.state_block_number.is_number()
-                && self
-                    .bundle
-                    .bundle
-                    .state_block_number
-                    .as_number()
-                    .unwrap_or(0)
-                    != 0,
+                && self.bundle.bundle.state_block_number.as_number().unwrap_or(0) != 0,
             trevm,
             BundleError::BlockNumberMismatch.into()
         );

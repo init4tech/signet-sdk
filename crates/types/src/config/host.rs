@@ -43,15 +43,7 @@ impl HostConfig {
         transactor: Address,
         tokens: PredeployTokens,
     ) -> Self {
-        Self {
-            chain_id,
-            deploy_height,
-            zenith,
-            orders,
-            passage,
-            transactor,
-            tokens,
-        }
+        Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
     }
 
     /// Load the constants from a [`Genesis`].

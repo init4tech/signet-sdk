@@ -44,9 +44,7 @@ impl Transact<'_, '_> {
     /// information.
     pub(crate) fn magic_sig(&self) -> MagicSig {
         MagicSig {
-            ty: MagicSigInfo::Transact {
-                sender: self.transact.sender(),
-            },
+            ty: MagicSigInfo::Transact { sender: self.transact.sender() },
             txid: self.transact.tx_hash(),
             event_idx: self.transact.log_index,
         }
@@ -214,11 +212,6 @@ impl ToRethPrimitive for ReceiptEnvelope {
             _ => panic!("unsupported receipt type"),
         };
 
-        reth::primitives::Receipt {
-            tx_type,
-            success,
-            cumulative_gas_used,
-            logs: r.receipt.logs,
-        }
+        reth::primitives::Receipt { tx_type, success, cumulative_gas_used, logs: r.receipt.logs }
     }
 }

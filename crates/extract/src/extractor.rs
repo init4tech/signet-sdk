@@ -17,9 +17,7 @@ pub struct Extractor {
 impl Extractor {
     /// Create a new [`Extractor`] from system constants.
     pub const fn new(constants: &SignetSystemConstants) -> Self {
-        Self {
-            constants: *constants,
-        }
+        Self { constants: *constants }
     }
 
     /// Extract a [`Events`] from a log, checking the chain ID.
@@ -56,23 +54,17 @@ impl Extractor {
         block: &'b RecoveredBlock<Block>,
         receipts: &'b [Receipt],
     ) -> impl Iterator<Item = ExtractedEvent<'c>> {
-        block
-            .body()
-            .transactions
-            .iter()
-            .zip(receipts.iter())
-            .flat_map(|(tx, receipt)| {
-                let tx_hash = tx.hash();
+        block.body().transactions.iter().zip(receipts.iter()).flat_map(|(tx, receipt)| {
+            let tx_hash = tx.hash();
 
-                self.extract_receipt(receipt)
-                    .map(move |(log_index, event)| ExtractedEvent {
-                        tx,
-                        tx_hash: *tx_hash,
-                        receipt,
-                        log_index,
-                        event,
-                    })
+            self.extract_receipt(receipt).map(move |(log_index, event)| ExtractedEvent {
+                tx,
+                tx_hash: *tx_hash,
+                receipt,
+                log_index,
+                event,
             })
+        })
     }
 
     /// Get the Zenith outputs from a chain. This function does the following:
@@ -91,10 +83,7 @@ impl Extractor {
             .filter(|(block, _)| block.number > self.constants.host_deploy_height())
             .map(move |(block, receipts)| {
                 let height = block.number;
-                let ru_height = self
-                    .constants
-                    .host_block_to_rollup_block_num(height)
-                    .unwrap();
+                let ru_height = self.constants.host_block_to_rollup_block_num(height).unwrap();
                 let host_block = block;
                 let mut context = MarketContext::new();
                 let mut enters = vec![];
@@ -124,17 +113,13 @@ impl Extractor {
                             .push(event.try_into_transact().expect("checked by match guard")),
                         Events::BlockSubmitted(_) => {
                             submitted = Some(
-                                event
-                                    .try_into_block_submitted()
-                                    .expect("checked by match guard"),
+                                event.try_into_block_submitted().expect("checked by match guard"),
                             );
                         }
                         Events::EnterToken(enter) => {
                             if self.constants.is_host_token(enter.token) {
                                 enter_tokens.push(
-                                    event
-                                        .try_into_enter_token()
-                                        .expect("checked by match guard"),
+                                    event.try_into_enter_token().expect("checked by match guard"),
                                 );
                             }
                         }

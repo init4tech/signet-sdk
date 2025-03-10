@@ -61,21 +61,12 @@ impl<T> OrderDetector<T> {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and an inner inspector.
     pub fn new_with_inspector(contract: Address, chain_id: u64, inner: T) -> Self {
-        Self {
-            contract,
-            chain_id,
-            orders: Default::default(),
-            filleds: Default::default(),
-            inner,
-        }
+        Self { contract, chain_id, orders: Default::default(), filleds: Default::default(), inner }
     }
 
     /// Take the orders from the inspector, clearing it.
     pub fn take(&mut self) -> (FramedOrders, FramedFilleds) {
-        (
-            std::mem::take(&mut self.orders),
-            std::mem::take(&mut self.filleds),
-        )
+        (std::mem::take(&mut self.orders), std::mem::take(&mut self.filleds))
     }
 
     /// Take the orders from the inspector, clearing it, and convert them to

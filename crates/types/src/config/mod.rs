@@ -37,11 +37,8 @@ impl SignetSystemConstants {
     /// Load the constants from a [`Genesis`].
     pub fn try_from_genesis(genesis: &Genesis) -> Result<Self, ConfigError> {
         let k = "signetConstants";
-        let constants = genesis
-            .config
-            .extra_fields
-            .get(k)
-            .ok_or_else(|| ConfigError::missing(k))?;
+        let constants =
+            genesis.config.extra_fields.get(k).ok_or_else(|| ConfigError::missing(k))?;
         serde_json::from_value(constants.clone()).map_err(Into::into)
     }
 
@@ -99,19 +96,13 @@ impl SignetSystemConstants {
 
     /// Pair the RU height with the host height.
     pub const fn pair_ru(&self, ru_height: u64) -> PairedHeights {
-        PairedHeights {
-            host: self.rollup_block_to_host_block_num(ru_height),
-            rollup: ru_height,
-        }
+        PairedHeights { host: self.rollup_block_to_host_block_num(ru_height), rollup: ru_height }
     }
 
     /// Pair the host height with the RU height.
     pub fn pair_host(&self, host_height: u64) -> Option<PairedHeights> {
         let rollup_height = self.host_block_to_rollup_block_num(host_height)?;
-        Some(PairedHeights {
-            host: host_height,
-            rollup: rollup_height,
-        })
+        Some(PairedHeights { host: host_height, rollup: rollup_height })
     }
 
     /// Get the host zenith address.
@@ -184,10 +175,7 @@ impl SignetSystemConstants {
     ///
     /// Returns `None` if the address is not a pre-deployed token.
     pub fn rollup_token_from_host_address(&self, host_address: Address) -> Option<Address> {
-        self.host
-            .tokens()
-            .token_for(host_address)
-            .map(|t| self.rollup.tokens().address_for(t))
+        self.host.tokens().token_for(host_address).map(|t| self.rollup.tokens().address_for(t))
     }
 
     /// Get the minter address.
