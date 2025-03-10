@@ -1,0 +1,21 @@
+[package]
+name = "signet-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+alloy = { workspace = true, features = ["eips"] }
+
+trevm.workspace = true
+
+zenith-types.workspace = true
+
+hex.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
