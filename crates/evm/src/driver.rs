@@ -473,7 +473,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ) -> RunTxResult<'c, Db, Self, Ext> {
         let _span = {
             let e = &self.extracts.enter_tokens[idx];
-            tracing::debug_span!("signet::evm::execute_enter_token", idx, host_tx = %e.tx_hash, log_index = e.log_index).entered()
+            tracing::debug_span!("signet::evm::execute_enter_token", idx, host_tx = %e.tx_hash(), log_index = e.log_index).entered()
         };
 
         // Get the rollup token address from the host token address.
@@ -531,7 +531,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let _span = {
             let e = &self.extracts.transacts[idx];
             tracing::debug_span!("execute_transact_event", idx,
-                host_tx = %e.tx_hash,
+                host_tx = %e.tx_hash(),
                 log_index = e.log_index,
                 sender = %e.event.sender,
                 gas_limit = e.event.gas(),
@@ -1023,7 +1023,6 @@ mod test {
         let mut extracts = Extracts::empty(&block);
         extracts.enters.push(ExtractedEvent {
             tx: &fake_tx,
-            tx_hash: Default::default(),
             receipt: &fake_receipt,
             log_index: 0,
             event: enter,
@@ -1075,14 +1074,12 @@ mod test {
         let mut extracts = Extracts::empty(&block);
         extracts.enters.push(ExtractedEvent {
             tx: &fake_tx,
-            tx_hash: Default::default(),
             receipt: &fake_receipt,
             log_index: 0,
             event: enter,
         });
         extracts.transacts.push(ExtractedEvent {
             tx: &fake_tx,
-            tx_hash: Default::default(),
             receipt: &fake_receipt,
             log_index: 0,
             event: transact,

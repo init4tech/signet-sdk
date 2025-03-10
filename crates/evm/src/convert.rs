@@ -89,7 +89,7 @@ pub(crate) struct Enter<'a, 'b> {
 
 impl Enter<'_, '_> {
     /// Get the magic signature for the enter event.
-    pub(crate) const fn magic_sig(&self) -> MagicSig {
+    pub(crate) fn magic_sig(&self) -> MagicSig {
         MagicSig {
             ty: MagicSigInfo::Enter,
             txid: self.enter.tx_hash(),
@@ -138,7 +138,7 @@ pub(crate) struct EnterToken<'a, 'b> {
 
 impl EnterToken<'_, '_> {
     /// Get the magic signature for the enter token event.
-    pub(crate) const fn magic_sig(&self) -> MagicSig {
+    pub(crate) fn magic_sig(&self) -> MagicSig {
         MagicSig {
             ty: MagicSigInfo::EnterToken,
             txid: self.enter_token.tx_hash(),

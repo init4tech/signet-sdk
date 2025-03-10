@@ -6,9 +6,8 @@ use alloy::{
     primitives::{bytes::Buf, Address, Bytes, TxKind, U256},
     rpc::types::mev::EthCallBundleTransactionResult,
 };
-use signet_types::{
-    bundle::SignetCallBundleResponse, MarketContext, MarketError, SignetCallBundle,
-};
+use signet_bundle::{SignetCallBundle, SignetCallBundleResponse};
+use signet_types::{MarketContext, MarketError};
 use std::fmt::Debug;
 use trevm::{
     revm::{

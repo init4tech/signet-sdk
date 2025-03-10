@@ -1,5 +1,5 @@
 [package]
-name = "signet-types"
+name = "signet-bundle"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,9 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+trevm.workspace = true
 zenith-types.workspace = true
 
-alloy = { workspace = true, features = ["eips"] }
+alloy.workspace = true
 
-hex.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-thiserror.workspace = true
+serde.workspace = true
