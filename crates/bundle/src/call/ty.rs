@@ -5,6 +5,7 @@ use alloy::{
     rpc::types::mev::{EthCallBundle, EthCallBundleResponse},
 };
 use serde::{Deserialize, Serialize};
+use signet_types::MarketContext;
 use std::collections::BTreeMap;
 
 /// Bundle of transactions for `signet_callBundle`.
@@ -69,6 +70,17 @@ impl SignetCallBundle {
     /// Returns the base fee for this bundle.
     pub const fn base_fee(&self) -> Option<u128> {
         self.bundle.base_fee
+    }
+
+    /// Create a market context from the fills in this bundle.
+    pub fn make_context(&self, host_chain_id: u64) -> MarketContext {
+        let mut context = MarketContext::default();
+        self.host_fills.iter().for_each(|(asset, fills)| {
+            fills.iter().for_each(|(recipient, amount)| {
+                context.add_raw_fill(host_chain_id, *asset, *recipient, *amount)
+            })
+        });
+        context
     }
 
     /// Creates a new bundle from the given [`Encodable2718`] transactions.

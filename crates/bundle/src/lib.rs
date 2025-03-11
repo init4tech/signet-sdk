@@ -16,12 +16,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod call;
-pub use call::{SignetCallBundle, SignetCallBundleResponse};
+pub use call::{SignetBundleDriver, SignetBundleError, SignetCallBundle, SignetCallBundleResponse};
 
 mod send;
 pub use send::{SignetEthBundle, SignetEthBundleResponse};
-
-mod driver;
-pub use driver::{SignetBundleDriver, SignetBundleError};
 
 mod trevm;

@@ -47,9 +47,9 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetBundleError<Db> {
 
 /// A bundle driver for the Signet EVM.
 #[derive(Debug)]
-pub struct SignetBundleDriver {
+pub struct SignetBundleDriver<'a> {
     /// The bundle to drive.
-    bundle: SignetCallBundle,
+    bundle: &'a SignetCallBundle,
     /// The accumulated results of the bundle, if applicable.
     response: SignetCallBundleResponse,
     /// The market context.
@@ -58,17 +58,28 @@ pub struct SignetBundleDriver {
     host_chain_id: u64,
 }
 
-impl SignetBundleDriver {
+impl<'a> SignetBundleDriver<'a> {
     /// Create a new bundle driver with the given bundle and response.
-    pub fn new(bundle: SignetCallBundle, host_chain_id: u64) -> Self {
-        let mut context = MarketContext::default();
-        bundle.host_fills.iter().for_each(|(asset, fills)| {
-            fills.iter().for_each(|(recipient, amount)| {
-                context.add_raw_fill(host_chain_id, *asset, *recipient, *amount)
-            })
-        });
-
+    pub fn new(bundle: &'a SignetCallBundle, host_chain_id: u64) -> Self {
+        let context = bundle.make_context(host_chain_id);
         Self { bundle, response: Default::default(), context, host_chain_id }
+    }
+}
+
+impl SignetBundleDriver<'_> {
+    /// Get a reference to the bundle.
+    pub const fn bundle(&self) -> &SignetCallBundle {
+        &self.bundle
+    }
+
+    /// Get a reference to the response.
+    pub const fn response(&self) -> &SignetCallBundleResponse {
+        &self.response
+    }
+
+    /// Get a reference to the market context.
+    pub const fn context(&self) -> &MarketContext {
+        &self.context
     }
 
     /// Take the response from the bundle driver. This consumes
@@ -83,7 +94,8 @@ impl SignetBundleDriver {
     /// that was filled, but not required by the orders in the bundle.
     pub fn clear(&mut self) -> (SignetCallBundleResponse, MarketContext) {
         let r = std::mem::take(&mut self.response);
-        let c = std::mem::take(&mut self.context);
+        let context = self.bundle.make_context(self.host_chain_id);
+        let c = std::mem::replace(&mut self.context, context);
         (r, c)
     }
 
@@ -104,21 +116,6 @@ impl SignetBundleDriver {
         }
 
         Ok(txs)
-    }
-
-    /// Get a reference to the bundle.
-    pub const fn bundle(&self) -> &SignetCallBundle {
-        &self.bundle
-    }
-
-    /// Get a reference to the response.
-    pub const fn response(&self) -> &SignetCallBundleResponse {
-        &self.response
-    }
-
-    /// Get a reference to the market context.
-    pub const fn context(&self) -> &MarketContext {
-        &self.context
     }
 
     /// Process a bundle transaction and accumulate the results into a [`EthCallBundleTransactionResult`].
@@ -179,7 +176,7 @@ impl SignetBundleDriver {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting market context.
-impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver {
+impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
     type Error<Db: Database + DatabaseCommit> = SignetBundleError<Db>;
 
     fn run_bundle<'a, Db: Database + DatabaseCommit>(
@@ -231,7 +228,7 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver {
             .as_number()
             .unwrap_or(trevm.inner().block().number.to::<u64>());
 
-        let run_result = trevm.try_with_block(&self.bundle, |mut trevm| {
+        let run_result = trevm.try_with_block(self.bundle, |mut trevm| {
 
             // Decode and validate the transactions in the bundle
             let txs =
