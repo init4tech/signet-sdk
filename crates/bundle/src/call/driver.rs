@@ -1,5 +1,3 @@
-//! Signet's bundle driver and related bundle utilities.
-
 use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{
     consensus::{Transaction, TxEnvelope},
