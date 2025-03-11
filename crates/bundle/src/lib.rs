@@ -20,5 +20,3 @@ pub use call::{SignetBundleDriver, SignetBundleError, SignetCallBundle, SignetCa
 
 mod send;
 pub use send::{SignetEthBundle, SignetEthBundleResponse};
-
-mod trevm;
