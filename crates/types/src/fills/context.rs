@@ -240,8 +240,8 @@ impl MarketContext {
     /// This will process all fills first, and all orders second.
     pub fn checked_remove_ru_tx_events(
         &mut self,
-        fills: &MarketContext,
         aggregate: &AggregateOrders,
+        fills: &MarketContext,
     ) -> Result<(), MarketError> {
         self.check_ru_tx_events(fills, aggregate)?;
         self.absorb(fills);

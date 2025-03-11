@@ -1,20 +1,16 @@
 use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{
-    consensus::{Transaction, TxEnvelope},
+    consensus::TxEnvelope,
     eips::eip2718::Decodable2718,
-    primitives::{bytes::Buf, Address, Bytes, TxKind, U256},
-    rpc::types::mev::EthCallBundleTransactionResult,
+    primitives::{bytes::Buf, Bytes, U256},
 };
 use signet_evm::OrderDetector;
 use signet_types::{MarketContext, MarketError};
-use signet_zenith::HostOrders::{self, Output};
 use std::fmt::Debug;
 use trevm::{
-    revm::{
-        primitives::{EVMError, ExecutionResult},
-        Database, DatabaseCommit,
-    },
-    trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
+    revm::{primitives::EVMError, Database, DatabaseCommit},
+    trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError, DriveBundleResult,
+    EvmNeedsTx,
 };
 
 /// Errors that can occur when running a bundle on the Signet EVM.
@@ -115,60 +111,6 @@ impl SignetBundleDriver<'_> {
 
         Ok(txs)
     }
-
-    /// Process a bundle transaction and accumulate the results into a [`EthCallBundleTransactionResult`].
-    pub fn process_call_bundle_tx<Db: Database>(
-        tx: &TxEnvelope,
-        pre_sim_coinbase_balance: U256,
-        post_sim_coinbase_balance: U256,
-        base_fee: U256,
-        execution_result: ExecutionResult,
-    ) -> Result<(EthCallBundleTransactionResult, U256), SignetBundleError<Db>> {
-        if let TxEnvelope::Eip4844(_) = tx {
-            return Err(SignetBundleError::BundleError(BundleError::UnsupportedTransactionType));
-        }
-
-        let from_address = tx.recover_signer().map_err(|e| {
-            SignetBundleError::BundleError(BundleError::TransactionSenderRecoveryError(e))
-        })?;
-
-        // Calculate the gas price and fees
-        // Calculate the gas fees paid
-        let gas_price = U256::from(tx.effective_gas_price(Some(base_fee.saturating_to())));
-        let gas_used = execution_result.gas_used();
-        let gas_fees = gas_price * U256::from(gas_used);
-
-        // set the return data for the response
-        let (value, revert) = if execution_result.is_success() {
-            let value = execution_result.into_output().unwrap_or_default();
-            (Some(value), None)
-        } else {
-            let revert = execution_result.into_output().unwrap_or_default();
-            (None, Some(revert))
-        };
-
-        let coinbase_diff = post_sim_coinbase_balance.saturating_sub(pre_sim_coinbase_balance);
-        let eth_sent_to_coinbase = coinbase_diff.saturating_sub(gas_fees);
-
-        Ok((
-            EthCallBundleTransactionResult {
-                tx_hash: *tx.tx_hash(),
-                coinbase_diff,
-                eth_sent_to_coinbase,
-                from_address,
-                to_address: match tx.kind() {
-                    TxKind::Call(to) => Some(to),
-                    _ => Some(Address::ZERO),
-                },
-                value,
-                revert,
-                gas_used,
-                gas_price,
-                gas_fees,
-            },
-            post_sim_coinbase_balance,
-        ))
-    }
 }
 
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
@@ -179,58 +121,38 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
 
     fn run_bundle<'a, Db: Database + DatabaseCommit>(
         &mut self,
-        trevm: trevm::EvmNeedsTx<'a, OrderDetector<I>, Db>,
-    ) -> trevm::DriveBundleResult<'a, OrderDetector<I>, Db, Self> {
+        trevm: EvmNeedsTx<'a, OrderDetector<I>, Db>,
+    ) -> DriveBundleResult<'a, OrderDetector<I>, Db, Self> {
+        // convenience binding to make usage later less verbose
+        let bundle = &self.bundle.bundle;
+
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
-            trevm.inner().block().number.to::<u64>() == self.bundle.bundle.block_number,
+            trevm.inner().block().number.to::<u64>() == bundle.block_number,
             trevm,
             BundleError::BlockNumberMismatch.into()
         );
 
-        // Check if the bundle has any transactions
-        trevm_ensure!(!self.bundle.bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
+        // Ensure that the bundle has transactions
+        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
 
         // Check if the state block number is valid (not 0, and not a tag)
         trevm_ensure!(
-            self.bundle.bundle.state_block_number.is_number()
-                && self.bundle.bundle.state_block_number.as_number().unwrap_or(0) != 0,
+            bundle.state_block_number.is_number()
+                && bundle.state_block_number.as_number().unwrap_or_default() != 0,
             trevm,
             BundleError::BlockNumberMismatch.into()
         );
 
-        // Load the host fills into the context for simulation
-        for fill in self.bundle.host_fills.iter() {
-            self.context.add_fill(
-                self.host_chain_id,
-                &HostOrders::Filled {
-                    outputs: fill
-                        .1
-                        .iter()
-                        .map(|(user, amount)| Output {
-                            token: *fill.0,
-                            recipient: *user,
-                            amount: *amount,
-                            chainId: self.host_chain_id as u32,
-                        })
-                        .collect(),
-                },
-            )
-        }
-
         // Set the state block number this simulation was based on
-        self.response.state_block_number = self
-            .bundle
-            .bundle
+        self.response.state_block_number = bundle
             .state_block_number
             .as_number()
             .unwrap_or(trevm.inner().block().number.to::<u64>());
 
         let run_result = trevm.try_with_block(self.bundle, |mut trevm| {
-
             // Decode and validate the transactions in the bundle
-            let txs =
-                unwrap_or_trevm_err!(Self::decode_and_validate_txs(&self.bundle.bundle.txs), trevm);
+            let txs = unwrap_or_trevm_err!(Self::decode_and_validate_txs(&bundle.txs), trevm);
 
             // Cache the pre simulation coinbase balance, so we can use it to calculate the coinbase diff after every tx simulated.
             let initial_coinbase_balance = unwrap_or_trevm_err!(
@@ -249,64 +171,50 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
             for tx in txs.iter() {
                 let run_result = trevm.run_tx(tx);
 
-                match run_result {
-                    // return immediately if errored
-                    Err(e) => {
-                        return Err(e.map_err(|e| {
-                            SignetBundleError::BundleError(e.into())
-                        }));
-                    }
-                    // Accept + accumulate state
-                    Ok(mut res) => {
+                let mut res = run_result
+                    .map_err(|e| e.map_err(|e| SignetBundleError::BundleError(e.into())))?;
 
-                        // Check & respect market context. This MUST be done after every transaction before accepting the state.
-                        let (aggregate, mkt_ctx) =
-                            res.inner_mut_unchecked().context.external.take_aggregate();
-                        if let Err(err) = self.context.checked_remove_ru_tx_events(&mkt_ctx, &aggregate) {
-                            tracing::debug!(%err, "Discarding bundle simulation due to market error");
-                            return Err(res.errored(SignetBundleError::MarketError(err)));
-                        }
+                // Check & respect market context. This MUST be done after every transaction before accepting the state.
+                let (aggregate, mkt_ctx) =
+                    res.inner_mut_unchecked().context.external.take_aggregate();
 
-                        let (execution_result, mut committed_trevm) = res.accept();
-
-                        // Get the coinbase and basefee from the block
-                        let coinbase = committed_trevm.inner().block().coinbase;
-                        let basefee = committed_trevm.inner().block().basefee;
-
-                        // Get the post simulation coinbase balance
-                        let post_sim_coinbase_balance = unwrap_or_trevm_err!(
-                            committed_trevm.try_read_balance(coinbase).map_err(|e| {
-                                SignetBundleError::BundleError(BundleError::EVMError {
-                                    inner: trevm::revm::primitives::EVMError::Database(e),
-                                })
-                            }),
-                            committed_trevm
-                        );
-
-                        // Process the transaction and accumulate the results
-                        let (response, post_sim_coinbase_balance) = unwrap_or_trevm_err!(
-                            Self::process_call_bundle_tx(
-                                tx,
-                                pre_sim_coinbase_balance,
-                                post_sim_coinbase_balance,
-                                basefee,
-                                execution_result
-                            ),
-                            committed_trevm
-                        );
-
-                        // Accumulate overall results from response
-                        self.response.total_gas_used += response.gas_used;
-                        self.response.gas_fees += response.gas_fees;
-                        self.response.results.push(response);
-
-                        // update the coinbase balance
-                        pre_sim_coinbase_balance = post_sim_coinbase_balance;
-
-                        // Set the trevm instance to the committed one
-                        trevm = committed_trevm;
-                    }
+                if let Err(err) = self.context.checked_remove_ru_tx_events(&aggregate, &mkt_ctx) {
+                    tracing::debug!(%err, "Discarding bundle simulation due to market error");
+                    return Err(res.errored(SignetBundleError::MarketError(err)));
                 }
+
+                // Accept the tx outcome.
+                let (execution_result, mut committed_trevm) = res.accept();
+
+                // Get the coinbase and basefee from the block
+                let coinbase = committed_trevm.inner().block().coinbase;
+                let basefee = committed_trevm.inner().block().basefee;
+
+                // Get the post simulation coinbase balance
+                let post_sim_coinbase_balance = unwrap_or_trevm_err!(
+                    committed_trevm.try_read_balance(coinbase).map_err(|e| {
+                        SignetBundleError::BundleError(BundleError::EVMError {
+                            inner: trevm::revm::primitives::EVMError::Database(e),
+                        })
+                    }),
+                    committed_trevm
+                );
+
+                // Calculate the coinbase diff
+                let coinbase_diff =
+                    post_sim_coinbase_balance.saturating_sub(pre_sim_coinbase_balance);
+
+                // Accumulate the transaction
+                unwrap_or_trevm_err!(
+                    self.response.accumulate_tx(tx, coinbase_diff, basefee, execution_result),
+                    committed_trevm
+                );
+
+                // update the coinbase balance
+                pre_sim_coinbase_balance = post_sim_coinbase_balance;
+
+                // Set the trevm instance to the committed one
+                trevm = committed_trevm;
             }
 
             // Accumulate the total results
@@ -330,7 +238,7 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
 
     fn post_bundle<Db: Database + DatabaseCommit>(
         &mut self,
-        _trevm: &trevm::EvmNeedsTx<'_, OrderDetector<I>, Db>,
+        _trevm: &EvmNeedsTx<'_, OrderDetector<I>, Db>,
     ) -> Result<(), Self::Error<Db>> {
         Ok(())
     }
