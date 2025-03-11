@@ -19,3 +19,6 @@ mod bundle;
 pub use bundle::{
     SignetCallBundle, SignetCallBundleResponse, SignetEthBundle, SignetEthBundleResponse,
 };
+
+mod driver;
+pub use driver::{SignetBundleDriver, SignetBundleError};

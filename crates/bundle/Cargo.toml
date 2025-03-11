@@ -9,12 +9,17 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+signet-types.workspace = true
+signet-evm.workspace = true
+
 trevm.workspace = true
 zenith-types.workspace = true
 
 alloy.workspace = true
 
 serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

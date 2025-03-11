@@ -1,12 +1,13 @@
 //! Signet's bundle driver and related bundle utilities.
 
+use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::eip2718::Decodable2718,
     primitives::{bytes::Buf, Address, Bytes, TxKind, U256},
     rpc::types::mev::EthCallBundleTransactionResult,
 };
-use signet_bundle::{SignetCallBundle, SignetCallBundleResponse};
+use signet_evm::OrderDetector;
 use signet_types::{MarketContext, MarketError};
 use std::fmt::Debug;
 use trevm::{
@@ -17,8 +18,6 @@ use trevm::{
     trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
 };
 use zenith_types::HostOrders::{self, Output};
-
-use crate::OrderDetector;
 
 /// Errors that can occur when running a bundle on the Signet EVM.
 #[derive(thiserror::Error)]
@@ -48,18 +47,18 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetBundleError<Db> {
 
 /// A bundle driver for the Signet EVM.
 #[derive(Debug)]
-pub struct SignetBundleDriver<B, R> {
+pub struct SignetBundleDriver {
     /// The bundle to drive.
-    bundle: B,
+    bundle: SignetCallBundle,
     /// The accumulated results of the bundle, if applicable.
-    response: R,
+    response: SignetCallBundleResponse,
     /// The market context.
     context: MarketContext,
     /// The host chain id.
     host_chain_id: u64,
 }
 
-impl SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse> {
+impl SignetBundleDriver {
     /// Create a new bundle driver with the given bundle and response.
     pub fn new(bundle: SignetCallBundle, host_chain_id: u64) -> Self {
         let mut context = MarketContext::default();
@@ -87,9 +86,7 @@ impl SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse> {
         let c = std::mem::take(&mut self.context);
         (r, c)
     }
-}
 
-impl<R> SignetBundleDriver<SignetCallBundle, R> {
     /// Decode and validate the transactions in the bundle.
     pub fn decode_and_validate_txs<Db: Database>(
         txs: &[Bytes],
@@ -108,16 +105,14 @@ impl<R> SignetBundleDriver<SignetCallBundle, R> {
 
         Ok(txs)
     }
-}
 
-impl<B, R> SignetBundleDriver<B, R> {
     /// Get a reference to the bundle.
-    pub const fn bundle(&self) -> &B {
+    pub const fn bundle(&self) -> &SignetCallBundle {
         &self.bundle
     }
 
     /// Get a reference to the response.
-    pub const fn response(&self) -> &R {
+    pub const fn response(&self) -> &SignetCallBundleResponse {
         &self.response
     }
 
@@ -131,7 +126,7 @@ impl<B, R> SignetBundleDriver<B, R> {
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: U256,
         post_sim_coinbase_balance: U256,
-        basefee: U256,
+        base_fee: U256,
         execution_result: ExecutionResult,
     ) -> Result<(EthCallBundleTransactionResult, U256), SignetBundleError<Db>> {
         if let TxEnvelope::Eip4844(_) = tx {
@@ -142,19 +137,10 @@ impl<B, R> SignetBundleDriver<B, R> {
             SignetBundleError::BundleError(BundleError::TransactionSenderRecoveryError(e))
         })?;
 
-        let gas_used = execution_result.gas_used();
-
-        // Calculate the gas price
-        let gas_price = match tx {
-            TxEnvelope::Legacy(tx) => U256::from(tx.tx().gas_price),
-            TxEnvelope::Eip2930(tx) => U256::from(tx.tx().gas_price),
-            TxEnvelope::Eip1559(tx) => {
-                U256::from(tx.tx().effective_gas_price(Some(basefee.to::<u64>())))
-            }
-            _ => unreachable!(),
-        };
-
+        // Calculate the gas price and fees
         // Calculate the gas fees paid
+        let gas_price = U256::from(tx.effective_gas_price(Some(base_fee.saturating_to())));
+        let gas_used = execution_result.gas_used();
         let gas_fees = gas_price * U256::from(gas_used);
 
         // set the return data for the response
@@ -193,9 +179,7 @@ impl<B, R> SignetBundleDriver<B, R> {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting market context.
-impl<I> BundleDriver<OrderDetector<I>>
-    for SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse>
-{
+impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver {
     type Error<Db: Database + DatabaseCommit> = SignetBundleError<Db>;
 
     fn run_bundle<'a, Db: Database + DatabaseCommit>(
