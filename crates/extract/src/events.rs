@@ -2,7 +2,7 @@ use alloy::{
     primitives::{Log, LogData},
     sol_types::SolEventInterface,
 };
-use zenith_types::{
+use signet_zenith::{
     Passage::{self, PassageEvents},
     RollupOrders::{self, RollupOrdersEvents},
     Transactor::{self, TransactorEvents},

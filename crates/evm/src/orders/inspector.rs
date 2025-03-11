@@ -11,7 +11,7 @@ use trevm::revm::{
     },
     Database, EvmContext, Inspector,
 };
-use zenith_types::RollupOrders;
+use signet_zenith::RollupOrders;
 
 /// Inspector used to detect Signet Orders and inform the builder of the
 /// fill requirements.
@@ -90,7 +90,7 @@ impl<T> OrderDetector<T> {
 
     /// Take the orders from the inspector, clearing it, and convert them to
     /// aggregate orders.
-    pub fn take_aggregate(&mut self) -> (zenith_types::AggregateOrders, MarketContext) {
+    pub fn take_aggregate(&mut self) -> (signet_zenith::AggregateOrders, MarketContext) {
         let (orders, filleds) = self.take();
         (orders.aggregate(), filleds.aggregate(self.chain_id()))
     }

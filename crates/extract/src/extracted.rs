@@ -3,7 +3,7 @@ use alloy::{
     primitives::{Log, TxHash, U256},
 };
 use reth::primitives::{Receipt, TransactionSigned};
-use zenith_types::{Passage, RollupOrders, Transactor, Zenith};
+use signet_zenith::{Passage, RollupOrders, Transactor, Zenith};
 
 use crate::Events;
 

@@ -30,7 +30,7 @@ use trevm::{
     },
     unwrap_or_trevm_err, BlockDriver, BlockOutput, Tx,
 };
-use zenith_types::MINTER_ADDRESS;
+use signet_zenith::MINTER_ADDRESS;
 
 macro_rules! run_tx {
     ($self:ident, $trevm:ident, $tx:expr, $sender:expr) => {{
@@ -464,7 +464,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
     /// Execute an [`EnterToken`] event.
     ///
-    /// [`EnterToken`]: zenith_types::Passage::EnterToken
+    /// [`EnterToken`]: signet_zenith::Passage::EnterToken
     fn execute_enter_token<'c, Ext, Db: Database + DatabaseCommit>(
         &mut self,
         mut trevm: EvmNeedsTx<'c, Db, Ext>,
@@ -521,7 +521,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// - Create a receipt.
     /// - Create a transaction and push it to the block.
     ///
-    /// [`Transactor::Transact`]: zenith_types::Transactor::Transact
+    /// [`Transactor::Transact`]: signet_zenith::Transactor::Transact
     fn execute_transact_event<'c, Ext, Db: Database + DatabaseCommit>(
         &mut self,
         mut trevm: EvmNeedsTx<'c, Db, Ext>,
@@ -1011,7 +1011,7 @@ mod test {
         let fake_tx = TransactionSigned::default();
         let fake_receipt: reth::primitives::Receipt = Default::default();
 
-        let enter = zenith_types::Passage::Enter {
+        let enter = signet_zenith::Passage::Enter {
             rollupChainId: U256::from(TEST_RU_CHAIN_ID),
             rollupRecipient: user,
             amount: U256::from(100),
@@ -1052,13 +1052,13 @@ mod test {
         let fake_tx = TransactionSigned::default();
         let fake_receipt: reth::primitives::Receipt = Default::default();
 
-        let enter = zenith_types::Passage::Enter {
+        let enter = signet_zenith::Passage::Enter {
             rollupChainId: U256::from(TEST_RU_CHAIN_ID),
             rollupRecipient: sender,
             amount: U256::from(ETH_TO_WEI),
         };
 
-        let transact = zenith_types::Transactor::Transact {
+        let transact = signet_zenith::Transactor::Transact {
             rollupChainId: U256::from(TEST_RU_CHAIN_ID),
             sender,
             to: recipient,

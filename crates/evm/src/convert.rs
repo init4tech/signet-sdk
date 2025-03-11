@@ -12,7 +12,7 @@ use trevm::{
     revm::primitives::{TransactTo, TxEnv},
     Tx,
 };
-use zenith_types::{Passage, Transactor};
+use signet_zenith::{Passage, Transactor};
 
 /// This is the default minimum gas cost for a transaction, used by Ethereum
 /// for simple sends to accounts without code.
@@ -163,7 +163,7 @@ impl ToRethPrimitive for EnterToken<'_, '_> {
     type RethPrimitive = TransactionSigned;
 
     fn to_reth(self) -> Self::RethPrimitive {
-        let input = zenith_types::mintCall {
+        let input = signet_zenith::mintCall {
             amount: self.enter_token.amount(),
             to: self.enter_token.rollupRecipient,
         }

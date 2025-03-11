@@ -1,7 +1,7 @@
 use crate::MarketError;
 use alloy::primitives::{Address, U256};
 use std::collections::HashMap;
-use zenith_types::{AggregateOrders, RollupOrders};
+use signet_zenith::{AggregateOrders, RollupOrders};
 
 /// The market context, to be filled via block extracts.
 ///
@@ -20,7 +20,7 @@ use zenith_types::{AggregateOrders, RollupOrders};
 /// ```
 /// # use alloy::primitives::{Address, U256};
 /// # use signet_types::MarketContext;
-/// # use zenith_types::{AggregateOrders, RollupOrders};
+/// # use signet_zenith::{AggregateOrders, RollupOrders};
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let fill = RollupOrders::Filled {
 /// #   outputs: vec![],
@@ -295,7 +295,7 @@ impl CombinedContext<'_, '_> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use zenith_types::RollupOrders::{Filled, Order, Output};
+    use signet_zenith::RollupOrders::{Filled, Order, Output};
 
     #[test]
     fn basic_fills() {

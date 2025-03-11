@@ -5,9 +5,9 @@ use alloy::{
     rpc::types::mev::{EthCallBundle, EthCallBundleResponse, EthSendBundle},
 };
 use serde::{Deserialize, Serialize};
+use signet_zenith::SignedOrder;
 use std::collections::BTreeMap;
 use trevm::Block;
-use zenith_types::SignedOrder;
 
 /// Bundle of transactions for `signet_callBundle`.
 ///
@@ -317,7 +317,7 @@ mod test {
         primitives::{Address, U256},
         rpc::types::mev::{EthCallBundle, EthCallBundleTransactionResult},
     };
-    use zenith_types::HostOrders::{
+    use signet_zenith::HostOrders::{
         Output, Permit2Batch, PermitBatchTransferFrom, TokenPermissions,
     };
 

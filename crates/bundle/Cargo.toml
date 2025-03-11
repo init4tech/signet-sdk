@@ -13,7 +13,7 @@ signet-types.workspace = true
 signet-evm.workspace = true
 
 trevm.workspace = true
-zenith-types.workspace = true
+signet-zenith.workspace = true
 
 alloy.workspace = true
 

@@ -9,6 +9,7 @@ use alloy::{
 };
 use signet_evm::OrderDetector;
 use signet_types::{MarketContext, MarketError};
+use signet_zenith::HostOrders::{self, Output};
 use std::fmt::Debug;
 use trevm::{
     revm::{
@@ -17,7 +18,6 @@ use trevm::{
     },
     trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
 };
-use zenith_types::HostOrders::{self, Output};
 
 /// Errors that can occur when running a bundle on the Signet EVM.
 #[derive(thiserror::Error)]

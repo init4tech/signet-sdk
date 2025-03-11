@@ -1,6 +1,6 @@
 use reth::primitives::{Block, RecoveredBlock};
 use signet_types::MarketContext;
-use zenith_types::{Passage, Transactor, Zenith};
+use signet_zenith::{Passage, Transactor, Zenith};
 
 use crate::ExtractedEvent;
 
