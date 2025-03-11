@@ -15,3 +15,6 @@ zenith-types.workspace = true
 alloy.workspace = true
 
 serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

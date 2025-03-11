@@ -16,7 +16,7 @@ use reth::{
     providers::ExecutionOutcome,
 };
 use signet_extract::Extracts;
-use signet_types::{MarketContext, MarketError, SignetSystemConstants};
+use signet_types::{config::SignetSystemConstants, MarketContext, MarketError};
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, trace_span};
 use trevm::{
@@ -766,7 +766,7 @@ mod test {
     };
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
-    use signet_types::{HostConfig, PredeployTokens, RollupConfig};
+    use signet_types::config::{HostConfig, PredeployTokens, RollupConfig};
     use trevm::NoopCfg;
 
     /// Make a fake block with a specific number.

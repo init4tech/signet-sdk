@@ -12,11 +12,8 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod config;
-pub use config::{
-    ConfigError, HostConfig, PermissionedToken, PredeployTokens, RollupConfig,
-    SignetSystemConstants, MINTER_ADDRESS,
-};
+/// Structs that hold Signet system configuration.
+pub mod config;
 
 mod fills;
 pub use fills::{MarketContext, MarketError};
@@ -24,8 +21,8 @@ pub use fills::{MarketContext, MarketError};
 mod magic_sig;
 pub use magic_sig::{MagicSig, MagicSigInfo};
 
-mod node;
-pub use node::PairedHeights;
+mod height;
+pub use height::PairedHeights;
 
 mod slot;
 pub use slot::SlotCalculator;

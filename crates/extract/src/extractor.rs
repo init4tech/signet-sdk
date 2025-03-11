@@ -4,7 +4,7 @@ use reth::{
     primitives::{Block, Receipt, RecoveredBlock},
     providers::Chain,
 };
-use signet_types::{MarketContext, SignetSystemConstants};
+use signet_types::{config::SignetSystemConstants, MarketContext};
 use tracing::debug_span;
 use zenith_types::Passage;
 

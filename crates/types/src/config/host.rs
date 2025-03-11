@@ -1,8 +1,12 @@
-use crate::{ConfigError, PredeployTokens};
+use crate::config::{ConfigError, PredeployTokens};
 use alloy::{genesis::Genesis, primitives::Address};
 use serde_json::Value;
 
 /// System addresses and other configuration details on the host chain.
+///
+/// These are system constants which may vary between chains, and are used to
+/// determine the behavior of the chain, such as which contracts the Signet
+/// node should listen to, and the addresses of system-priveleged tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostConfig {

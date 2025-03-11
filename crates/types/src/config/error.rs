@@ -1,4 +1,5 @@
-/// Error type for config module.
+/// Error type for [`crate::config`] module. Captures errors related to loading
+/// configuration from the environment or other sources.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     /// Missing `signetConstants` genesis field.
@@ -16,9 +17,6 @@ pub enum ConfigError {
     /// Error parsing hex from environment variable
     #[error("failed to parse hex: {0}")]
     Hex(#[from] hex::FromHexError),
-    /// Error reading file
-    #[error("failed to read file: {0}")]
-    Io(#[from] std::io::Error),
     /// Error parsing JSON
     #[error("failed to parse JSON: {0}")]
     Json(#[from] serde_json::Error),
