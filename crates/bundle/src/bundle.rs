@@ -177,7 +177,7 @@ impl SignetCallBundle {
     /// The tx_preimage is calculated as `keccak(tx_hash1 + tx_hash2 + ... + tx_hashn)`.
     /// The host_preimage is calculated as
     /// `keccak(NUM_OF_ASSETS_LE + asset1 + NUM_OF_FILLS_LE + asset1_user1 + user1_amount2 + ... + asset1_usern + asset1_amountn + ...)`.
-    /// For the number of users/fills and amounts amounts in the host_preimage, the amounts are serialized as little-endian U256 slice.
+    /// For the number of users/fills and amounts in the host_preimage, the amounts are serialized as little-endian U256 slice.
     pub fn bundle_hash(&self) -> B256 {
         let mut hasher = alloy::primitives::Keccak256::new();
 

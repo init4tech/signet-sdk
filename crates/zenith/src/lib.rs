@@ -22,11 +22,6 @@ pub use block::{decode_txns, encode_txns, Alloy2718Coder, Coder, ZenithBlock, Ze
 mod orders;
 pub use orders::{AggregateOrders, SignedOrder};
 
-mod bundle;
-pub use bundle::{
-    ZenithCallBundle, ZenithCallBundleResponse, ZenithEthBundle, ZenithEthBundleResponse,
-};
-
 mod req;
 pub use req::SignRequest;
 
