@@ -1,7 +1,7 @@
 use crate::MarketError;
 use alloy::primitives::{Address, U256};
-use std::collections::HashMap;
 use signet_zenith::{AggregateOrders, RollupOrders};
+use std::collections::HashMap;
 
 /// The market context, to be filled via block extracts.
 ///

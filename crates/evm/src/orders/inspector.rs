@@ -4,6 +4,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use signet_types::{config::SignetSystemConstants, MarketContext};
+use signet_zenith::RollupOrders;
 use trevm::revm::{
     inspectors::NoOpInspector,
     interpreter::{
@@ -11,7 +12,6 @@ use trevm::revm::{
     },
     Database, EvmContext, Inspector,
 };
-use signet_zenith::RollupOrders;
 
 /// Inspector used to detect Signet Orders and inform the builder of the
 /// fill requirements.

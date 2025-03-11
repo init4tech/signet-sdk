@@ -8,11 +8,11 @@ use alloy::{
 use reth::primitives::{Transaction, TransactionSigned};
 use signet_extract::ExtractedEvent;
 use signet_types::{MagicSig, MagicSigInfo};
+use signet_zenith::{Passage, Transactor};
 use trevm::{
     revm::primitives::{TransactTo, TxEnv},
     Tx,
 };
-use signet_zenith::{Passage, Transactor};
 
 /// This is the default minimum gas cost for a transaction, used by Ethereum
 /// for simple sends to accounts without code.

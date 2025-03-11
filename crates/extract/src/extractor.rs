@@ -5,8 +5,8 @@ use reth::{
     providers::Chain,
 };
 use signet_types::{config::SignetSystemConstants, MarketContext};
-use tracing::debug_span;
 use signet_zenith::Passage;
+use tracing::debug_span;
 
 /// Extracts Zenith events from a chain.
 ///

@@ -2,8 +2,8 @@ use alloy::consensus::TxEnvelope;
 use reth::rpc::server_types::eth::EthResult;
 use serde::Serialize;
 use signet_bundle::SignetEthBundle;
-use tracing::warn;
 use signet_zenith::SignedOrder;
+use tracing::warn;
 
 /// Signet's Transaction Cache forwarder. Forwards transactions to a URL via
 /// simple post.

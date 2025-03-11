@@ -17,6 +17,7 @@ use reth::{
 };
 use signet_extract::Extracts;
 use signet_types::{config::SignetSystemConstants, MarketContext, MarketError};
+use signet_zenith::MINTER_ADDRESS;
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, trace_span};
 use trevm::{
@@ -30,7 +31,6 @@ use trevm::{
     },
     unwrap_or_trevm_err, BlockDriver, BlockOutput, Tx,
 };
-use signet_zenith::MINTER_ADDRESS;
 
 macro_rules! run_tx {
     ($self:ident, $trevm:ident, $tx:expr, $sender:expr) => {{
