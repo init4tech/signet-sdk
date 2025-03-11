@@ -1,12 +1,13 @@
 //! Signet's bundle driver and related bundle utilities.
 
+use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::eip2718::Decodable2718,
     primitives::{bytes::Buf, Address, Bytes, TxKind, U256},
     rpc::types::mev::EthCallBundleTransactionResult,
 };
-use signet_bundle::{SignetCallBundle, SignetCallBundleResponse};
+use signet_evm::OrderDetector;
 use signet_types::{MarketContext, MarketError};
 use std::fmt::Debug;
 use trevm::{
@@ -17,8 +18,6 @@ use trevm::{
     trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
 };
 use zenith_types::HostOrders::{self, Output};
-
-use crate::OrderDetector;
 
 /// Errors that can occur when running a bundle on the Signet EVM.
 #[derive(thiserror::Error)]

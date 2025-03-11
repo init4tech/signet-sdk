@@ -15,9 +15,6 @@
 mod aliases;
 pub use aliases::*;
 
-mod bundle;
-pub use bundle::*;
-
 /// Utilities for converting types to Reth primitives.
 pub mod convert;
 pub use convert::ToRethPrimitive;

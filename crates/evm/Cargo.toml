@@ -9,8 +9,6 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-
-signet-bundle.workspace = true
 signet-extract.workspace = true
 signet-types.workspace = true
 
