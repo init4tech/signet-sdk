@@ -45,7 +45,7 @@ signet-types = { path = "crates/types" }
 ajj = { version = "0.3.1" }
 
 # trevm
-trevm = { version = "^0.19.8", features = ["full_env_cfg"] }
+trevm = { version = "=0.19.11", features = ["full_env_cfg"] }
 
 # zenith
 zenith-types = "0.15"
