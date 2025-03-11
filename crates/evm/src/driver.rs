@@ -314,7 +314,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         // We check the market context here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
         if let Err(err) =
-            self.working_context.checked_remove_ru_tx_events(&market_context, &aggregate)
+            self.working_context.checked_remove_ru_tx_events(&aggregate, &market_context)
         {
             tracing::debug!(%err, "Discarding transaction outcome due to market error");
             return Ok(trevm.reject());

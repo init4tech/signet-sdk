@@ -1,12 +1,18 @@
 //! Signet bundle types.
 use alloy::{
-    eips::{eip2718::Encodable2718, BlockNumberOrTag},
+    consensus::{Transaction, TxEnvelope},
+    eips::{eip2718::Encodable2718, BlockNumberOrTag, Decodable2718},
     primitives::{keccak256, Address, Bytes, B256, U256},
-    rpc::types::mev::{EthCallBundle, EthCallBundleResponse},
+    rlp::Buf,
+    rpc::types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTransactionResult},
 };
 use serde::{Deserialize, Serialize};
 use signet_types::MarketContext;
 use std::collections::BTreeMap;
+use trevm::{
+    revm::{primitives::ExecutionResult, Database},
+    BundleError,
+};
 
 /// Bundle of transactions for `signet_callBundle`.
 ///
@@ -233,10 +239,106 @@ impl SignetCallBundle {
         // Hash both tx and host hashes to get the final bundle hash.
         pre_image.finalize()
     }
+
+    /// Decode and validate the transactions in the bundle.
+    pub fn decode_and_validate_txs<Db: trevm::revm::Database>(
+        &self,
+    ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
+        let txs = self
+            .txs()
+            .iter()
+            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| BundleError::TransactionDecodingError(err))?;
+
+        if txs.iter().any(|tx| tx.is_eip4844()) {
+            return Err(BundleError::UnsupportedTransactionType);
+        }
+
+        Ok(txs)
+    }
 }
 
 /// Response for `signet_callBundle`.
-pub type SignetCallBundleResponse = EthCallBundleResponse;
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct SignetCallBundleResponse {
+    #[serde(flatten)]
+    inner: EthCallBundleResponse,
+}
+
+impl core::ops::Deref for SignetCallBundleResponse {
+    type Target = EthCallBundleResponse;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl core::ops::DerefMut for SignetCallBundleResponse {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl From<EthCallBundleResponse> for SignetCallBundleResponse {
+    fn from(inner: EthCallBundleResponse) -> Self {
+        Self { inner }
+    }
+}
+
+impl From<SignetCallBundleResponse> for EthCallBundleResponse {
+    fn from(this: SignetCallBundleResponse) -> Self {
+        this.inner
+    }
+}
+
+impl SignetCallBundleResponse {
+    /// Accumulate a transaction result into the response.
+    pub fn accumulate_tx_result(&mut self, tx_result: EthCallBundleTransactionResult) {
+        self.inner.total_gas_used += tx_result.gas_used;
+        self.inner.gas_fees += tx_result.gas_fees;
+        self.inner.results.push(tx_result);
+    }
+
+    /// Accumulate the result of transaction execution into the response.
+    pub fn accumulate_tx<Db: Database>(
+        &mut self,
+        tx: &TxEnvelope,
+        coinbase_diff: U256,
+        base_fee: U256,
+        execution_result: ExecutionResult,
+    ) -> Result<(), BundleError<Db>> {
+        if let TxEnvelope::Eip4844(_) = tx {
+            return Err(BundleError::UnsupportedTransactionType);
+        }
+
+        // we'll incrementally populate this result.
+        let mut result = EthCallBundleTransactionResult::default();
+
+        result.from_address =
+            tx.recover_signer().map_err(|e| BundleError::TransactionSenderRecoveryError(e))?;
+
+        // Calculate the gas price and fees
+        result.gas_price = U256::from(tx.effective_gas_price(Some(base_fee.saturating_to())));
+        result.gas_used = execution_result.gas_used();
+        result.gas_fees = result.gas_price * U256::from(result.gas_used);
+
+        // set the return data for the response
+        if execution_result.is_success() {
+            result.value = Some(execution_result.into_output().unwrap_or_default());
+        } else {
+            result.revert = Some(execution_result.into_output().unwrap_or_default());
+        };
+
+        // Calculate the coinbase diff and the eth sent to coinbase
+        result.coinbase_diff = coinbase_diff;
+        result.eth_sent_to_coinbase = result.coinbase_diff.saturating_sub(result.gas_fees);
+
+        // Accumulate the result
+        self.accumulate_tx_result(result);
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -278,7 +380,7 @@ mod test {
 
     #[test]
     fn call_bundle_resp_ser_roundtrip() {
-        let resp = EthCallBundleResponse {
+        let resp: SignetCallBundleResponse = EthCallBundleResponse {
             bundle_hash: B256::repeat_byte(1),
             bundle_gas_price: U256::from(2),
             coinbase_diff: U256::from(3),
@@ -298,7 +400,8 @@ mod test {
             }],
             state_block_number: 14,
             total_gas_used: 15,
-        };
+        }
+        .into();
 
         let serialized = serde_json::to_string(&resp).unwrap();
         let deserialized: SignetCallBundleResponse = serde_json::from_str(&serialized).unwrap();
