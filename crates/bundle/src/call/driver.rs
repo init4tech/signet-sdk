@@ -95,6 +95,8 @@ impl SignetBundleDriver<'_> {
         (r, c)
     }
 
+    /// Check the market context, accept the result, accumulate the transaction
+    /// details into the response.
     fn check_market_and_accept<'a, Db: Database + DatabaseCommit, I>(
         &mut self,
         mut trevm: signet_evm::EvmTransacted<'a, Db, I>,
