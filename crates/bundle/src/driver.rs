@@ -47,18 +47,18 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetBundleError<Db> {
 
 /// A bundle driver for the Signet EVM.
 #[derive(Debug)]
-pub struct SignetBundleDriver<B, R> {
+pub struct SignetBundleDriver {
     /// The bundle to drive.
-    bundle: B,
+    bundle: SignetCallBundle,
     /// The accumulated results of the bundle, if applicable.
-    response: R,
+    response: SignetCallBundleResponse,
     /// The market context.
     context: MarketContext,
     /// The host chain id.
     host_chain_id: u64,
 }
 
-impl SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse> {
+impl SignetBundleDriver {
     /// Create a new bundle driver with the given bundle and response.
     pub fn new(bundle: SignetCallBundle, host_chain_id: u64) -> Self {
         let mut context = MarketContext::default();
@@ -86,9 +86,7 @@ impl SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse> {
         let c = std::mem::take(&mut self.context);
         (r, c)
     }
-}
 
-impl<R> SignetBundleDriver<SignetCallBundle, R> {
     /// Decode and validate the transactions in the bundle.
     pub fn decode_and_validate_txs<Db: Database>(
         txs: &[Bytes],
@@ -107,16 +105,14 @@ impl<R> SignetBundleDriver<SignetCallBundle, R> {
 
         Ok(txs)
     }
-}
 
-impl<B, R> SignetBundleDriver<B, R> {
     /// Get a reference to the bundle.
-    pub const fn bundle(&self) -> &B {
+    pub const fn bundle(&self) -> &SignetCallBundle {
         &self.bundle
     }
 
     /// Get a reference to the response.
-    pub const fn response(&self) -> &R {
+    pub const fn response(&self) -> &SignetCallBundleResponse {
         &self.response
     }
 
@@ -192,9 +188,7 @@ impl<B, R> SignetBundleDriver<B, R> {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting market context.
-impl<I> BundleDriver<OrderDetector<I>>
-    for SignetBundleDriver<SignetCallBundle, SignetCallBundleResponse>
-{
+impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver {
     type Error<Db: Database + DatabaseCommit> = SignetBundleError<Db>;
 
     fn run_bundle<'a, Db: Database + DatabaseCommit>(
