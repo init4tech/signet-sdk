@@ -3,7 +3,7 @@ use alloy::{
     primitives::{Address, Log, U256},
     sol_types::SolEvent,
 };
-use signet_types::MarketContext;
+use signet_types::{config::SignetSystemConstants, MarketContext};
 use trevm::revm::{
     inspectors::NoOpInspector,
     interpreter::{
@@ -20,11 +20,8 @@ use zenith_types::RollupOrders;
 /// for tracers and other tools that need to inspect the EVM state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderDetector<T = NoOpInspector> {
-    /// The address to which to listen for Order logs.
-    contract: Address,
-    /// The chain ID that we are inspecting. This must be passed to the
-    /// [`MarketContext`] when aggregated [`RollupOrders::Filled`] events.
-    chain_id: u64,
+    /// The signet system constants.
+    constants: SignetSystemConstants,
     /// Orders detected so far, account for EVM reverts
     orders: FramedOrders,
     /// Fills detected so far, accounting for EVM reverts
@@ -48,10 +45,9 @@ impl<T> AsMut<T> for OrderDetector<T> {
 impl<T> OrderDetector<T> {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and `outputs` mapping.
-    pub fn new(contract: Address, chain_id: u64) -> OrderDetector<NoOpInspector> {
+    pub fn new(constants: SignetSystemConstants) -> OrderDetector<NoOpInspector> {
         OrderDetector {
-            contract,
-            chain_id,
+            constants,
             orders: Default::default(),
             filleds: Default::default(),
             inner: NoOpInspector,
@@ -60,8 +56,18 @@ impl<T> OrderDetector<T> {
 
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and an inner inspector.
-    pub fn new_with_inspector(contract: Address, chain_id: u64, inner: T) -> Self {
-        Self { contract, chain_id, orders: Default::default(), filleds: Default::default(), inner }
+    pub fn new_with_inspector(constants: SignetSystemConstants, inner: T) -> Self {
+        Self { constants, orders: Default::default(), filleds: Default::default(), inner }
+    }
+
+    /// Get the address of the orders contract.
+    pub const fn contract(&self) -> Address {
+        self.constants.rollup().orders()
+    }
+
+    /// Get the chain ID.
+    pub const fn chain_id(&self) -> u64 {
+        self.constants.ru_chain_id()
     }
 
     /// Take the orders from the inspector, clearing it.
@@ -73,7 +79,7 @@ impl<T> OrderDetector<T> {
     /// aggregate orders.
     pub fn take_aggregate(&mut self) -> (zenith_types::AggregateOrders, MarketContext) {
         let (orders, filleds) = self.take();
-        (orders.aggregate(), filleds.aggregate(self.chain_id))
+        (orders.aggregate(), filleds.aggregate(self.chain_id()))
     }
 
     /// Take the inner inspector and the framed events.
@@ -109,7 +115,7 @@ where
 {
     fn log(&mut self, interp: &mut Interpreter, context: &mut EvmContext<Db>, log: &Log) {
         // skip if the log is not from the orders contract
-        if log.address != self.contract {
+        if log.address != self.contract() {
             return;
         }
 

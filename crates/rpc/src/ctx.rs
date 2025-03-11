@@ -166,13 +166,9 @@ where
 
         let db = self.signet.state_provider_database(height)?;
 
-        let mut trevm = signet_evm::signet_evm(
-            db,
-            self.signet.constants.ru_orders(),
-            self.signet.constants.ru_chain_id(),
-        )
-        .fill_cfg(&self.signet)
-        .fill_block(block);
+        let mut trevm = signet_evm::signet_evm(db, self.signet.constants)
+            .fill_cfg(&self.signet)
+            .fill_block(block);
 
         trevm.set_spec_id(spec_id);
 
