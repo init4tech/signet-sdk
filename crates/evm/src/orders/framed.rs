@@ -11,7 +11,8 @@ pub type FramedFilleds = Framed<RollupOrders::Filled>;
 ///
 /// Events are emitted during EVM execution. These events are emitted within
 /// specific callframe boundaries. When a callframe is exited, if it reverted
-/// then all events added within that frame must be discarded.
+/// then all events added within that frame must be discarded. Framing the
+/// events allows for easy reversion of all events added within a frame.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Framed<T> {
     events: Vec<T>,

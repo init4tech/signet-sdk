@@ -1,3 +1,18 @@
+//! Contains logic for extracting events and other data from host chain blocks.
+//!
+//! ## Usage
+//!
+//! Create a [`Extractor`] from a set of [`SignetSystemConstants`], then invoke
+//! [`Extractor::extract_signet`] to extract all relevant Signet events from a
+//! chain.
+//!
+//! These events will be returned as a series of [`Extracts`] objects, each of
+//! which containing the relevant [`ExtractedEvent`]s and a [`MarketContext`]
+//! for a specific host block.
+//!
+//! [`SignetSystemConstants`]: signet_types::config::SignetSystemConstants
+//! [`MarketContext`]: signet_types::MarketContext
+
 #![warn(
     missing_copy_implementations,
     missing_debug_implementations,
@@ -9,8 +24,6 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
-
-//! Contains logic for extracting events and other data from host chain blocks.
 
 mod events;
 pub use events::Events;

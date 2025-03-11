@@ -1,4 +1,7 @@
 //! Signet-related types and utilities used throughout the SDK and node.
+//!
+//! This is a utility and data-type crate. As a result its documentation is
+//! boring.
 
 #![warn(
     missing_copy_implementations,

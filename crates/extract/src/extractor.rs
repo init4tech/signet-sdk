@@ -9,6 +9,15 @@ use tracing::debug_span;
 use zenith_types::Passage;
 
 /// Extracts Zenith events from a chain.
+///
+/// The extractor is a newtype around the [`SignetSystemConstants`], which
+/// contain all necessary information for extracting events from a chain.
+///
+/// The extractor contains a series of inner iterators that traverse chains,
+/// blocks, and receipts to extract signet-relevant events. These events are
+/// represented as [`ExtractedEvent`] objects containing [`Events`]. One
+/// [`Extracts`] will be produced for each block in the input chain, provided
+/// that Signet was deployed at that height.
 #[derive(Debug, Clone, Copy)]
 pub struct Extractor {
     constants: SignetSystemConstants,
@@ -18,6 +27,11 @@ impl Extractor {
     /// Create a new [`Extractor`] from system constants.
     pub const fn new(constants: &SignetSystemConstants) -> Self {
         Self { constants: *constants }
+    }
+
+    /// Get the system constants.
+    pub const fn constants(&self) -> &SignetSystemConstants {
+        &self.constants
     }
 
     /// Extract a [`Events`] from a log, checking the chain ID.
@@ -71,7 +85,7 @@ impl Extractor {
     ///     - Accumulate the fills.
     ///     - Associate each event with block, tx and receipt references.
     ///     - Yield the extracted block info.
-    pub fn get_zenith_outputs<'a: 'c, 'b: 'c, 'c>(
+    pub fn extract_signet<'a: 'c, 'b: 'c, 'c>(
         &'a self,
         chain: &'b Chain,
     ) -> impl Iterator<Item = Extracts<'c>> {

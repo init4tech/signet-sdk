@@ -15,7 +15,8 @@ pub(crate) const FLAG_ENTER_TOKENS: u8 = 0x02;
 /// Flags used to identify the type of magic signature.
 pub(crate) const FLAG_TRANSACT: u8 = 0x03;
 
-/// Type flag used to
+/// Type flag used to identify the Signet event that cauesd the rollup
+/// consensus to create this magic signature.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MagicSigInfo {
     /// An enter event.
@@ -102,7 +103,7 @@ impl MagicSigInfo {
 /// Because Ethereum-like chains enforce low-S signatures, the S value of the
 /// magic signature is invalid for Ethereum-based chains supporting [EIP-2].
 /// This means that the magic signature is never a valid signature for any
-/// Ethereum-like chain.
+/// relevant Ethereum-like chain.
 ///
 /// [EIP-2]: https://eips.ethereum.org/EIPS/eip-2
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

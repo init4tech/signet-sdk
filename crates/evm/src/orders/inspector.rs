@@ -14,10 +14,23 @@ use trevm::revm::{
 use zenith_types::RollupOrders;
 
 /// Inspector used to detect Signet Orders and inform the builder of the
-/// requirements.
+/// fill requirements.
 ///
-/// The inspector allows an inner inspector to be used as well. This is useful
-/// for tracers and other tools that need to inspect the EVM state.
+/// This inspector is intended to be used with `trevm`. The EVM driver should
+/// - call [`OrderDetector::take_aggregate`] to get the aggregate orders
+///   produced by that transaction.
+/// - ensure that net fills are sufficient to cover the order inputs via
+///   [`MarketContext::checked_remove_ru_tx_events`].
+/// - reject transactions which are not sufficiently filled.
+///
+/// The [`SignetDriver`] has an example of this in the `check_market_and_accept`
+/// function.
+///
+/// The `OrderDetector` allows an inner inspector to be used as well. This is
+/// useful for tracers and other tools that need to inspect the EVM state.
+///
+/// [`SignetDriver`]: crate::SignetDriver
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderDetector<T = NoOpInspector> {
     /// The signet system constants.

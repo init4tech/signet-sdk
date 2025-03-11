@@ -10,6 +10,10 @@ use zenith_types::{
 };
 
 /// Events that we expect to find on the host chain.
+///
+/// These events are used by the Signet node to update the state of the rollup
+/// chain. Each one of these events is expected to be emitted by a different
+/// host chain contract.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Events {
     /// An [`Passage::EnterToken`] event.

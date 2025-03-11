@@ -276,7 +276,6 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             base_fee_per_gas: Some(self.base_fee()),
             beneficiary: self.beneficiary(),
 
-            // TODO: post trevm 0.5.0, use the memoized version on the output
             logs_bloom: self.logs_bloom(),
             gas_used: self.cumulative_gas_used(),
 
