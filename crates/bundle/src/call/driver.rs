@@ -69,7 +69,7 @@ impl<'a> SignetBundleDriver<'a> {
 impl SignetBundleDriver<'_> {
     /// Get a reference to the bundle.
     pub const fn bundle(&self) -> &SignetCallBundle {
-        &self.bundle
+        self.bundle
     }
 
     /// Get a reference to the response.
