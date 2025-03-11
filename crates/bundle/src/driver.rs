@@ -126,7 +126,7 @@ impl SignetBundleDriver {
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: U256,
         post_sim_coinbase_balance: U256,
-        basefee: U256,
+        base_fee: U256,
         execution_result: ExecutionResult,
     ) -> Result<(EthCallBundleTransactionResult, U256), SignetBundleError<Db>> {
         if let TxEnvelope::Eip4844(_) = tx {
@@ -137,19 +137,10 @@ impl SignetBundleDriver {
             SignetBundleError::BundleError(BundleError::TransactionSenderRecoveryError(e))
         })?;
 
-        let gas_used = execution_result.gas_used();
-
-        // Calculate the gas price
-        let gas_price = match tx {
-            TxEnvelope::Legacy(tx) => U256::from(tx.tx().gas_price),
-            TxEnvelope::Eip2930(tx) => U256::from(tx.tx().gas_price),
-            TxEnvelope::Eip1559(tx) => {
-                U256::from(tx.tx().effective_gas_price(Some(basefee.to::<u64>())))
-            }
-            _ => unreachable!(),
-        };
-
+        // Calculate the gas price and fees
         // Calculate the gas fees paid
+        let gas_price = U256::from(tx.effective_gas_price(Some(base_fee.saturating_to())));
+        let gas_used = execution_result.gas_used();
         let gas_fees = gas_price * U256::from(gas_used);
 
         // set the return data for the response
