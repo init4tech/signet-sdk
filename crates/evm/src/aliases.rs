@@ -65,3 +65,7 @@ pub type EvmErrored<'a, Db, I = NoOpInspector, E = EVMError<<Db as Database>::Er
 /// The result of running transactions for a block driver.
 pub type RunTxResult<'a, Db, T, I = NoOpInspector> =
     trevm::RunTxResult<'a, OrderDetector<I>, Db, T>;
+
+/// The result of driving a bundle.
+pub type DriveBundleResult<'a, Db, T, I = NoOpInspector> =
+    trevm::DriveBundleResult<'a, OrderDetector<I>, Db, T>;

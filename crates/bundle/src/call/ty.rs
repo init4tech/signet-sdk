@@ -1,8 +1,9 @@
 //! Signet bundle types.
 use alloy::{
     consensus::{Transaction, TxEnvelope},
-    eips::{eip2718::Encodable2718, BlockNumberOrTag},
+    eips::{eip2718::Encodable2718, BlockNumberOrTag, Decodable2718},
     primitives::{keccak256, Address, Bytes, B256, U256},
+    rlp::Buf,
     rpc::types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTransactionResult},
 };
 use serde::{Deserialize, Serialize};
@@ -237,6 +238,24 @@ impl SignetCallBundle {
 
         // Hash both tx and host hashes to get the final bundle hash.
         pre_image.finalize()
+    }
+
+    /// Decode and validate the transactions in the bundle.
+    pub fn decode_and_validate_txs<Db: trevm::revm::Database>(
+        &self,
+    ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
+        let txs = self
+            .txs()
+            .iter()
+            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| BundleError::TransactionDecodingError(err))?;
+
+        if txs.iter().any(|tx| tx.is_eip4844()) {
+            return Err(BundleError::UnsupportedTransactionType);
+        }
+
+        Ok(txs)
     }
 }
 
