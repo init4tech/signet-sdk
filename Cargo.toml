@@ -7,9 +7,9 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.81"
 authors = ["init4"]
-license = "UNLICENSED"
-homepage = "https://github.com/init4tech/signet-node"
-repository = "https://github.com/init4tech/signet-node"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/init4tech/signet-sdk"
+repository = "https://github.com/init4tech/signet-sdk"
 
 [profile.release]
 opt-level = 3
@@ -40,15 +40,13 @@ signet-extract = { path = "crates/extract" }
 signet-node = { path = "crates/node" }
 signet-rpc = { path = "crates/rpc" }
 signet-types = { path = "crates/types" }
+signet-zenith = { path = "crates/zenith" }
 
 # ajj
 ajj = { version = "0.3.1" }
 
 # trevm
-trevm = { version = "=0.19.11", features = ["full_env_cfg"] }
-
-# zenith
-zenith-types = "0.15"
+trevm = { version = "^0.19.12", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
 alloy = { version = "=0.11.1", features = ["full", "rpc-types-mev", "genesis", "arbitrary"] }

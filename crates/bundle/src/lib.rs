@@ -15,10 +15,13 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod bundle;
-pub use bundle::{
-    SignetCallBundle, SignetCallBundleResponse, SignetEthBundle, SignetEthBundleResponse,
-};
+mod call;
+pub use call::{SignetCallBundle, SignetCallBundleResponse};
+
+mod send;
+pub use send::{SignetEthBundle, SignetEthBundleResponse};
 
 mod driver;
 pub use driver::{SignetBundleDriver, SignetBundleError};
+
+mod trevm;

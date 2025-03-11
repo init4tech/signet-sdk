@@ -1,5 +1,5 @@
 use signet_types::MarketContext;
-use zenith_types::{AggregateOrders, RollupOrders};
+use signet_zenith::{AggregateOrders, RollupOrders};
 
 /// A [`Framed`] containing [`RollupOrders::Order`] instances.
 pub type FramedOrders = Framed<RollupOrders::Order>;

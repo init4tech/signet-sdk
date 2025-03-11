@@ -7,6 +7,7 @@ Signet is a pragmatic Ethereum rollup. See the [Signet docs] for more info.
 
 ## Libraries
 
+- signet-zenith - Zenith contract bindings and related types.
 - signet-types - Common types and utilities for Signet.
 - signet-extract - Extracts Signet blocks from an Ethereum block.
 - signet-evm - A wrapper around [trevm] that implements a Signet-specific order

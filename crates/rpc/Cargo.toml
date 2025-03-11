@@ -15,7 +15,7 @@ signet-types.workspace = true
 
 ajj.workspace = true
 trevm.workspace = true
-zenith-types.workspace = true
+signet-zenith.workspace = true
 
 alloy.workspace = true
 reth.workspace = true

@@ -1,5 +1,5 @@
 use alloy::primitives::{Address, PrimitiveSignature as Signature, B256};
-use zenith_types::MINTER_ADDRESS;
+use signet_zenith::MINTER_ADDRESS;
 
 /// A sentinel value to identify the magic signature. This is encoded in the
 /// S value, and renders the S value invalid for Ethereum-based chains
