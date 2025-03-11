@@ -1,4 +1,4 @@
-use crate::{Passage::EnterToken, Transactor, Zenith, ZenithCallBundle};
+use crate::{Passage::EnterToken, Transactor, Zenith};
 use alloy::{
     primitives::{Address, U256},
     rlp::BufMut,
@@ -6,8 +6,8 @@ use alloy::{
 };
 use trevm::{
     journal::{JournalDecode, JournalDecodeError, JournalEncode},
-    revm::primitives::{BlockEnv, TransactTo, TxEnv},
-    Block, Tx,
+    revm::primitives::{TransactTo, TxEnv},
+    Tx,
 };
 
 const ZENITH_HEADER_BYTES: usize = 32 + 32 + 32 + 20 + 32;
@@ -84,18 +84,6 @@ impl Tx for EnterToken {
         blob_hashes.clear();
         max_fee_per_blob_gas.take();
         authorization_list.take();
-    }
-}
-
-impl Block for ZenithCallBundle {
-    fn fill_block_env(&self, block_env: &mut BlockEnv) {
-        block_env.number =
-            self.bundle.state_block_number.as_number().map(U256::from).unwrap_or(block_env.number);
-        block_env.timestamp = self.bundle.timestamp.map(U256::from).unwrap_or(block_env.timestamp);
-        block_env.gas_limit = self.bundle.gas_limit.map(U256::from).unwrap_or(block_env.gas_limit);
-        block_env.difficulty =
-            self.bundle.difficulty.map(U256::from).unwrap_or(block_env.difficulty);
-        block_env.basefee = self.bundle.base_fee.map(U256::from).unwrap_or(block_env.basefee);
     }
 }
 

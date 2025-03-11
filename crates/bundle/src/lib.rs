@@ -22,3 +22,5 @@ pub use bundle::{
 
 mod driver;
 pub use driver::{SignetBundleDriver, SignetBundleError};
+
+mod trevm;
