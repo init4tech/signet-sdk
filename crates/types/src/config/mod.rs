@@ -17,6 +17,11 @@ use alloy::{
 };
 
 /// Signet constants.
+///
+/// This struct contains the system constants for a Signet chain, including
+/// information about the host and rollup state. These constants are used to
+/// determine the behavior of the chain, such as which contracts the Signet
+/// node should listen to, and the addresses of system-priveleged tokens.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetSystemConstants {
     /// Host constants.

@@ -1,11 +1,14 @@
 //! Utilities for fetching slots from block timestamps for Signet.
-/// A slot calculator, which can calculate the slot for a given timestamp.
+
+/// A slot calculator, which can calculate the slot number for a given
+/// timestamp.
 #[derive(Debug, Copy, Clone)]
 pub struct SlotCalculator {
     /// The start timestamp.
     start_timestamp: u64,
-    /// The offset in slots. This is needed for chains that are not PoS right from the start of the network, such as Ethereum Mainnet.
-    /// Networks that are PoS from genesis, such as Holesky, have an offset of 0.
+    /// The offset in slots. This is needed for chains that are not PoS right
+    /// from the start of the network, such as Ethereum Mainnet. Networks that
+    /// are PoS from genesis, such as Holesky, have an offset of 0.
     slot_offset: u64,
     /// The slot duration.
     slot_duration: u64,
@@ -32,6 +35,21 @@ impl SlotCalculator {
         let elapsed = timestamp - self.start_timestamp;
         let slots = elapsed.saturating_div(self.slot_duration);
         slots + self.slot_offset
+    }
+
+    /// The timestamp of the first PoS block in the chain.
+    pub const fn start_timestamp(&self) -> u64 {
+        self.start_timestamp
+    }
+
+    /// The slot number of the first PoS block in the chain.
+    pub const fn slot_offset(&self) -> u64 {
+        self.slot_offset
+    }
+
+    /// The slot duration, usually 12 seconds.
+    pub const fn slot_duration(&self) -> u64 {
+        self.slot_duration
     }
 }
 

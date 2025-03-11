@@ -7,7 +7,13 @@ use zenith_types::{Passage, RollupOrders, Transactor, Zenith};
 
 use crate::Events;
 
-/// Extraction Result
+/// A single event extracted from the host chain.
+///
+/// This struct contains a reference to the transaction that caused the event,
+/// the receipt that the event was extracted from, the index of the log in the
+/// receipt's logs, and the extracted event itself.
+///
+/// Events may be either the enum type [`Events`], or a specific event type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtractedEvent<'a, T = Events> {
     /// The transaction that caused the event

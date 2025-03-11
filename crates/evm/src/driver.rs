@@ -16,7 +16,7 @@ use reth::{
     providers::ExecutionOutcome,
 };
 use signet_extract::Extracts;
-use signet_types::{MarketContext, MarketError, SignetSystemConstants};
+use signet_types::{config::SignetSystemConstants, MarketContext, MarketError};
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, trace_span};
 use trevm::{
@@ -276,7 +276,6 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             base_fee_per_gas: Some(self.base_fee()),
             beneficiary: self.beneficiary(),
 
-            // TODO: post trevm 0.5.0, use the memoized version on the output
             logs_bloom: self.logs_bloom(),
             gas_used: self.cumulative_gas_used(),
 
@@ -766,7 +765,7 @@ mod test {
     };
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
-    use signet_types::{HostConfig, PredeployTokens, RollupConfig};
+    use signet_types::config::{HostConfig, PredeployTokens, RollupConfig};
     use trevm::NoopCfg;
 
     /// Make a fake block with a specific number.

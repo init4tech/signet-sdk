@@ -40,7 +40,7 @@ use reth_chainspec::{BaseFeeParams, ChainSpec, ChainSpecProvider};
 use reth_node_api::{BlockBody, FullNodeComponents};
 use reth_rpc_eth_api::{RpcBlock, RpcReceipt, RpcTransaction};
 use signet_evm::{EvmNeedsTx, RuRevmState};
-use signet_types::{MagicSig, SignetSystemConstants};
+use signet_types::{config::SignetSystemConstants, MagicSig};
 use std::{marker::PhantomData, sync::Arc};
 use tracing::{instrument, trace, Level};
 use trevm::{
@@ -166,13 +166,9 @@ where
 
         let db = self.signet.state_provider_database(height)?;
 
-        let mut trevm = signet_evm::signet_evm(
-            db,
-            self.signet.constants.ru_orders(),
-            self.signet.constants.ru_chain_id(),
-        )
-        .fill_cfg(&self.signet)
-        .fill_block(block);
+        let mut trevm = signet_evm::signet_evm(db, self.signet.constants)
+            .fill_cfg(&self.signet)
+            .fill_block(block);
 
         trevm.set_spec_id(spec_id);
 

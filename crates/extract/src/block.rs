@@ -4,7 +4,9 @@ use zenith_types::{Passage, Transactor, Zenith};
 
 use crate::ExtractedEvent;
 
-/// The output of the block extraction process.
+/// The output of the block extraction process. This struct contains borrows
+/// from a block object, the extracted events, and a [`MarketContext`]
+/// populated with the fills present in the host block.
 #[derive(Debug, Clone)]
 pub struct Extracts<'a> {
     /// The host block.

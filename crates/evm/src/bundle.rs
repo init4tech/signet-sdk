@@ -240,7 +240,7 @@ impl<I> BundleDriver<OrderDetector<I>>
         }
 
         // Set the state block number this simulation was based on
-        self.response.response.state_block_number = self
+        self.response.state_block_number = self
             .bundle
             .bundle
             .state_block_number
@@ -317,9 +317,9 @@ impl<I> BundleDriver<OrderDetector<I>>
                         );
 
                         // Accumulate overall results from response
-                        self.response.response.total_gas_used += response.gas_used;
-                        self.response.response.gas_fees += response.gas_fees;
-                        self.response.response.results.push(response);
+                        self.response.total_gas_used += response.gas_used;
+                        self.response.gas_fees += response.gas_fees;
+                        self.response.results.push(response);
 
                         // update the coinbase balance
                         pre_sim_coinbase_balance = post_sim_coinbase_balance;
@@ -331,17 +331,16 @@ impl<I> BundleDriver<OrderDetector<I>>
             }
 
             // Accumulate the total results
-            self.response.response.coinbase_diff =
+            self.response.coinbase_diff =
                 post_sim_coinbase_balance.saturating_sub(initial_coinbase_balance);
-            self.response.response.eth_sent_to_coinbase =
-                self.response.response.coinbase_diff.saturating_sub(self.response.response.gas_fees);
-            self.response.response.bundle_gas_price = self
-                .response
+            self.response.eth_sent_to_coinbase =
+                self.response.coinbase_diff.saturating_sub(self.response.gas_fees);
+            self.response.bundle_gas_price = self
                 .response
                 .coinbase_diff
-                .checked_div(U256::from(self.response.response.total_gas_used))
+                .checked_div(U256::from(self.response.total_gas_used))
                 .unwrap_or_default();
-            self.response.response.bundle_hash = self.bundle.bundle_hash();
+            self.response.bundle_hash = self.bundle.bundle_hash();
 
             // return the final state
             Ok(trevm)

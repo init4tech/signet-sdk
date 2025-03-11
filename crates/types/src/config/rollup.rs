@@ -1,4 +1,4 @@
-use crate::{ConfigError, PredeployTokens};
+use crate::config::{ConfigError, PredeployTokens};
 use alloy::{
     genesis::Genesis,
     primitives::{address, Address},
@@ -12,7 +12,9 @@ pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e6164
 
 /// Configuration details for the rollup chain.
 ///
-/// These are system constants which may vary
+/// These are system constants which may vary between chains, and are used to
+/// determine the behavior of the chain, such as which contracts the Signet
+/// node should listen to, and the addresses of system-priveleged tokens.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RollupConfig {

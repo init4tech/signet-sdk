@@ -31,7 +31,7 @@ pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector};
 mod result;
 pub use result::BlockResult;
 
-use alloy::primitives::Address;
+use signet_types::config::SignetSystemConstants;
 use trevm::{
     revm::{
         inspector_handle_register, inspectors::NoOpInspector, Database, DatabaseCommit, EvmBuilder,
@@ -51,12 +51,11 @@ pub type RuRevmState = reth::revm::db::State<
 /// Create a new EVM with the given database.
 pub fn signet_evm<Db: Database + DatabaseCommit>(
     db: Db,
-    orders_addr: Address,
-    chain_id: u64,
+    constants: SignetSystemConstants,
 ) -> EvmNeedsCfg<'static, Db> {
     EvmBuilder::default()
         .with_db(db)
-        .with_external_context(OrderDetector::<NoOpInspector>::new(orders_addr, chain_id))
+        .with_external_context(OrderDetector::<NoOpInspector>::new(constants))
         .append_handler_register(inspector_handle_register)
         .build_trevm()
 }
@@ -64,15 +63,14 @@ pub fn signet_evm<Db: Database + DatabaseCommit>(
 /// Create a new EVM with the given database and inspector.
 pub fn signet_evm_with_inspector<Db, I>(
     db: Db,
-    inspector: I,
-    orders_addr: Address,
-    chain_id: u64,
+    inner: I,
+    constants: SignetSystemConstants,
 ) -> EvmNeedsCfg<'static, Db, I>
 where
     I: Inspector<Db>,
     Db: Database + DatabaseCommit,
 {
-    let inspector = OrderDetector::new_with_inspector(orders_addr, chain_id, inspector);
+    let inspector = OrderDetector::new_with_inspector(constants, inner);
     EvmBuilder::default()
         .with_db(db)
         .with_external_context(inspector)
@@ -85,6 +83,7 @@ where
 pub mod test_utils {
     use alloy::primitives::Address;
     use reth::revm::InMemoryDB;
+    use signet_types::config::{HostConfig, PredeployTokens, RollupConfig, SignetSystemConstants};
 
     /// Test chain id for the host chain.
     pub const TEST_HOST_CHAIN_ID: u64 = 1;
@@ -99,8 +98,31 @@ pub mod test_utils {
 
     /// Create a new Signet EVM with an in-memory database for testing.
     pub fn test_signet_evm() -> super::EvmNeedsCfg<'static, trevm::revm::db::InMemoryDB> {
-        let mut trevm =
-            super::signet_evm(InMemoryDB::default(), HOST_ORDERS_ADDRESS, TEST_RU_CHAIN_ID);
+        let usdc = Address::repeat_byte(0x01);
+        let usdt = Address::repeat_byte(0x02);
+        let wbtc = Address::repeat_byte(0x03);
+
+        let mut trevm = super::signet_evm(
+            InMemoryDB::default(),
+            SignetSystemConstants::new(
+                HostConfig::new(
+                    TEST_HOST_CHAIN_ID,
+                    0,
+                    HOST_ZENITH_ADDRESS,
+                    HOST_ORDERS_ADDRESS,
+                    Address::repeat_byte(1),
+                    Address::repeat_byte(2),
+                    PredeployTokens::new(usdc, usdt, wbtc),
+                ),
+                RollupConfig::new(
+                    TEST_RU_CHAIN_ID,
+                    RU_ORDERS_ADDRESS,
+                    Address::repeat_byte(3),
+                    Address::repeat_byte(4),
+                    PredeployTokens::new(usdc, usdt, wbtc),
+                ),
+            ),
+        );
         trevm.inner_mut_unchecked().cfg_mut().chain_id = TEST_RU_CHAIN_ID;
         trevm
     }

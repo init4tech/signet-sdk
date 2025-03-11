@@ -9,14 +9,22 @@ use std::collections::BTreeMap;
 use trevm::Block;
 use zenith_types::SignedOrder;
 
-/// Bundle of transactions for `signet_callBundle`
+/// Bundle of transactions for `signet_callBundle`.
 ///
-/// TODO: Link to docs.
+/// The Signet bundle contains the following:
+///
+/// - A standard [`EthCallBundle`] with the transactions to simulate.
+/// - A mapping of assets to users to amounts, which are the host fills to be
+///   checked against market orders after simulation.
+///
+/// This is based on the flashbots `eth_callBundle` bundle. See [their docs].
+///
+/// [their docs]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignetCallBundle {
-    /// The bundle of transactions to simulate. Same structure as a Flashbots [EthCallBundle] bundle.
-    /// see <https://github.com/alloy-rs/alloy/blob/main/crates/rpc-types-mev/src/eth_calls.rs#L13-L33>
+    /// The bundle of transactions to simulate. Same structure as a Flashbots
+    /// [`EthCallBundle`] bundle.
     #[serde(flatten)]
     pub bundle: EthCallBundle,
     /// Host fills to be applied to the bundle for simulation. The mapping corresponds
@@ -229,27 +237,28 @@ impl Block for SignetCallBundle {
     }
 }
 
-/// Response for `signet_callBundle`
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct SignetCallBundleResponse {
-    /// The flattened "vanilla" response which comes from `eth_callBundle`
-    #[serde(flatten)]
-    pub response: EthCallBundleResponse,
-}
+/// Response for `signet_callBundle`.
+pub type SignetCallBundleResponse = EthCallBundleResponse;
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///
-/// TODO: Link to docs.
+/// The Signet bundle contains the following:
+///
+/// - A standard [`EthSendBundle`] with the transactions to simulate.
+/// - A signed permit2 order to be applied on Ethereum with the bundle.
+///
+/// This is based on the flashbots `eth_sendBundle` bundle. See [their docs].
+///
+/// [their docs]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignetEthBundle {
-    /// The bundle of transactions to simulate. Same structure as a Flashbots [EthSendBundle] bundle.
-    /// see <https://github.com/alloy-rs/alloy/blob/main/crates/rpc-types-mev/src/eth_calls.rs#L121-L139>
+    /// The bundle of transactions to simulate. Same structure as a Flashbots [`EthSendBundle`] bundle.
     #[serde(flatten)]
     pub bundle: EthSendBundle,
-    /// Host fills to be applied with the bundle, represented as a signed permit2 order.
-    /// TODO: Link to docs
+    /// Host fills to be applied with the bundle, represented as a signed
+    /// permit2 order.
+    #[serde(default)]
     pub host_fills: Option<SignedOrder>,
 }
 
@@ -285,7 +294,11 @@ impl SignetEthBundle {
     }
 }
 
-/// Response for `signet_sendBundle`
+/// Response for `signet_sendBundle`.
+///
+/// This is based on the flashbots `eth_sendBundle` response. See [their docs].
+///
+/// [their docs]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignetEthBundleResponse {
@@ -294,4 +307,125 @@ pub struct SignetEthBundleResponse {
     /// This is calculated as keccak256(tx_hashes) where tx_hashes are the
     /// concatenated transaction hashes.
     pub bundle_hash: B256,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use alloy::{
+        eips::BlockNumberOrTag,
+        primitives::{Address, U256},
+        rpc::types::mev::{EthCallBundle, EthCallBundleTransactionResult},
+    };
+    use zenith_types::HostOrders::{
+        Output, Permit2Batch, PermitBatchTransferFrom, TokenPermissions,
+    };
+
+    #[test]
+    fn call_bundle_ser_roundtrip() {
+        let bundle = SignetCallBundle {
+            bundle: EthCallBundle {
+                txs: vec![b"tx1".into(), b"tx2".into()],
+                block_number: 1,
+                state_block_number: BlockNumberOrTag::Number(2),
+                timestamp: Some(3),
+                gas_limit: Some(4),
+                difficulty: Some(alloy::primitives::U256::from(5)),
+                base_fee: Some(6),
+                transaction_index: Some(7.into()),
+                coinbase: Some(Address::repeat_byte(8)),
+                timeout: Some(9),
+            },
+            host_fills: [(
+                Address::repeat_byte(10),
+                vec![(Address::repeat_byte(11), U256::from(12))].into_iter().collect(),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let serialized = serde_json::to_string(&bundle).unwrap();
+        let deserialized: SignetCallBundle = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(bundle, deserialized);
+    }
+
+    #[test]
+    fn send_bundle_ser_roundtrip() {
+        let bundle = SignetEthBundle {
+            bundle: EthSendBundle {
+                txs: vec![b"tx1".into(), b"tx2".into()],
+                block_number: 1,
+                min_timestamp: Some(2),
+                max_timestamp: Some(3),
+                reverting_tx_hashes: vec![B256::repeat_byte(4), B256::repeat_byte(5)],
+                replacement_uuid: Some("uuid".to_owned()),
+            },
+            host_fills: Some(SignedOrder {
+                permit: Permit2Batch {
+                    permit: PermitBatchTransferFrom {
+                        permitted: vec![TokenPermissions {
+                            token: Address::repeat_byte(66),
+                            amount: U256::from(17),
+                        }],
+                        nonce: U256::from(18),
+                        deadline: U256::from(19),
+                    },
+                    owner: Address::repeat_byte(77),
+                    signature: Bytes::from(b"abcd"),
+                },
+                outputs: vec![Output {
+                    token: Address::repeat_byte(88),
+                    amount: U256::from(20),
+                    recipient: Address::repeat_byte(99),
+                    chainId: 100,
+                }],
+            }),
+        };
+
+        let serialized = serde_json::to_string(&bundle).unwrap();
+        let deserialized: SignetEthBundle = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(bundle, deserialized);
+    }
+
+    #[test]
+    fn call_bundle_resp_ser_roundtrip() {
+        let resp = EthCallBundleResponse {
+            bundle_hash: B256::repeat_byte(1),
+            bundle_gas_price: U256::from(2),
+            coinbase_diff: U256::from(3),
+            eth_sent_to_coinbase: U256::from(4),
+            gas_fees: U256::from(5),
+            results: vec![EthCallBundleTransactionResult {
+                coinbase_diff: U256::from(6),
+                eth_sent_to_coinbase: U256::from(7),
+                from_address: Address::repeat_byte(8),
+                gas_fees: U256::from(9),
+                gas_price: U256::from(10),
+                gas_used: 11,
+                to_address: Some(Address::repeat_byte(12)),
+                tx_hash: B256::repeat_byte(13),
+                value: Some(Bytes::from(b"value")),
+                revert: Some(Bytes::from(b"revert")),
+            }],
+            state_block_number: 14,
+            total_gas_used: 15,
+        };
+
+        let serialized = serde_json::to_string(&resp).unwrap();
+        let deserialized: SignetCallBundleResponse = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(resp, deserialized);
+    }
+
+    #[test]
+    fn send_bundle_resp_ser_roundtrip() {
+        let resp = SignetEthBundleResponse { bundle_hash: B256::repeat_byte(1) };
+
+        let serialized = serde_json::to_string(&resp).unwrap();
+        let deserialized: SignetEthBundleResponse = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(resp, deserialized);
+    }
 }
