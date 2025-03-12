@@ -20,6 +20,9 @@ pub enum ConfigError {
     /// Error parsing JSON
     #[error("failed to parse JSON: {0}")]
     Json(#[from] serde_json::Error),
+    /// Error reading file
+    #[error("failed to read file: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 impl ConfigError {
