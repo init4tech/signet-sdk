@@ -28,7 +28,7 @@ identify the sender of the action, without a signature.
 
 This "magic signature" contains the following information:
 
-- The txhash of the Ethereum transaction that triggered the event
+- The transaction hash of the Ethereum transaction that triggered the event
 - The index of the event log that triggered the action in that transactions's
   receipt.
 - A 1-byte flag indicating the type of action (`Enter`, `EnterToken`,
