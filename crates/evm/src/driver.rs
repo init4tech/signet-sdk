@@ -118,13 +118,13 @@ impl Tx for FillShim<'_> {
 #[derive(Debug)]
 pub struct SignetDriver<'a, 'b> {
     /// The block extracts.
-    pub extracts: &'a Extracts<'b>,
+    extracts: &'a Extracts<'b>,
 
     /// Parent rollup block.
-    pub parent: SealedHeader,
+    parent: SealedHeader,
 
     /// Rollup constants, including pre-deploys
-    pub constants: SignetSystemConstants,
+    constants: SignetSystemConstants,
 
     /// The working context is a clone of the market context that is updated
     /// progessively as the block is evaluated.
@@ -165,6 +165,21 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             output: BlockOutput::with_capacity(cap),
             payable_gas_used: 0,
         }
+    }
+
+    /// Get the extracts being executed by the driver.
+    pub fn extracts(&self) -> &Extracts<'b> {
+        self.extracts
+    }
+
+    /// Get the parent header.
+    pub fn parent(&self) -> &SealedHeader {
+        &self.parent
+    }
+
+    /// Get the system constants.
+    pub fn constants(&self) -> &SignetSystemConstants {
+        &self.constants
     }
 
     /// Consume the driver, producing the sealed block and receipts.
