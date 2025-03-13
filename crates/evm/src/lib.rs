@@ -103,7 +103,7 @@ pub mod test_utils {
     pub const TEST_WBTC: Address = Address::repeat_byte(0x03);
 
     /// Create a new set of Signet system constants for testing.
-    pub fn test_signet_constants() -> SignetSystemConstants {
+    pub const fn test_signet_constants() -> SignetSystemConstants {
         let usdc = Address::repeat_byte(0x01);
         let usdt = Address::repeat_byte(0x02);
         let wbtc = Address::repeat_byte(0x03);
