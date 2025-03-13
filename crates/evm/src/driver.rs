@@ -19,7 +19,7 @@ use signet_extract::Extracts;
 use signet_types::{config::SignetSystemConstants, MarketContext, MarketError};
 use signet_zenith::MINTER_ADDRESS;
 use std::collections::{HashSet, VecDeque};
-use tracing::{debug, trace_span};
+use tracing::{debug, debug_span, trace_span, warn};
 use trevm::{
     fillers::DisableGasChecks,
     revm::{
@@ -118,13 +118,13 @@ impl Tx for FillShim<'_> {
 #[derive(Debug)]
 pub struct SignetDriver<'a, 'b> {
     /// The block extracts.
-    pub extracts: &'a Extracts<'b>,
+    extracts: &'a Extracts<'b>,
 
     /// Parent rollup block.
-    pub parent: SealedHeader,
+    parent: SealedHeader,
 
     /// Rollup constants, including pre-deploys
-    pub constants: SignetSystemConstants,
+    constants: SignetSystemConstants,
 
     /// The working context is a clone of the market context that is updated
     /// progessively as the block is evaluated.
@@ -167,38 +167,19 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         }
     }
 
-    /// Consume the driver, producing the sealed block and receipts.
-    pub fn finish(self) -> (RecoveredBlock<Block>, Vec<Receipt>) {
-        let (header, hash) = self.construct_sealed_header().split();
-        let (receipts, senders, _) = self.output.into_parts();
-
-        let block = RecoveredBlock::new(
-            Block::new(header, BlockBody { transactions: self.processed, ..Default::default() }),
-            senders,
-            hash,
-        );
-
-        let receipts = receipts.into_iter().map(|re| re.to_reth()).collect();
-
-        (block, receipts)
+    /// Get the extracts being executed by the driver.
+    pub const fn extracts(&self) -> &Extracts<'b> {
+        self.extracts
     }
 
-    /// Consume the driver and trevm, producing a BlockResult
-    pub fn finish_trevm<Db: Database>(
-        self,
-        trevm: crate::EvmNeedsBlock<'_, State<Db>>,
-    ) -> BlockResult {
-        let ru_height = self.extracts.ru_height;
-        let (sealed_block, receipts) = self.finish();
-        BlockResult {
-            sealed_block,
-            execution_outcome: ExecutionOutcome::new(
-                trevm.finish(),
-                vec![receipts],
-                ru_height,
-                vec![],
-            ),
-        }
+    /// Get the parent header.
+    pub const fn parent(&self) -> &SealedHeader {
+        &self.parent
+    }
+
+    /// Get the system constants.
+    pub const fn constants(&self) -> &SignetSystemConstants {
+        &self.constants
     }
 
     /// Get the rollup height of the current block.
@@ -243,6 +224,40 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// enters and enter token events.
     pub fn cumulative_gas_used(&self) -> u64 {
         self.output.cumulative_gas_used()
+    }
+
+    /// Consume the driver, producing the sealed block and receipts.
+    pub fn finish(self) -> (RecoveredBlock<Block>, Vec<Receipt>) {
+        let (header, hash) = self.construct_sealed_header().split();
+        let (receipts, senders, _) = self.output.into_parts();
+
+        let block = RecoveredBlock::new(
+            Block::new(header, BlockBody { transactions: self.processed, ..Default::default() }),
+            senders,
+            hash,
+        );
+
+        let receipts = receipts.into_iter().map(|re| re.to_reth()).collect();
+
+        (block, receipts)
+    }
+
+    /// Consume the driver and trevm, producing a [`BlockResult`].
+    pub fn finish_trevm<Db: Database>(
+        self,
+        trevm: crate::EvmNeedsBlock<'_, State<Db>>,
+    ) -> BlockResult {
+        let ru_height = self.extracts.ru_height;
+        let (sealed_block, receipts) = self.finish();
+        BlockResult {
+            sealed_block,
+            execution_outcome: ExecutionOutcome::new(
+                trevm.finish(),
+                vec![receipts],
+                ru_height,
+                vec![],
+            ),
+        }
     }
 
     /// Get the logs bloom of the block.
@@ -316,7 +331,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         if let Err(err) =
             self.working_context.checked_remove_ru_tx_events(&aggregate, &market_context)
         {
-            tracing::debug!(%err, "Discarding transaction outcome due to market error");
+            debug!(%err, "Discarding transaction outcome due to market error");
             return Ok(trevm.reject());
         }
 
@@ -377,7 +392,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         // We set up the span here so that tx details are captured in the event
         // of signature recovery failure.
         let s =
-        tracing::debug_span!("signet::evm::execute_transaction", tx_hash = %tx.hash(), sender = tracing::field::Empty, nonce = tx.nonce())
+        debug_span!("signet::evm::execute_transaction", tx_hash = %tx.hash(), sender = tracing::field::Empty, nonce = tx.nonce())
                 .entered();
 
         if let Ok(sender) = tx.recover_signer() {
@@ -386,7 +401,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             let t = run_tx_early_return!(self, trevm, &FillShim(&tx, sender), sender);
             trevm = self.check_market_and_accept(t, tx)?;
         } else {
-            tracing::warn!("Failed to recover signer for transaction");
+            warn!("Failed to recover signer for transaction");
         }
         Ok(trevm)
     }
@@ -452,7 +467,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             eth_minted += amount;
         }
 
-        tracing::debug!(
+        debug!(
             accounts_touched = accts.len(),
             %eth_minted,
             enters_count = self.extracts.enters.len(),
@@ -472,7 +487,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ) -> RunTxResult<'c, Db, Self, Ext> {
         let _span = {
             let e = &self.extracts.enter_tokens[idx];
-            tracing::debug_span!("signet::evm::execute_enter_token", idx, host_tx = %e.tx_hash(), log_index = e.log_index).entered()
+            debug_span!("signet::evm::execute_enter_token", idx, host_tx = %e.tx_hash(), log_index = e.log_index).entered()
         };
 
         // Get the rollup token address from the host token address.
@@ -529,7 +544,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ) -> RunTxResult<'c, Db, Self, Ext> {
         let _span = {
             let e = &self.extracts.transacts[idx];
-            tracing::debug_span!("execute_transact_event", idx,
+            debug_span!("execute_transact_event", idx,
                 host_tx = %e.tx_hash(),
                 log_index = e.log_index,
                 sender = %e.event.sender,
@@ -572,7 +587,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             let base_fee = t.inner().block().basefee;
             let to_debit = base_fee * unused_gas;
 
-            tracing::debug!(%base_fee, gas_used, %unused_gas, %to_debit, "Debiting unused transact gas");
+            debug!(%base_fee, gas_used, %unused_gas, %to_debit, "Debiting unused transact gas");
 
             let acct = t
                 .result_and_state_mut_unchecked()
@@ -585,7 +600,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
                 Some(balance) => acct.info.balance = balance,
                 // If the balance is insufficient, discard the transaction.
                 None => {
-                    tracing::debug!("Discarding transact outcome due to insufficient balance to pay for unused transact gas");
+                    debug!("Discarding transact outcome due to insufficient balance to pay for unused transact gas");
                     return Ok(t.reject());
                 }
             }
@@ -615,7 +630,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ) -> RunTxResult<'c, Db, Self, Ext> {
         // Zero the balance of the rollup passage (deleting any exited ETH).
         match trevm.try_set_balance_unchecked(self.constants.rollup().passage(), U256::ZERO) {
-            Ok(eth_burned) => tracing::debug!(%eth_burned, "Zeroed rollup passage balance"),
+            Ok(eth_burned) => debug!(%eth_burned, "Zeroed rollup passage balance"),
             Err(e) => return Err(trevm.errored(EVMError::Database(e).into())),
         }
         Ok(trevm)
@@ -635,11 +650,11 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let amount = U256::from(gas_used) * U256::from(base_fee);
 
         if amount.is_zero() {
-            tracing::debug!(%amount, gas_used, base_fee, recipient = %self.base_fee_recipient(), "No base fee to credit");
+            debug!(%amount, gas_used, base_fee, recipient = %self.base_fee_recipient(), "No base fee to credit");
             return Ok(trevm);
         }
 
-        tracing::debug!(%amount, gas_used, base_fee, recipient = %self.base_fee_recipient(), "Crediting base fee");
+        debug!(%amount, gas_used, base_fee, recipient = %self.base_fee_recipient(), "Crediting base fee");
 
         unwrap_or_trevm_err!(
             trevm
@@ -673,7 +688,7 @@ impl<I> BlockDriver<OrderDetector<I>> for SignetDriver<'_, '_> {
         &mut self,
         mut trevm: EvmNeedsTx<'c, Db, I>,
     ) -> trevm::RunTxResult<'c, OrderDetector<I>, Db, Self> {
-        let _span = tracing::debug_span!(
+        let _span = debug_span!(
             "run_txns",
             txn_count = self.to_process.len(),
             enter_count = self.extracts.enters.len(),
