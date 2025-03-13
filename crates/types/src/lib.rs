@@ -29,3 +29,6 @@ pub use height::PairedHeights;
 
 mod slot;
 pub use slot::SlotCalculator;
+
+mod seq;
+pub use seq::{RequestSigner, SignRequest, SignResponse};
