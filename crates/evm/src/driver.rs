@@ -168,17 +168,17 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Get the extracts being executed by the driver.
-    pub fn extracts(&self) -> &Extracts<'b> {
+    pub const fn extracts(&self) -> &Extracts<'b> {
         self.extracts
     }
 
     /// Get the parent header.
-    pub fn parent(&self) -> &SealedHeader {
+    pub const fn parent(&self) -> &SealedHeader {
         &self.parent
     }
 
     /// Get the system constants.
-    pub fn constants(&self) -> &SignetSystemConstants {
+    pub const fn constants(&self) -> &SignetSystemConstants {
         &self.constants
     }
 
