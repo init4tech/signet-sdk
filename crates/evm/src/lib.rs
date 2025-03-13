@@ -76,7 +76,7 @@ where
 }
 
 /// Test utilities for the Signet EVM impl.
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils {
     use alloy::primitives::Address;
     use reth::revm::InMemoryDB;
@@ -93,33 +93,44 @@ pub mod test_utils {
     /// Test address for the host orders.
     pub const HOST_ORDERS_ADDRESS: Address = Address::repeat_byte(0xdc);
 
-    /// Create a new Signet EVM with an in-memory database for testing.
-    pub fn test_signet_evm() -> super::EvmNeedsCfg<'static, trevm::revm::db::InMemoryDB> {
+    /// Test address for USDC.
+    pub const TEST_USDC: Address = Address::repeat_byte(0x01);
+
+    /// Test address for USDT.
+    pub const TEST_USDT: Address = Address::repeat_byte(0x02);
+
+    /// Test address for WBTC.
+    pub const TEST_WBTC: Address = Address::repeat_byte(0x03);
+
+    /// Create a new set of Signet system constants for testing.
+    pub fn test_signet_constants() -> SignetSystemConstants {
         let usdc = Address::repeat_byte(0x01);
         let usdt = Address::repeat_byte(0x02);
         let wbtc = Address::repeat_byte(0x03);
 
-        let mut trevm = super::signet_evm(
-            InMemoryDB::default(),
-            SignetSystemConstants::new(
-                HostConfig::new(
-                    TEST_HOST_CHAIN_ID,
-                    0,
-                    HOST_ZENITH_ADDRESS,
-                    HOST_ORDERS_ADDRESS,
-                    Address::repeat_byte(1),
-                    Address::repeat_byte(2),
-                    PredeployTokens::new(usdc, usdt, wbtc),
-                ),
-                RollupConfig::new(
-                    TEST_RU_CHAIN_ID,
-                    RU_ORDERS_ADDRESS,
-                    Address::repeat_byte(3),
-                    Address::repeat_byte(4),
-                    PredeployTokens::new(usdc, usdt, wbtc),
-                ),
+        SignetSystemConstants::new(
+            HostConfig::new(
+                TEST_HOST_CHAIN_ID,
+                0,
+                HOST_ZENITH_ADDRESS,
+                HOST_ORDERS_ADDRESS,
+                Address::repeat_byte(1),
+                Address::repeat_byte(2),
+                PredeployTokens::new(usdc, usdt, wbtc),
             ),
-        );
+            RollupConfig::new(
+                TEST_RU_CHAIN_ID,
+                RU_ORDERS_ADDRESS,
+                Address::repeat_byte(3),
+                Address::repeat_byte(4),
+                PredeployTokens::new(usdc, usdt, wbtc),
+            ),
+        )
+    }
+
+    /// Create a new Signet EVM with an in-memory database for testing.
+    pub fn test_signet_evm() -> super::EvmNeedsCfg<'static, trevm::revm::db::InMemoryDB> {
+        let mut trevm = super::signet_evm(InMemoryDB::default(), test_signet_constants());
         trevm.inner_mut_unchecked().cfg_mut().chain_id = TEST_RU_CHAIN_ID;
         trevm
     }
