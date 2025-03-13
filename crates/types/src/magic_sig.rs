@@ -8,16 +8,41 @@ use signet_zenith::MINTER_ADDRESS;
 /// [EIP-2]: https://eips.ethereum.org/EIPS/eip-2
 pub(crate) const MAGIC_SIG_SENTINEL: [u8; 4] = [0xff, 0xee, 0xdd, 0xcc];
 
-/// Flags used to identify Enters
-pub(crate) const FLAG_ENTER: u8 = 0x01;
-/// Flags used to identify the type of magic signature.
-pub(crate) const FLAG_ENTER_TOKENS: u8 = 0x02;
-/// Flags used to identify the type of magic signature.
-pub(crate) const FLAG_TRANSACT: u8 = 0x03;
+/// Enum of flags
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
+pub(crate) enum Flags {
+    /// Flag used to identify Enters
+    Enter = 0x01,
+    /// Flag used to identify EnterTokens
+    EnterToken = 0x02,
+    /// Flag used to identify Transacts
+    Transact = 0x03,
+}
+
+impl From<Flags> for u8 {
+    fn from(flag: Flags) -> u8 {
+        flag as u8
+    }
+}
+
+impl TryFrom<u8> for Flags {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x01 => Ok(Self::Enter),
+            0x02 => Ok(Self::EnterToken),
+            0x03 => Ok(Self::Transact),
+            _ => Err(()),
+        }
+    }
+}
 
 /// Type flag used to identify the Signet event that cauesd the rollup
 /// consensus to create this magic signature.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum MagicSigInfo {
     /// An enter event.
     Enter,
@@ -31,20 +56,22 @@ pub enum MagicSigInfo {
 }
 
 impl MagicSigInfo {
+    /// Get the flag for the magic signature info.
+    fn flag(&self) -> u8 {
+        match self {
+            Self::Enter => Flags::Enter as u8,
+            Self::EnterToken => Flags::EnterToken as u8,
+            Self::Transact { .. } => Flags::Transact as u8,
+        }
+    }
+
     /// Write the magic signature info into a buffer.
     pub fn write_into_s(&self, buf: &mut [u8]) {
         debug_assert_eq!(buf.len(), 32);
-        match self {
-            Self::Enter => {
-                buf[8] = FLAG_ENTER;
-            }
-            Self::EnterToken => {
-                buf[8] = FLAG_ENTER_TOKENS;
-            }
-            Self::Transact { sender } => {
-                buf[8] = FLAG_TRANSACT;
-                buf[12..32].copy_from_slice(sender.as_slice());
-            }
+
+        buf[8] = self.flag();
+        if let Self::Transact { sender } = self {
+            buf[12..32].copy_from_slice(sender.as_slice());
         }
     }
 
@@ -54,11 +81,11 @@ impl MagicSigInfo {
         if s.len() < 32 {
             return None;
         }
-        match s[8] {
-            FLAG_ENTER => Some(Self::Enter),
-            FLAG_ENTER_TOKENS => Some(Self::EnterToken),
-            FLAG_TRANSACT => Some(Self::Transact { sender: Address::from_slice(&s[12..]) }),
-            _ => None,
+        let flag = s[8].try_into().ok()?;
+        match flag {
+            Flags::Enter => Some(Self::Enter),
+            Flags::EnterToken => Some(Self::EnterToken),
+            Flags::Transact => Some(Self::Transact { sender: Address::from_slice(&s[12..]) }),
         }
     }
 
