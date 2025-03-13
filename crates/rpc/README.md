@@ -17,7 +17,7 @@ unique to Signet:
 
 - The following endpoints are disabled
   - wallet-related endpoints like `eth_sign`. Good Riddance.
-  - network-related endpoints like `eth_listening`. Signet has no network.
+  - p2p-related endpoints like `eth_listening`. Signet has no peer.
   - mining-related endpoints like `eth_mining`. Signet needs no miners.
   - txpool-related endpoints like `txpool_content`. Signet wants no txpool.
   - uncle-related endpoints like `eth_getUncleByBlockHashAndIndex`. Signet
