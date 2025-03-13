@@ -57,7 +57,7 @@ pub enum MagicSigInfo {
 
 impl MagicSigInfo {
     /// Get the flag for the magic signature info.
-    fn flag(&self) -> u8 {
+    const fn flag(&self) -> u8 {
         match self {
             Self::Enter => Flags::Enter as u8,
             Self::EnterToken => Flags::EnterToken as u8,
