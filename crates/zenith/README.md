@@ -1,11 +1,20 @@
-# zenith-rs
+## signet-zenith
 
-Rust types & utilities for working with [Zenith](https://github.com/init4tech/zenith).
+Rust types & utilities for working with [Zenith](https://github.com/init4tech/zenith) smart contracts.
 
-![rust](https://github.com/init4tech/zenith-rs/actions/workflows/rust-ci.yml/badge.svg) ![ecr](https://github.com/init4tech/zenith-rs/actions/workflows/ecr-cd.yml/badge.svg)
+## What's in this crate?
 
-## Development
+- [alloy] Bindings for Zenith smart contracts
+  - `Zenith`
+  - `Passage`
+  - `Orders`
+- `AggregateOrders` - a struct that holds the net `Order` data for a
+  transaction or set of transactions.
+- `SignedOrder` - a struct that holds a signed `Order` and the signature
+  that was used to sign it. This enables users to make gasless orders using the
+  [permit2] orders iunterface.
+- `ZenithBlock` - a struct used to decode transaction data from Ethereum blobs
+  containing builder-created blocks.
 
-This project requires Rust 1.82.0 or newer.
-
-To build the project, run `make build`. To run tests, run `make test`. Before committing code, make sure to run `make tidy`, which will run clippy and format the whole project.
+[alloy]: https://docs.rs/alloy/latest/alloy/
+[permit2]: https://github.com/Uniswap/permit2

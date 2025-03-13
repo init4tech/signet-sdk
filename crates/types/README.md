@@ -1,0 +1,22 @@
+## signet-types
+
+This crate contains shared datastructures that are used by multiple Signet
+components. It is used by `signet-extractor`, `signet-evm`, `signet-node` and
+other ecosystem crates to share common functionality. It's pretty boring
+honestly.
+
+## What's in this crate?
+
+- `mod config` - contains `SignetSystemConstants` a configuration object that
+  holds the system constants and is used by the extractor, the EVM, and the
+  node.
+- `MarketContext` - a struct that holds the market context for
+  [conditional transactions].
+- `MagicSig` - a struct that holds magic signatures for Signet L1-driven
+  actions.
+- `SlotCalculator` - a small utility for calculating the slot number from a
+  timestamp and vice versa.
+- `SignRequest` and `SignResponse` - data structures for block-builders
+  communicating with the Signet sequencer.
+
+[conditional transactions]: https://docs.signet.sh/learn-about-signet/cross-chain-transfers-on-signet
