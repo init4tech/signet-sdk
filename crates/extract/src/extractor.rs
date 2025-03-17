@@ -175,11 +175,13 @@ mod test {
             .enter_token(TEST_USERS[2], 10_000_000, USDC)
             .simple_transact(TEST_USERS[0], TEST_USERS[4], &[1, 2, 3, 4], GWEI_TO_WEI as usize)
             .fill(USDT, TEST_USERS[4], 10_000)
-            .submit_block(ru_block)
+            .submit_block(ru_block.clone())
             .to_chain();
 
         let extractor = Extractor::new(&TEST_CONSTANTS);
         let extracts = extractor.extract_signet(&chain).next().unwrap();
+
+        ru_block.assert_conforms(&extracts);
 
         assert_eq!(extracts.enters.len(), 2);
         assert_eq!(extracts.enters[0].rollupRecipient, TEST_USERS[0]);
@@ -203,9 +205,5 @@ mod test {
         let fills = extracts.context.fills().get(&(TEST_HOST_CHAIN_ID, USDT)).unwrap();
         assert_eq!(fills.len(), 1);
         assert_eq!(*fills.get(&TEST_USERS[4]).unwrap(), U256::from(10_000));
-
-        let block_submitted = extracts.submitted.unwrap();
-        assert_eq!(block_submitted.gas_limit(), 12345);
-        assert_eq!(block_submitted.reward_address(), Address::repeat_byte(0x99));
     }
 }

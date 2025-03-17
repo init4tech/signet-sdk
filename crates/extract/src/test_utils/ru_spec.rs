@@ -1,3 +1,5 @@
+use crate::Extracts;
+
 use super::{sign_tx_with_key_pair, simple_send};
 use alloy::{
     consensus::{BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEnvelope},
@@ -117,5 +119,18 @@ impl RuBlockSpec {
         };
 
         (block_submitted, sidecar)
+    }
+
+    /// Assert that extracted data conforms to the block spec.
+    pub fn assert_conforms(&self, extracts: &Extracts<'_>) {
+        let submitted = extracts.submitted.as_ref().unwrap();
+
+        if let Some(gas_limit) = self.gas_limit {
+            assert_eq!(submitted.gas_limit(), gas_limit)
+        }
+
+        if let Some(reward_address) = self.reward_address {
+            assert_eq!(submitted.reward_address(), reward_address)
+        }
     }
 }
