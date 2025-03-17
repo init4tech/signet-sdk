@@ -76,10 +76,9 @@ where
 }
 
 /// Test utilities for the Signet EVM impl.
-
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
-    
+
     use reth::revm::InMemoryDB;
     use signet_types::test_utils::*;
 
