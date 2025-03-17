@@ -157,7 +157,7 @@ mod test {
     use crate::test_utils::*;
     use alloy::{
         consensus::constants::GWEI_TO_WEI,
-        primitives::{Address, Bytes, U256},
+        primitives::{Address, U256},
     };
     use signet_types::test_utils::*;
 
