@@ -81,7 +81,7 @@ async-trait = "0.1.87"
 parking_lot = "0.12"
 
 # Rpc
-jsonrpsee = "0.24"
+jsonrpsee = "0.24.9"
 jsonrpsee-core = "0.24"
 jsonrpsee-http-client = "0.24"
 jsonrpsee-types = "0.24"

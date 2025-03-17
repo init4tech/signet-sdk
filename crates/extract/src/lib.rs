@@ -36,3 +36,7 @@ pub use extractor::Extractor;
 
 mod block;
 pub use block::Extracts;
+
+#[cfg(any(test, feature = "test-utils"))]
+/// Utils for unit and integration tests.
+pub mod test_utils;
