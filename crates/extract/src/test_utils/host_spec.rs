@@ -1,4 +1,7 @@
-use crate::test_utils::{NotificationSpec, NotificationWithSidecars, RuBlockSpec};
+use crate::{
+    test_utils::{NotificationSpec, NotificationWithSidecars, RuBlockSpec},
+    Events, Extracts,
+};
 use alloy::{
     consensus::{constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip4844},
     primitives::{Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
@@ -11,7 +14,7 @@ use reth::{
     },
     providers::{Chain, ExecutionOutcome},
 };
-use signet_types::config::SignetSystemConstants;
+use signet_types::{config::SignetSystemConstants, MarketContext};
 use signet_zenith::{Passage, RollupOrders, Transactor};
 use std::{
     borrow::Borrow,
@@ -43,6 +46,9 @@ pub struct HostBlockSpec {
     pub ru_block_receipt: Option<Receipt>,
     /// The block number. This will be overridden when making chains of blocks.
     pub block_number: AtomicU64,
+
+    /// The events that were used to create this block.
+    pub events: Vec<Events>,
 }
 
 impl Clone for HostBlockSpec {
@@ -54,6 +60,7 @@ impl Clone for HostBlockSpec {
             sidecar: self.sidecar.clone(),
             ru_block_receipt: self.ru_block_receipt.clone(),
             block_number: self.block_number().into(),
+            events: self.events.clone(),
         }
     }
 }
@@ -68,6 +75,7 @@ impl HostBlockSpec {
             sidecar: None,
             ru_block_receipt: None,
             block_number: AtomicU64::new(0),
+            events: vec![],
         }
     }
 
@@ -79,15 +87,14 @@ impl HostBlockSpec {
 
     /// Add an enter to the host block.
     pub fn enter_token(mut self, recipient: Address, amount: usize, token: Address) -> Self {
-        self.receipts.push(to_receipt(
-            self.constants.host_passage(),
-            &Passage::EnterToken {
-                rollupChainId: U256::from(self.constants.ru_chain_id()),
-                rollupRecipient: recipient,
-                amount: U256::from(amount),
-                token,
-            },
-        ));
+        let e = Passage::EnterToken {
+            rollupChainId: U256::from(self.constants.ru_chain_id()),
+            rollupRecipient: recipient,
+            amount: U256::from(amount),
+            token,
+        };
+        self.receipts.push(to_receipt(self.constants.host_passage(), &e));
+        self.events.push(e.into());
 
         self
     }
@@ -120,14 +127,13 @@ impl HostBlockSpec {
 
     /// Add an enter to the host block.
     pub fn enter(mut self, recipient: Address, amount: usize) -> Self {
-        self.receipts.push(to_receipt(
-            self.constants.host_passage(),
-            &Passage::Enter {
-                rollupChainId: U256::from(self.constants.ru_chain_id()),
-                rollupRecipient: recipient,
-                amount: U256::from(amount),
-            },
-        ));
+        let e = Passage::Enter {
+            rollupChainId: U256::from(self.constants.ru_chain_id()),
+            rollupRecipient: recipient,
+            amount: U256::from(amount),
+        };
+        self.receipts.push(to_receipt(self.constants.host_passage(), &e));
+        self.events.push(e.into());
 
         self
     }
@@ -159,8 +165,9 @@ impl HostBlockSpec {
     }
 
     /// Add a transact to the host block
-    pub fn transact(mut self, t: &Transactor::Transact) -> Self {
-        self.receipts.push(to_receipt(self.constants.host_transactor(), t));
+    pub fn transact(mut self, t: Transactor::Transact) -> Self {
+        self.receipts.push(to_receipt(self.constants.host_transactor(), &t));
+        self.events.push(t.into());
         self
     }
 
@@ -181,22 +188,21 @@ impl HostBlockSpec {
             gas: U256::from(100_000),
             maxFeePerGas: U256::from(GWEI_TO_WEI),
         };
-        self.transact(&transact)
+        self.transact(transact)
     }
 
     /// Add a fill to the host block
     pub fn fill(mut self, token: Address, recipient: Address, amount: u64) -> Self {
-        self.receipts.push(to_receipt(
-            self.constants.host_orders(),
-            &RollupOrders::Filled {
-                outputs: vec![RollupOrders::Output {
-                    chainId: self.constants.ru_chain_id() as u32,
-                    token,
-                    recipient,
-                    amount: U256::from(amount),
-                }],
-            },
-        ));
+        let e = RollupOrders::Filled {
+            outputs: vec![RollupOrders::Output {
+                chainId: self.constants.ru_chain_id() as u32,
+                token,
+                recipient,
+                amount: U256::from(amount),
+            }],
+        };
+        self.receipts.push(to_receipt(self.constants.host_orders(), &e));
+        self.events.push(e.into());
         self
     }
 
@@ -346,6 +352,41 @@ impl HostBlockSpec {
     /// Make a revert notification spec
     pub fn to_revert_notification_spec(&self) -> NotificationSpec {
         NotificationSpec { old: vec![self.clone()], new: vec![] }
+    }
+
+    /// Assert that the block conforms to the spec
+    pub fn assert_conforms(&self, extracts: &Extracts<'_>) {
+        if let Some(ru_block) = &self.ru_block {
+            ru_block.assert_conforms(extracts);
+        }
+
+        let mut enters = extracts.enters();
+        let mut enter_tokens = extracts.enter_tokens();
+        let mut transacts = extracts.transacts();
+
+        let mut context = MarketContext::new();
+
+        for event in self.events.iter() {
+            match event {
+                Events::Enter(e) => {
+                    assert_eq!(&(enters.next().expect("iter ended early")), e);
+                }
+                Events::EnterToken(e) => {
+                    assert_eq!(&(enter_tokens.next().expect("iter ended early")), e);
+                }
+                Events::Transact(e) => {
+                    assert_eq!(transacts.next().expect("iter ended early"), e);
+                }
+                Events::Filled(e) => {
+                    context.add_fill(self.constants.host_chain_id(), e);
+                }
+                Events::BlockSubmitted(_) => {}
+            }
+        }
+        assert!(enters.next().is_none());
+        assert!(enter_tokens.next().is_none());
+        assert!(transacts.next().is_none());
+        assert_eq!(extracts.market_context(), context);
     }
 }
 
