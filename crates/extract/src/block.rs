@@ -72,7 +72,7 @@ impl Extracts<'_> {
 
 impl<'a> Extracts<'a> {
     /// Used for testing.
-    #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn empty(host_block: &'a RecoveredBlock<Block>) -> Self {
         Self {
             host_block,
