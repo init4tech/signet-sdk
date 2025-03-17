@@ -1,9 +1,6 @@
 use super::{sign_tx_with_key_pair, simple_send};
 use alloy::{
-    consensus::{
-        BlobTransactionSidecar, SidecarBuilder, SimpleCoder,
-        TxEnvelope,
-    },
+    consensus::{BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEnvelope},
     eips::eip2718::Encodable2718,
     primitives::{keccak256, Address, Bytes, B256, U256},
     rlp::Encodable,
@@ -14,6 +11,15 @@ use signet_types::config::SignetSystemConstants;
 use signet_zenith::Zenith::{self};
 
 /// A block spec for the Ru chain.
+///
+/// Typically this should be used as follows:
+/// 1. Instantiate with a [`SignetSystemConstants`] object via [`Self::new`].
+/// 2. Add transactions to the block with [`Self::add_tx`].
+/// 3. Optionally set the gas limit with [`Self::with_gas_limit`].
+/// 4. Optionally set the reward address with [`Self::with_reward_address`].
+/// 5. Add to a [`HostBlockSpec`] via `HostBlockSpec::add_ru_block`.
+///
+/// [`HostBlockSpec`]: crate::test_utils::HostBlockSpec
 #[derive(Debug, Clone)]
 pub struct RuBlockSpec {
     /// The system constants for the block.
@@ -27,6 +33,11 @@ pub struct RuBlockSpec {
 }
 
 impl RuBlockSpec {
+    /// Create a new empty RU block spec.
+    pub const fn new(constants: SignetSystemConstants) -> Self {
+        Self { constants, tx: vec![], gas_limit: None, reward_address: None }
+    }
+
     /// Builder method to set the gas limit.
     pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = Some(gas_limit);

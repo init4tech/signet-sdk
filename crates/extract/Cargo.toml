@@ -21,6 +21,10 @@ tracing.workspace = true
 # test utils
 reth-exex = { workspace = true, optional = true }
 
+[dev-dependencies]
+signet-types = { workspace = true, features = ["test-utils"] }
+reth-exex = { workspace = true }
+
 [features]
 default = []
 test-utils = ["dep:reth-exex", "signet-types/test-utils"]

@@ -1,10 +1,6 @@
-use crate::test_utils::{
-    NotificationSpec, NotificationWithSidecars, RuBlockSpec,
-};
+use crate::test_utils::{NotificationSpec, NotificationWithSidecars, RuBlockSpec};
 use alloy::{
-    consensus::{
-        constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip4844,
-    },
+    consensus::{constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip4844},
     primitives::{Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
     signers::Signature,
 };
@@ -16,15 +12,22 @@ use reth::{
     providers::{Chain, ExecutionOutcome},
 };
 use signet_types::config::SignetSystemConstants;
-use signet_zenith::{
-    Passage, RollupOrders, Transactor,
-};
+use signet_zenith::{Passage, RollupOrders, Transactor};
 use std::{
     borrow::Borrow,
     sync::atomic::{AtomicU64, Ordering},
 };
 
 /// A block spec for the host chain.
+///
+/// Typically this should be used as follows:
+///
+/// 1. Instantiate with a [`SignetSystemConstants`] object via [`Self::new`].
+/// 2. Add Signet events to the block with  [`Self::enter`],
+///    [`Self::enter_token`] [`Self::transact`], and [`Self::fill`].
+/// 3. (optional) Add a [`RuBlockSpec`] with [`Self::submit_block`].
+/// 4. Convert to a [`Chain`] with [`Self::to_chain`], or a
+///    [`NotificationSpec`] with [`Self::to_commit_notification_spec`].
 #[derive(Debug)]
 pub struct HostBlockSpec {
     /// The system constants for the block.
