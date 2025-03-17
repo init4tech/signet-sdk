@@ -175,7 +175,7 @@ mod test {
             .enter_token(TEST_USERS[2], 10_000_000, USDC)
             .simple_transact(TEST_USERS[0], TEST_USERS[4], [1, 2, 3, 4], GWEI_TO_WEI as usize)
             .fill(USDT, TEST_USERS[4], 10_000)
-            .submit_block(ru_block.clone());
+            .submit_block(ru_block);
         let (chain, _) = hbs.to_chain();
 
         let extractor = Extractor::new(&TEST_CONSTANTS);
