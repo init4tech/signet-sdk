@@ -2,10 +2,7 @@ use crate::test_utils::HostBlockSpec;
 use alloy::consensus::BlobTransactionSidecar;
 use reth::primitives::TransactionSigned;
 use reth_exex::ExExNotification;
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 /// A notification spec.
 #[derive(Debug, Default)]
