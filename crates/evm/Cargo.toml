@@ -28,6 +28,7 @@ reth-db-common.workspace = true
 
 trevm = { workspace = true, features = ["test-utils"] }
 
+
 [features]
 default = []
-test_utils = []
+test-utils = ["signet-types/test-utils"]

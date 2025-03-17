@@ -1,8 +1,7 @@
+use crate::ExtractedEvent;
 use reth::primitives::{Block, RecoveredBlock};
 use signet_types::MarketContext;
 use signet_zenith::{Passage, Transactor, Zenith};
-
-use crate::ExtractedEvent;
 
 /// The output of the block extraction process. This struct contains borrows
 /// from a block object, the extracted events, and a [`MarketContext`]

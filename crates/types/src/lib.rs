@@ -32,3 +32,7 @@ pub use slot::SlotCalculator;
 
 mod seq;
 pub use seq::{RequestSigner, SignRequest, SignResponse};
+
+#[cfg(any(test, feature = "test-utils"))]
+/// Utils for unit and integration tests.
+pub mod test_utils;
