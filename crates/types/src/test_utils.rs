@@ -6,7 +6,7 @@ use alloy::{
 use std::sync::LazyLock;
 
 /// Test signers used in tests.
-pub const TEST_SIGNERS: LazyLock<[PrivateKeySigner; 10]> = LazyLock::new(|| {
+pub static TEST_SIGNERS: LazyLock<[PrivateKeySigner; 10]> = LazyLock::new(|| {
     [
         PrivateKeySigner::from(SigningKey::from_slice(&[1u8; 32]).unwrap()),
         PrivateKeySigner::from(SigningKey::from_slice(&[2u8; 32]).unwrap()),
@@ -22,7 +22,7 @@ pub const TEST_SIGNERS: LazyLock<[PrivateKeySigner; 10]> = LazyLock::new(|| {
 });
 
 /// Test users used in tests. Addresses corresponding to [`TEST_SIGNERS`].
-pub const TEST_USERS: LazyLock<[Address; 10]> =
+pub static TEST_USERS: LazyLock<[Address; 10]> =
     LazyLock::new(|| TEST_SIGNERS.each_ref().map(|s| s.address()));
 
 /// Default reward address used in tests when no other is specified.
