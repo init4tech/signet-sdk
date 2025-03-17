@@ -78,9 +78,8 @@ where
 /// Test utilities for the Signet EVM impl.
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
-
-    use reth::revm::InMemoryDB;
     use signet_types::test_utils::*;
+    use trevm::revm::InMemoryDB;
 
     /// Create a new Signet EVM with an in-memory database for testing.
     pub fn test_signet_evm() -> super::EvmNeedsCfg<'static, trevm::revm::db::InMemoryDB> {
