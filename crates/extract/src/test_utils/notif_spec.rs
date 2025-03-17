@@ -1,35 +1,10 @@
-use super::{sign_tx_with_key_pair, simple_send};
 use crate::test_utils::HostBlockSpec;
-use alloy::{
-    consensus::{
-        constants::GWEI_TO_WEI, BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEip4844,
-        TxEnvelope,
-    },
-    eips::eip2718::Encodable2718,
-    primitives::{keccak256, Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
-    rlp::Encodable,
-    signers::{local::PrivateKeySigner, Signature},
-};
-use reth::{
-    primitives::{
-        Block, BlockBody, Header, Receipt, RecoveredBlock, SealedBlock, SealedHeader, Transaction,
-        TransactionSigned, TxType,
-    },
-    providers::{Chain, ExecutionOutcome},
-};
+use alloy::consensus::BlobTransactionSidecar;
+use reth::primitives::TransactionSigned;
 use reth_exex::ExExNotification;
-use signet_types::config::SignetSystemConstants;
-use signet_zenith::{
-    Passage, RollupOrders, Transactor,
-    Zenith::{self},
-};
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 
 /// A notification spec.

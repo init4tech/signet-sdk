@@ -28,6 +28,8 @@ reth-db-common.workspace = true
 
 trevm = { workspace = true, features = ["test-utils"] }
 
+signet-types = { workspace = true, features = ["test-utils"] }
+signet-extract = { workspace = true, features = ["test-utils"] }
 
 [features]
 default = []

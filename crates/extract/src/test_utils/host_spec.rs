@@ -1,15 +1,12 @@
 use crate::test_utils::{
-    sign_tx_with_key_pair, simple_send, NotificationSpec, NotificationWithSidecars, RuBlockSpec,
+    NotificationSpec, NotificationWithSidecars, RuBlockSpec,
 };
 use alloy::{
     consensus::{
-        constants::GWEI_TO_WEI, BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEip4844,
-        TxEnvelope,
+        constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip4844,
     },
-    eips::eip2718::Encodable2718,
-    primitives::{keccak256, Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
-    rlp::Encodable,
-    signers::{local::PrivateKeySigner, Signature},
+    primitives::{Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
+    signers::Signature,
 };
 use reth::{
     primitives::{
@@ -18,19 +15,13 @@ use reth::{
     },
     providers::{Chain, ExecutionOutcome},
 };
-use reth_exex::ExExNotification;
 use signet_types::config::SignetSystemConstants;
 use signet_zenith::{
     Passage, RollupOrders, Transactor,
-    Zenith::{self},
 };
 use std::{
     borrow::Borrow,
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 /// A block spec for the host chain.
@@ -66,7 +57,7 @@ impl Clone for HostBlockSpec {
 
 impl HostBlockSpec {
     /// Make a new block spec
-    pub fn new(constants: SignetSystemConstants) -> Self {
+    pub const fn new(constants: SignetSystemConstants) -> Self {
         Self {
             constants,
             receipts: vec![],

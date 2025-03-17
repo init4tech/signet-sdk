@@ -79,12 +79,9 @@ where
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
-    use alloy::primitives::Address;
+    
     use reth::revm::InMemoryDB;
-    use signet_types::{
-        config::{HostConfig, PredeployTokens, RollupConfig, SignetSystemConstants},
-        test_utils::*,
-    };
+    use signet_types::test_utils::*;
 
     /// Create a new Signet EVM with an in-memory database for testing.
     pub fn test_signet_evm() -> super::EvmNeedsCfg<'static, trevm::revm::db::InMemoryDB> {

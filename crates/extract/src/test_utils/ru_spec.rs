@@ -1,35 +1,17 @@
 use super::{sign_tx_with_key_pair, simple_send};
 use alloy::{
     consensus::{
-        constants::GWEI_TO_WEI, BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEip4844,
+        BlobTransactionSidecar, SidecarBuilder, SimpleCoder,
         TxEnvelope,
     },
     eips::eip2718::Encodable2718,
-    primitives::{keccak256, Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
+    primitives::{keccak256, Address, Bytes, B256, U256},
     rlp::Encodable,
-    signers::{local::PrivateKeySigner, Signature},
+    signers::local::PrivateKeySigner,
 };
-use reth::{
-    primitives::{
-        Block, BlockBody, Header, Receipt, RecoveredBlock, SealedBlock, SealedHeader, Transaction,
-        TransactionSigned, TxType,
-    },
-    providers::{Chain, ExecutionOutcome},
-};
-use reth_exex::ExExNotification;
+use reth::primitives::TransactionSigned;
 use signet_types::config::SignetSystemConstants;
-use signet_zenith::{
-    Passage, RollupOrders, Transactor,
-    Zenith::{self},
-};
-use std::{
-    borrow::Borrow,
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use signet_zenith::Zenith::{self};
 
 /// A block spec for the Ru chain.
 #[derive(Debug, Clone)]
@@ -46,13 +28,13 @@ pub struct RuBlockSpec {
 
 impl RuBlockSpec {
     /// Builder method to set the gas limit.
-    pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = Some(gas_limit);
         self
     }
 
     /// Builder method to set the reward address.
-    pub fn with_reward_address(mut self, reward_address: Address) -> Self {
+    pub const fn with_reward_address(mut self, reward_address: Address) -> Self {
         self.reward_address = Some(reward_address);
         self
     }

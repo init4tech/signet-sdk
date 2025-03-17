@@ -780,7 +780,10 @@ mod test {
     };
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
-    use signet_types::config::{HostConfig, PredeployTokens, RollupConfig};
+    use signet_types::{
+        config::{HostConfig, PredeployTokens, RollupConfig},
+        test_utils::*,
+    };
     use trevm::NoopCfg;
 
     /// Make a fake block with a specific number.
