@@ -50,8 +50,7 @@ impl SignetBundleDriver<'_> {
         self.response
     }
 
-    /// Clear the driver, resetting the response and the aggregate fills. This
-    /// resets the driver, allowing for re-simulation of the same bundle.
+    /// Clear the driver, resetting the response.
     pub fn clear(&mut self) -> SignetCallBundleResponse {
         std::mem::take(&mut self.response)
     }
@@ -176,7 +175,7 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
                 .unwrap_or_default();
             self.response.bundle_hash = self.bundle.bundle_hash();
 
-            // Taking these clears the context for reuse.
+            // Taking these clears the order detector
             let (orders, fills) = trevm.inner_mut_unchecked().context.external.take_aggregate();
             self.response.orders = orders;
             self.response.fills = fills;
