@@ -314,12 +314,6 @@ mod test {
                 coinbase: Some(Address::repeat_byte(8)),
                 timeout: Some(9),
             },
-            host_fills: [(
-                Address::repeat_byte(10),
-                vec![(Address::repeat_byte(11), U256::from(12))].into_iter().collect(),
-            )]
-            .into_iter()
-            .collect(),
         };
 
         let serialized = serde_json::to_string(&bundle).unwrap();
