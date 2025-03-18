@@ -159,7 +159,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             extracts,
             parent,
             constants,
-            working_context: extracts.agg_fills(),
+            working_context: extracts.aggregate_fills(),
             to_process,
             processed: Vec::with_capacity(cap),
             output: BlockOutput::with_capacity(cap),
