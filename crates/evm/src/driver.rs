@@ -16,7 +16,7 @@ use reth::{
     providers::ExecutionOutcome,
 };
 use signet_extract::Extracts;
-use signet_types::{config::SignetSystemConstants, MarketContext, MarketError};
+use signet_types::{config::SignetSystemConstants, AggregateFills, MarketError};
 use signet_zenith::MINTER_ADDRESS;
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, debug_span, trace_span, warn};
@@ -126,9 +126,9 @@ pub struct SignetDriver<'a, 'b> {
     /// Rollup constants, including pre-deploys
     constants: SignetSystemConstants,
 
-    /// The working context is a clone of the market context that is updated
-    /// progessively as the block is evaluated.
-    working_context: MarketContext,
+    /// The working context is a clone of the block's [`AggregateFills`] that
+    /// is updated progessively as the block is evaluated.
+    working_context: AggregateFills,
 
     /// Transactions in the RU block (if any)
     to_process: VecDeque<TransactionSigned>,
@@ -159,7 +159,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             extracts,
             parent,
             constants,
-            working_context: extracts.market_context(),
+            working_context: extracts.aggregate_fills(),
             to_process,
             processed: Vec::with_capacity(cap),
             output: BlockOutput::with_capacity(cap),
@@ -311,25 +311,24 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         SealedHeader::new(header, hash)
     }
 
-    /// Check the market context, discard if invalid, otherwise accumulate
+    /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate
     /// payable gas and call [`Self::accept_tx`].
     ///
     /// This path is used by
     /// - [`TransactionSigned`] objects
     /// - [`Transact`] events
-    fn check_market_and_accept<'c, Ext, Db: Database + DatabaseCommit>(
+    fn check_fills_and_accept<'c, Ext, Db: Database + DatabaseCommit>(
         &mut self,
         mut trevm: EvmTransacted<'c, Db, Ext>,
         tx: TransactionSigned,
     ) -> RunTxResult<'c, Db, Self, Ext> {
         // Taking these clears the context for reuse.
-        let (aggregate, market_context) =
-            trevm.inner_mut_unchecked().context.external.take_aggregate();
+        let (agg_orders, agg_fills) =
+            trevm.inner_mut_unchecked().context.external.take_aggregates();
 
-        // We check the market context here, and if it fails, we discard the
+        // We check the AggregateFills here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
-        if let Err(err) =
-            self.working_context.checked_remove_ru_tx_events(&aggregate, &market_context)
+        if let Err(err) = self.working_context.checked_remove_ru_tx_events(&agg_orders, &agg_fills)
         {
             debug!(%err, "Discarding transaction outcome due to market error");
             return Ok(trevm.reject());
@@ -382,7 +381,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// This function does the following:
     /// - Recover the signer of the transaction.
     /// - Run the transaction.
-    /// - Check the market context.
+    /// - Check the [`AggregateFills`].
     /// - Create a receipt.
     fn execute_transaction<'c, Ext, Db: Database + DatabaseCommit>(
         &mut self,
@@ -399,7 +398,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             s.record("sender", sender.to_string());
             // Run the tx, returning from this function if there is a tx error
             let t = run_tx_early_return!(self, trevm, &FillShim(&tx, sender), sender);
-            trevm = self.check_market_and_accept(t, tx)?;
+            trevm = self.check_fills_and_accept(t, tx)?;
         } else {
             warn!("Failed to recover signer for transaction");
         }
@@ -509,7 +508,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         };
 
         let t = run_tx_early_return!(self, trevm, &to_execute, MINTER_ADDRESS);
-        // No need to check market context. This call cannot result in orders.
+        // No need to check AggregateFills. This call cannot result in orders.
         Ok(self.accept_tx(t, to_execute.to_reth()))
     }
 
@@ -531,7 +530,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ///
     /// This function does the following:
     /// - Run the transaction.
-    /// - Check the market context.
+    /// - Check the aggregate fills.
     /// - Debit the sender's account for unused gas.
     /// - Create a receipt.
     /// - Create a transaction and push it to the block.
@@ -606,7 +605,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             }
         }
 
-        self.check_market_and_accept(t, to_execute.to_reth())
+        self.check_fills_and_accept(t, to_execute.to_reth())
     }
 
     /// Execute all transact events.

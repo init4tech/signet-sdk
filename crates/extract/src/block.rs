@@ -1,10 +1,10 @@
 use crate::ExtractedEvent;
 use reth::primitives::{Block, RecoveredBlock};
-use signet_types::MarketContext;
+use signet_types::AggregateFills;
 use signet_zenith::{Passage, Transactor, Zenith};
 
 /// The output of the block extraction process. This struct contains borrows
-/// from a block object, the extracted events, and a [`MarketContext`]
+/// from a block object, the extracted events, and a [`AggregateFills`]
 /// populated with the fills present in the host block.
 #[derive(Debug, Clone)]
 pub struct Extracts<'a> {
@@ -22,8 +22,8 @@ pub struct Extracts<'a> {
     pub transacts: Vec<ExtractedEvent<'a, Transactor::Transact>>,
     /// The enter tokens.
     pub enter_tokens: Vec<ExtractedEvent<'a, Passage::EnterToken>>,
-    /// The market context.
-    pub(crate) context: MarketContext,
+    /// The net fills extracted from the host block.
+    pub(crate) context: AggregateFills,
 }
 
 impl Extracts<'_> {
@@ -65,7 +65,7 @@ impl Extracts<'_> {
     }
 
     /// Get a clone of the market context.
-    pub fn market_context(&self) -> MarketContext {
+    pub fn aggregate_fills(&self) -> AggregateFills {
         self.context.clone()
     }
 }

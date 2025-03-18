@@ -4,7 +4,7 @@ use reth::{
     primitives::{Block, Receipt, RecoveredBlock},
     providers::Chain,
 };
-use signet_types::{config::SignetSystemConstants, MarketContext};
+use signet_types::{config::SignetSystemConstants, AggregateFills};
 use signet_zenith::Passage;
 use tracing::debug_span;
 
@@ -96,7 +96,7 @@ impl Extractor {
                 let height = block.number;
                 let ru_height = self.constants.host_block_to_rollup_block_num(height).unwrap();
                 let host_block = block;
-                let mut context = MarketContext::new();
+                let mut context = AggregateFills::new();
                 let mut enters = vec![];
                 let mut transacts = vec![];
                 let mut enter_tokens: Vec<ExtractedEvent<'c, Passage::EnterToken>> = vec![];

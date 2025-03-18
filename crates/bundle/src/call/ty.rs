@@ -2,13 +2,13 @@
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::{eip2718::Encodable2718, BlockNumberOrTag, Decodable2718},
-    primitives::{keccak256, Address, Bytes, B256, U256},
+    primitives::{keccak256, Bytes, B256, U256},
     rlp::Buf,
     rpc::types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTransactionResult},
 };
 use serde::{Deserialize, Serialize};
-use signet_types::MarketContext;
-use std::collections::BTreeMap;
+use signet_types::AggregateFills;
+use signet_zenith::AggregateOrders;
 use trevm::{
     revm::{primitives::ExecutionResult, Database},
     BundleError,
@@ -32,17 +32,9 @@ pub struct SignetCallBundle {
     /// [`EthCallBundle`] bundle.
     #[serde(flatten)]
     pub bundle: EthCallBundle,
-    /// Host fills to be applied to the bundle for simulation. The mapping corresponds
-    /// to asset => user => amount.
-    pub host_fills: BTreeMap<Address, BTreeMap<Address, U256>>,
 }
 
 impl SignetCallBundle {
-    /// Returns the host fills for this bundle.
-    pub const fn host_fills(&self) -> &BTreeMap<Address, BTreeMap<Address, U256>> {
-        &self.host_fills
-    }
-
     /// Returns the transactions in this bundle.
     pub fn txs(&self) -> &[Bytes] {
         &self.bundle.txs
@@ -76,47 +68,6 @@ impl SignetCallBundle {
     /// Returns the base fee for this bundle.
     pub const fn base_fee(&self) -> Option<u128> {
         self.bundle.base_fee
-    }
-
-    /// Create a market context from the fills in this bundle.
-    pub fn make_context(&self, host_chain_id: u64) -> MarketContext {
-        let mut context = MarketContext::default();
-        self.host_fills.iter().for_each(|(asset, fills)| {
-            fills.iter().for_each(|(recipient, amount)| {
-                context.add_raw_fill(host_chain_id, *asset, *recipient, *amount)
-            })
-        });
-        context
-    }
-
-    /// Creates a new bundle from the given [`Encodable2718`] transactions.
-    pub fn from_2718_and_host_fills<I, T>(
-        txs: I,
-        host_fills: BTreeMap<Address, BTreeMap<Address, U256>>,
-    ) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Encodable2718,
-    {
-        Self::from_raw_txs_and_host_fills(txs.into_iter().map(|tx| tx.encoded_2718()), host_fills)
-    }
-
-    /// Creates a new bundle with the given transactions and host fills.
-    pub fn from_raw_txs_and_host_fills<I, T>(
-        txs: I,
-        host_fills: BTreeMap<Address, BTreeMap<Address, U256>>,
-    ) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Bytes>,
-    {
-        Self {
-            bundle: EthCallBundle {
-                txs: txs.into_iter().map(Into::into).collect(),
-                ..Default::default()
-            },
-            host_fills,
-        }
     }
 
     /// Adds an [`Encodable2718`] transaction to the bundle.
@@ -188,12 +139,11 @@ impl SignetCallBundle {
         self
     }
 
-    /// Make a bundle hash from the given deserialized transaction array and host fills from this bundle.
-    /// The hash is calculated as keccak256(tx_preimage + host_preimage).
-    /// The tx_preimage is calculated as `keccak(tx_hash1 + tx_hash2 + ... + tx_hashn)`.
-    /// The host_preimage is calculated as
-    /// `keccak(NUM_OF_ASSETS_LE + asset1 + NUM_OF_FILLS_LE + asset1_user1 + user1_amount2 + ... + asset1_usern + asset1_amountn + ...)`.
-    /// For the number of users/fills and amounts in the host_preimage, the amounts are serialized as little-endian U256 slice.
+    /// Calculate the bundle hash for this bundle.
+    ///
+    /// The hash is calculated as
+    /// `keccak256(tx_hash1 || tx_hash2 || ... || tx_hashn)` where `||` is the
+    /// concatenation operator.
     pub fn bundle_hash(&self) -> B256 {
         let mut hasher = alloy::primitives::Keccak256::new();
 
@@ -202,42 +152,7 @@ impl SignetCallBundle {
             // Calculate the tx hash (keccak256(encoded_signed_tx)) and append it to the tx_bytes.
             hasher.update(keccak256(tx).as_slice());
         }
-        let tx_preimage = hasher.finalize();
-
-        // Now, let's build the host_preimage. We do it in steps:
-        // 1. Prefix the number of assets, encoded as a little-endian U256 slice.
-        // 2. For each asset:
-        // 3. Concatenate the asset address.
-        // 4. Prefix the number of fills.
-        // 5. For each fill, concatenate the user and amount, the latter encoded as a little-endian U256 slice.
-        let mut hasher = alloy::primitives::Keccak256::new();
-
-        // Prefix the list of users with the number of assets.
-        hasher.update(U256::from(self.host_fills.len()).as_le_slice());
-
-        for (asset, fills) in self.host_fills.iter() {
-            // Concatenate the asset address.
-            hasher.update(asset.as_slice());
-
-            // Prefix the list of fills with the number of fills
-            hasher.update(U256::from(fills.len()).as_le_slice());
-
-            for (user, amount) in fills.iter() {
-                // Concatenate the user address and amount for each fill.
-                hasher.update(user.as_slice());
-                hasher.update(amount.as_le_slice());
-            }
-        }
-
-        // Hash the host pre-image.
-        let host_preimage = hasher.finalize();
-
-        let mut pre_image = alloy::primitives::Keccak256::new();
-        pre_image.update(tx_preimage.as_slice());
-        pre_image.update(host_preimage.as_slice());
-
-        // Hash both tx and host hashes to get the final bundle hash.
-        pre_image.finalize()
+        hasher.finalize()
     }
 
     /// Decode and validate the transactions in the bundle.
@@ -260,10 +175,33 @@ impl SignetCallBundle {
 }
 
 /// Response for `signet_callBundle`.
+///
+/// The response contains the following:
+/// - The inner [`EthCallBundleResponse`] response.
+/// - Aggregate orders produced by the bundle.
+/// - Fills produced by the bundle.
+///
+/// The aggregate orders contains both the net outputs the filler can expect to
+/// receive from this bundle and the net inputs the filler must provide to
+/// ensure this bundle is valid.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct SignetCallBundleResponse {
     #[serde(flatten)]
     inner: EthCallBundleResponse,
+    /// Aggregate orders produced by the bundle.
+    ///
+    /// This mapping will contain all outputs and required inputs, collapsed
+    /// into a single entry per asset. For the bundle to be valid, there must
+    /// be fills for all the inputs in this mapping. Which is to say, this type
+    /// indicates the following:
+    ///
+    /// - The net outputs the filler can expect to receive from this bundle.
+    /// - The net inputs the filler must provide to ensure this bundle is valid.
+    pub orders: AggregateOrders,
+    /// Fills produced by the bundle. This will contain the net fills produced
+    /// by the transaction. These can be deducted from the net inputs required
+    /// by the orders to ensure the bundle is valid.
+    pub fills: AggregateFills,
 }
 
 impl core::ops::Deref for SignetCallBundleResponse {
@@ -280,9 +218,21 @@ impl core::ops::DerefMut for SignetCallBundleResponse {
     }
 }
 
+impl AsRef<EthCallBundleResponse> for SignetCallBundleResponse {
+    fn as_ref(&self) -> &EthCallBundleResponse {
+        &self.inner
+    }
+}
+
+impl AsMut<EthCallBundleResponse> for SignetCallBundleResponse {
+    fn as_mut(&mut self) -> &mut EthCallBundleResponse {
+        &mut self.inner
+    }
+}
+
 impl From<EthCallBundleResponse> for SignetCallBundleResponse {
     fn from(inner: EthCallBundleResponse) -> Self {
-        Self { inner }
+        Self { inner, orders: Default::default(), fills: Default::default() }
     }
 }
 
@@ -294,7 +244,7 @@ impl From<SignetCallBundleResponse> for EthCallBundleResponse {
 
 impl SignetCallBundleResponse {
     /// Accumulate a transaction result into the response.
-    pub fn accumulate_tx_result(&mut self, tx_result: EthCallBundleTransactionResult) {
+    fn accumulate_tx_result(&mut self, tx_result: EthCallBundleTransactionResult) {
         self.inner.total_gas_used += tx_result.gas_used;
         self.inner.gas_fees += tx_result.gas_fees;
         self.inner.results.push(tx_result);
@@ -364,12 +314,6 @@ mod test {
                 coinbase: Some(Address::repeat_byte(8)),
                 timeout: Some(9),
             },
-            host_fills: [(
-                Address::repeat_byte(10),
-                vec![(Address::repeat_byte(11), U256::from(12))].into_iter().collect(),
-            )]
-            .into_iter()
-            .collect(),
         };
 
         let serialized = serde_json::to_string(&bundle).unwrap();

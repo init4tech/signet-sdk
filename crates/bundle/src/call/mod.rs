@@ -1,5 +1,5 @@
 mod driver;
-pub use driver::{SignetBundleDriver, SignetBundleError};
+pub use driver::SignetBundleDriver;
 
 mod trevm;
 

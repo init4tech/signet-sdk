@@ -14,7 +14,7 @@ use reth::{
     },
     providers::{Chain, ExecutionOutcome},
 };
-use signet_types::{config::SignetSystemConstants, MarketContext};
+use signet_types::{config::SignetSystemConstants, AggregateFills};
 use signet_zenith::{Passage, RollupOrders, Transactor};
 use std::{
     borrow::Borrow,
@@ -364,7 +364,7 @@ impl HostBlockSpec {
         let mut enter_tokens = extracts.enter_tokens();
         let mut transacts = extracts.transacts();
 
-        let mut context = MarketContext::new();
+        let mut context = AggregateFills::new();
 
         for event in self.events.iter() {
             match event {
@@ -386,7 +386,7 @@ impl HostBlockSpec {
         assert!(enters.next().is_none());
         assert!(enter_tokens.next().is_none());
         assert!(transacts.next().is_none());
-        assert_eq!(extracts.market_context(), context);
+        assert_eq!(extracts.aggregate_fills(), context);
     }
 }
 

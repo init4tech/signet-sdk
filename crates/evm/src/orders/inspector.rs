@@ -3,7 +3,7 @@ use alloy::{
     primitives::{Address, Log, U256},
     sol_types::SolEvent,
 };
-use signet_types::{config::SignetSystemConstants, MarketContext};
+use signet_types::{config::SignetSystemConstants, AggregateFills};
 use signet_zenith::RollupOrders;
 use trevm::revm::{
     inspectors::NoOpInspector,
@@ -20,10 +20,10 @@ use trevm::revm::{
 /// - call [`OrderDetector::take_aggregate`] to get the aggregate orders
 ///   produced by that transaction.
 /// - ensure that net fills are sufficient to cover the order inputs via
-///   [`MarketContext::checked_remove_ru_tx_events`].
+///   [`AggregateFills::checked_remove_ru_tx_events`].
 /// - reject transactions which are not sufficiently filled.
 ///
-/// The [`SignetDriver`] has an example of this in the `check_market_and_accept`
+/// The [`SignetDriver`] has an example of this in the `check_fills_and_accept`
 /// function.
 ///
 /// The `OrderDetector` allows an inner inspector to be used as well. This is
@@ -90,7 +90,7 @@ impl<T> OrderDetector<T> {
 
     /// Take the orders from the inspector, clearing it, and convert them to
     /// aggregate orders.
-    pub fn take_aggregate(&mut self) -> (signet_zenith::AggregateOrders, MarketContext) {
+    pub fn take_aggregates(&mut self) -> (signet_zenith::AggregateOrders, AggregateFills) {
         let (orders, filleds) = self.take();
         (orders.aggregate(), filleds.aggregate(self.chain_id()))
     }
