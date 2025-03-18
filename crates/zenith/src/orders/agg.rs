@@ -1,9 +1,10 @@
 use crate::RollupOrders;
 use alloy::primitives::{Address, U256};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Aggregated orders for a transaction or set of transactions.
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct AggregateOrders {
     /// Outputs to be transferred to the user. These may be on the rollup or
     /// the host or potentially elsewhere in the future.

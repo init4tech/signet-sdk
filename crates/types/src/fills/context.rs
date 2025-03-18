@@ -1,5 +1,6 @@
 use crate::MarketError;
 use alloy::primitives::{Address, U256};
+use serde::{Deserialize, Serialize};
 use signet_zenith::{AggregateOrders, RollupOrders};
 use std::collections::HashMap;
 
@@ -38,7 +39,7 @@ use std::collections::HashMap;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarketContext {
     /// Outputs to be transferred to the user. These may be on the rollup or
     /// the host or potentially elsewhere in the future.

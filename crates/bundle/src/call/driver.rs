@@ -1,8 +1,8 @@
 use crate::{SignetBundleError, SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
 use signet_evm::OrderDetector;
-use signet_types::MarketContext;
 use std::fmt::Debug;
+use tracing::{debug_span, instrument, Level};
 use trevm::{
     revm::{Database, DatabaseCommit},
     trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
@@ -18,17 +18,18 @@ pub struct SignetBundleDriver<'a> {
     bundle: &'a SignetCallBundle,
     /// The accumulated results of the bundle, if applicable.
     response: SignetCallBundleResponse,
-    /// The market context.
-    context: MarketContext,
-    /// The host chain id.
-    host_chain_id: u64,
+}
+
+impl<'a> From<&'a SignetCallBundle> for SignetBundleDriver<'a> {
+    fn from(bundle: &'a SignetCallBundle) -> Self {
+        Self::new(bundle)
+    }
 }
 
 impl<'a> SignetBundleDriver<'a> {
     /// Create a new bundle driver with the given bundle and response.
-    pub fn new(bundle: &'a SignetCallBundle, host_chain_id: u64) -> Self {
-        let context = bundle.build_context(host_chain_id);
-        Self { bundle, response: Default::default(), context, host_chain_id }
+    pub fn new(bundle: &'a SignetCallBundle) -> Self {
+        Self { bundle, response: Default::default() }
     }
 }
 
@@ -43,11 +44,6 @@ impl SignetBundleDriver<'_> {
         &self.response
     }
 
-    /// Get a reference to the market context.
-    pub const fn context(&self) -> &MarketContext {
-        &self.context
-    }
-
     /// Take the response from the bundle driver. This consumes
     pub fn into_response(self) -> SignetCallBundleResponse {
         self.response
@@ -58,34 +54,20 @@ impl SignetBundleDriver<'_> {
     ///
     /// The returned context contains the amount of overfill, i.e. the amount
     /// that was filled, but not required by the orders in the bundle.
-    pub fn clear(&mut self) -> (SignetCallBundleResponse, MarketContext) {
-        let r = std::mem::take(&mut self.response);
-        let context = self.bundle.build_context(self.host_chain_id);
-        let c = std::mem::replace(&mut self.context, context);
-        (r, c)
+    pub fn clear(&mut self) -> SignetCallBundleResponse {
+        std::mem::take(&mut self.response)
     }
 
     /// Check the market context, accept the result, accumulate the transaction
     /// details into the response.
-    fn check_market_and_accept<'a, Db: Database + DatabaseCommit, I>(
+    fn accept_and_accumulate<'a, Db: Database + DatabaseCommit, I>(
         &mut self,
-        mut trevm: signet_evm::EvmTransacted<'a, Db, I>,
+        trevm: signet_evm::EvmTransacted<'a, Db, I>,
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: &mut U256,
         basefee: U256,
     ) -> signet_evm::DriveBundleResult<'a, Db, Self, I> {
         let coinbase = trevm.inner().block().coinbase;
-
-        // Taking these clears the context for reuse.
-        let (aggregate, market_context) =
-            trevm.inner_mut_unchecked().context.external.take_aggregate();
-
-        // We check the market context here, and if it fails, we discard the
-        // transaction outcome and push a failure receipt.
-        if let Err(err) = self.context.checked_remove_ru_tx_events(&aggregate, &market_context) {
-            tracing::debug!(%err, "Discarding transaction outcome due to market error");
-            return Err(trevm.errored(SignetBundleError::MarketError(err)));
-        }
 
         let (execution_result, mut trevm) = trevm.accept();
 
@@ -117,6 +99,7 @@ impl SignetBundleDriver<'_> {
 impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
     type Error<Db: Database + DatabaseCommit> = SignetBundleError<Db>;
 
+    #[instrument(skip_all, level = Level::DEBUG)]
     fn run_bundle<'a, Db: Database + DatabaseCommit>(
         &mut self,
         trevm: signet_evm::EvmNeedsTx<'a, Db, I>,
@@ -163,19 +146,22 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
             // Stack vars to keep track of the coinbase balance across txs.
             let mut pre_sim_coinbase_balance = initial_coinbase_balance;
 
-            for tx in txs.iter() {
+            let span = debug_span!("bundle loop", count = txs.len()).entered();
+            for (idx, tx) in txs.iter().enumerate() {
+                let _span = debug_span!("tx loop", tx = %tx.tx_hash(), idx).entered();
                 let run_result = trevm.run_tx(tx);
 
                 let transacted_trevm = run_result.map_err(|e| e.map_err(Into::into))?;
 
                 // Set the trevm instance to the committed one
-                trevm = self.check_market_and_accept(
+                trevm = self.accept_and_accumulate(
                     transacted_trevm,
                     tx,
                     &mut pre_sim_coinbase_balance,
                     basefee,
                 )?;
             }
+            drop(span);
 
             // Accumulate the total results
             self.response.coinbase_diff =
@@ -188,6 +174,11 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
                 .checked_div(U256::from(self.response.total_gas_used))
                 .unwrap_or_default();
             self.response.bundle_hash = self.bundle.bundle_hash();
+
+            // Taking these clears the context for reuse.
+            let (orders, fills) = trevm.inner_mut_unchecked().context.external.take_aggregate();
+            self.response.orders = orders;
+            self.response.fills = fills;
 
             // return the final state
             Ok(trevm)
