@@ -1,17 +1,18 @@
-use crate::{SignetBundleError, SignetCallBundle, SignetCallBundleResponse};
+use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
 use signet_evm::OrderDetector;
 use std::fmt::Debug;
 use tracing::{debug_span, instrument, Level};
 use trevm::{
-    revm::{Database, DatabaseCommit},
+    revm::{primitives::EVMError, Database, DatabaseCommit},
     trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
 };
 
 /// A bundle driver for the Signet EVM.
 ///
-/// This type allows for the simulation of a [`SignetCallBundle`] and ensuring
-/// that it conforms to market rules as a unit.
+/// This type allows for the simulation of a [`SignetCallBundle`], outputting
+/// the results of the simulation in a [`SignetCallBundleResponse`].
+///
 #[derive(Debug)]
 pub struct SignetBundleDriver<'a> {
     /// The bundle to drive.
@@ -49,13 +50,13 @@ impl SignetBundleDriver<'_> {
         self.response
     }
 
-    /// Clear the driver, resetting the response and the market context. This
+    /// Clear the driver, resetting the response and the aggregate fills. This
     /// resets the driver, allowing for re-simulation of the same bundle.
     pub fn clear(&mut self) -> SignetCallBundleResponse {
         std::mem::take(&mut self.response)
     }
 
-    /// Check the market context, accept the result, accumulate the transaction
+    /// Check the aggregate fills, accept the result, accumulate the transaction
     /// details into the response.
     fn accept_and_accumulate<'a, Db: Database + DatabaseCommit, I>(
         &mut self,
@@ -70,7 +71,7 @@ impl SignetBundleDriver<'_> {
 
         // Get the post simulation coinbase balance
         let post_sim_coinbase_balance = unwrap_or_trevm_err!(
-            trevm.try_read_balance(coinbase).map_err(SignetBundleError::evm_db),
+            trevm.try_read_balance(coinbase).map_err(EVMError::Database).map_err(BundleError::from),
             trevm
         );
 
@@ -92,9 +93,9 @@ impl SignetBundleDriver<'_> {
 
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
-// which is used to simulate a signet bundle while respecting market context.
+// which is used to simulate a signet bundle while respecting aggregate fills.
 impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
-    type Error<Db: Database + DatabaseCommit> = SignetBundleError<Db>;
+    type Error<Db: Database + DatabaseCommit> = BundleError<Db>;
 
     #[instrument(skip_all, level = Level::DEBUG)]
     fn run_bundle<'a, Db: Database + DatabaseCommit>(
@@ -105,13 +106,13 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
         let bundle = &self.bundle.bundle;
 
         // Ensure that the bundle has transactions
-        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
+        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty);
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
             trevm.block_number().to::<u64>() == bundle.block_number,
             trevm,
-            BundleError::BlockNumberMismatch.into()
+            BundleError::BlockNumberMismatch
         );
         // Set the state block number this simulation was based on
         self.response.state_block_number = trevm.block_number().to::<u64>();
@@ -121,7 +122,7 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
             bundle.state_block_number.is_number()
                 && bundle.state_block_number.as_number().unwrap_or_default() != 0,
             trevm,
-            BundleError::BlockNumberMismatch.into()
+            BundleError::BlockNumberMismatch
         );
 
         // Decode and validate the transactions in the bundle
@@ -136,7 +137,10 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
 
             // Cache the pre simulation coinbase balance, so we can use it to calculate the coinbase diff after every tx simulated.
             let initial_coinbase_balance = unwrap_or_trevm_err!(
-                trevm.try_read_balance(coinbase).map_err(SignetBundleError::evm_db),
+                trevm
+                    .try_read_balance(coinbase)
+                    .map_err(EVMError::Database)
+                    .map_err(BundleError::from),
                 trevm
             );
 
