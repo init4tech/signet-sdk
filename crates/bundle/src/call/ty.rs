@@ -79,7 +79,7 @@ impl SignetCallBundle {
     }
 
     /// Create a market context from the fills in this bundle.
-    pub fn make_context(&self, host_chain_id: u64) -> MarketContext {
+    pub fn build_context(&self, host_chain_id: u64) -> MarketContext {
         let mut context = MarketContext::default();
         self.host_fills.iter().for_each(|(asset, fills)| {
             fills.iter().for_each(|(recipient, amount)| {
@@ -280,6 +280,18 @@ impl core::ops::DerefMut for SignetCallBundleResponse {
     }
 }
 
+impl AsRef<EthCallBundleResponse> for SignetCallBundleResponse {
+    fn as_ref(&self) -> &EthCallBundleResponse {
+        &self.inner
+    }
+}
+
+impl AsMut<EthCallBundleResponse> for SignetCallBundleResponse {
+    fn as_mut(&mut self) -> &mut EthCallBundleResponse {
+        &mut self.inner
+    }
+}
+
 impl From<EthCallBundleResponse> for SignetCallBundleResponse {
     fn from(inner: EthCallBundleResponse) -> Self {
         Self { inner }
@@ -294,7 +306,7 @@ impl From<SignetCallBundleResponse> for EthCallBundleResponse {
 
 impl SignetCallBundleResponse {
     /// Accumulate a transaction result into the response.
-    pub fn accumulate_tx_result(&mut self, tx_result: EthCallBundleTransactionResult) {
+    fn accumulate_tx_result(&mut self, tx_result: EthCallBundleTransactionResult) {
         self.inner.total_gas_used += tx_result.gas_used;
         self.inner.gas_fees += tx_result.gas_fees;
         self.inner.results.push(tx_result);

@@ -1,47 +1,17 @@
-use crate::{SignetCallBundle, SignetCallBundleResponse};
+use crate::{SignetBundleError, SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
 use signet_evm::OrderDetector;
-use signet_types::{MarketContext, MarketError};
+use signet_types::MarketContext;
 use std::fmt::Debug;
 use trevm::{
-    revm::{primitives::EVMError, Database, DatabaseCommit},
+    revm::{Database, DatabaseCommit},
     trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
 };
 
-/// Errors that can occur when running a bundle on the Signet EVM.
-#[derive(thiserror::Error)]
-pub enum SignetBundleError<Db: Database> {
-    /// A primitive [`BundleError`] error ocurred.
-    #[error(transparent)]
-    BundleError(#[from] BundleError<Db>),
-    /// A [`MarketError`] ocurred.
-    #[error(transparent)]
-    MarketError(#[from] MarketError),
-}
-
-impl<Db: Database> Debug for SignetBundleError<Db> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SignetBundleError::BundleError(e) => write!(f, "BundleError({:?})", e),
-            SignetBundleError::MarketError(e) => write!(f, "MarketError({:?})", e),
-        }
-    }
-}
-
-impl<Db: Database> From<EVMError<Db::Error>> for SignetBundleError<Db> {
-    fn from(e: EVMError<Db::Error>) -> Self {
-        SignetBundleError::BundleError(BundleError::EVMError { inner: e })
-    }
-}
-
-impl<Db: Database> SignetBundleError<Db> {
-    /// Instantiate a new [`SignetBundleError`] from a [`Database::Error`].
-    pub const fn evm_db(e: Db::Error) -> Self {
-        SignetBundleError::BundleError(BundleError::EVMError { inner: EVMError::Database(e) })
-    }
-}
-
 /// A bundle driver for the Signet EVM.
+///
+/// This type allows for the simulation of a [`SignetCallBundle`] and ensuring
+/// that it conforms to market rules as a unit.
 #[derive(Debug)]
 pub struct SignetBundleDriver<'a> {
     /// The bundle to drive.
@@ -57,7 +27,7 @@ pub struct SignetBundleDriver<'a> {
 impl<'a> SignetBundleDriver<'a> {
     /// Create a new bundle driver with the given bundle and response.
     pub fn new(bundle: &'a SignetCallBundle, host_chain_id: u64) -> Self {
-        let context = bundle.make_context(host_chain_id);
+        let context = bundle.build_context(host_chain_id);
         Self { bundle, response: Default::default(), context, host_chain_id }
     }
 }
@@ -84,13 +54,13 @@ impl SignetBundleDriver<'_> {
     }
 
     /// Clear the driver, resetting the response and the market context. This
-    /// reset the driver, allowing for resimulation of the same bundle.
+    /// resets the driver, allowing for re-simulation of the same bundle.
     ///
     /// The returned context contains the amount of overfill, i.e. the amount
     /// that was filled, but not required by the orders in the bundle.
     pub fn clear(&mut self) -> (SignetCallBundleResponse, MarketContext) {
         let r = std::mem::take(&mut self.response);
-        let context = self.bundle.make_context(self.host_chain_id);
+        let context = self.bundle.build_context(self.host_chain_id);
         let c = std::mem::replace(&mut self.context, context);
         (r, c)
     }
@@ -159,10 +129,12 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
-            trevm.inner().block().number.to::<u64>() == bundle.block_number,
+            trevm.block_number().to::<u64>() == bundle.block_number,
             trevm,
             BundleError::BlockNumberMismatch.into()
         );
+        // Set the state block number this simulation was based on
+        self.response.state_block_number = trevm.block_number().to::<u64>();
 
         // Check if the state block number is valid (not 0, and not a tag)
         trevm_ensure!(
@@ -177,11 +149,10 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
 
         trevm.try_with_block(self.bundle, |mut trevm| {
             // Get the coinbase and basefee from the block
-            let coinbase = trevm.inner().block().coinbase;
-            let basefee = trevm.inner().block().basefee;
-
-            // Set the state block number this simulation was based on
-            self.response.state_block_number = trevm.inner().block().number.to::<u64>();
+            // NB: Do not move these outside the `try_with_block` closure, as
+            // they may be rewritten by the bundle
+            let coinbase = trevm.block().coinbase;
+            let basefee = trevm.block().basefee;
 
             // Cache the pre simulation coinbase balance, so we can use it to calculate the coinbase diff after every tx simulated.
             let initial_coinbase_balance = unwrap_or_trevm_err!(
