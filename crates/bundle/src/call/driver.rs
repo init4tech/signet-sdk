@@ -51,9 +51,6 @@ impl SignetBundleDriver<'_> {
 
     /// Clear the driver, resetting the response and the market context. This
     /// resets the driver, allowing for re-simulation of the same bundle.
-    ///
-    /// The returned context contains the amount of overfill, i.e. the amount
-    /// that was filled, but not required by the orders in the bundle.
     pub fn clear(&mut self) -> SignetCallBundleResponse {
         std::mem::take(&mut self.response)
     }
