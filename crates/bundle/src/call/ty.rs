@@ -7,7 +7,7 @@ use alloy::{
     rpc::types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTransactionResult},
 };
 use serde::{Deserialize, Serialize};
-use signet_types::MarketContext;
+use signet_types::AggregateFills;
 use signet_zenith::AggregateOrders;
 use trevm::{
     revm::{primitives::ExecutionResult, Database},
@@ -201,7 +201,7 @@ pub struct SignetCallBundleResponse {
     /// Fills produced by the bundle. This will contain the net fills produced
     /// by the transaction. These can be deducted from the net inputs required
     /// by the orders to ensure the bundle is valid.
-    pub fills: MarketContext,
+    pub fills: AggregateFills,
 }
 
 impl core::ops::Deref for SignetCallBundleResponse {

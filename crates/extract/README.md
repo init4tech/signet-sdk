@@ -18,7 +18,7 @@ There are 4 types of events that trigger actions on Signet:
 - `Transact` - Execute a transaction on Signet.
 
 Another event affects Signet's [conditional transactions]. The `Fill` event is
-used to populate the market context for conditional transactions. This event is
+used to populate the aggregate fills for conditional transactions. This event is
 emitted by the `Orders` contract on Ethereum when a trade is executed, and then
 used to enforce the conditional invariant on Signet.
 
@@ -26,6 +26,6 @@ used to enforce the conditional invariant on Signet.
 
 The `Extractor` object traverses a [`Chain`] and produces a `Extracts` per
 block. This object contains all relevant events that occured in the block, as
-well as a populated market context.
+well as a populated `AggregateFills`.
 
 [`Chain`]: https://reth.rs/docs/reth/providers/struct.Chain.html

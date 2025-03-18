@@ -12,7 +12,6 @@ use trevm::{
 ///
 /// This type allows for the simulation of a [`SignetCallBundle`], outputting
 /// the results of the simulation in a [`SignetCallBundleResponse`].
-///
 #[derive(Debug)]
 pub struct SignetBundleDriver<'a> {
     /// The bundle to drive.
@@ -176,7 +175,7 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
             self.response.bundle_hash = self.bundle.bundle_hash();
 
             // Taking these clears the order detector
-            let (orders, fills) = trevm.inner_mut_unchecked().context.external.take_aggregate();
+            let (orders, fills) = trevm.inner_mut_unchecked().context.external.take_aggregates();
             self.response.orders = orders;
             self.response.fills = fills;
 

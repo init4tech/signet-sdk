@@ -7,11 +7,11 @@
 //! chain.
 //!
 //! These events will be returned as a series of [`Extracts`] objects, each of
-//! which containing the relevant [`ExtractedEvent`]s and a [`MarketContext`]
+//! which containing the relevant [`ExtractedEvent`]s and a [`AggregateFills`]
 //! for a specific host block.
 //!
 //! [`SignetSystemConstants`]: signet_types::config::SignetSystemConstants
-//! [`MarketContext`]: signet_types::MarketContext
+//! [`AggregateFills`]: signet_types::AggregateFills
 
 #![warn(
     missing_copy_implementations,

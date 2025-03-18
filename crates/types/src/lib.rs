@@ -19,7 +19,7 @@
 pub mod config;
 
 mod fills;
-pub use fills::{MarketContext, MarketError};
+pub use fills::{AggregateFills, MarketError};
 
 mod magic_sig;
 pub use magic_sig::{MagicSig, MagicSigInfo};

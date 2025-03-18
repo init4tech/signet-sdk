@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use signet_zenith::{AggregateOrders, RollupOrders};
 use std::collections::HashMap;
 
-/// The market context, to be filled via block extracts.
+/// The aggregate fills, to be populated via block extracts. Generally used to
+/// hold a **running** total of fills for a given user and asset across a block
+/// or set of transactions.
 ///
 /// We use the following terminology:
 /// - Add: push outputs from [`RollupOrders::Filled`] into the context.
@@ -20,7 +22,7 @@ use std::collections::HashMap;
 ///
 /// ```
 /// # use alloy::primitives::{Address, U256};
-/// # use signet_types::MarketContext;
+/// # use signet_types::AggregateFills;
 /// # use signet_zenith::{AggregateOrders, RollupOrders};
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let fill = RollupOrders::Filled {
@@ -31,7 +33,7 @@ use std::collections::HashMap;
 /// #   inputs: vec![],
 /// #   outputs: vec![],
 /// # };
-/// let mut context = MarketContext::default();
+/// let mut context = AggregateFills::default();
 /// // The first argument is the chain ID of the chain that emitted the event
 /// // in this case, Ethereum.
 /// context.add_fill(1, &fill);
@@ -40,21 +42,16 @@ use std::collections::HashMap;
 /// # }
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MarketContext {
+pub struct AggregateFills {
     /// Outputs to be transferred to the user. These may be on the rollup or
     /// the host or potentially elsewhere in the future.
     fills: HashMap<(u64, Address), HashMap<Address, U256>>,
 }
 
-impl MarketContext {
-    /// Create a new market context.
+impl AggregateFills {
+    /// Create a new aggregate.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Create a new market context with fills.
-    pub const fn with_fills(fills: HashMap<(u64, Address), HashMap<Address, U256>>) -> Self {
-        Self { fills }
     }
 
     /// Get the fill balance a specific asset for a specific user.
@@ -99,7 +96,7 @@ impl MarketContext {
         self.add_raw_fill(chain_id, output.token, output.recipient, output.amount)
     }
 
-    /// Ingest a new order into the market context. The chain_id is the ID
+    /// Ingest a new fill into the aggregate. The chain_id is the ID
     /// of the chain which emitted the event.
     ///
     /// # Note:
@@ -223,7 +220,7 @@ impl MarketContext {
     /// This will process all fills first, and all orders second.
     pub fn check_ru_tx_events(
         &self,
-        fills: &MarketContext,
+        fills: &AggregateFills,
         aggregate: &AggregateOrders,
     ) -> Result<(), MarketError> {
         // Check the aggregate against the combined contexts.
@@ -236,13 +233,13 @@ impl MarketContext {
 
     /// Check and remove the events emitted by a rollup transaction. This
     /// function allows atomic ingestion of multiple Fills and Orders. If
-    /// the check fails, the market context will not be mutated.
+    /// the check fails, the aggregate will not be mutated.
     ///
     /// This will process all fills first, and all orders second.
     pub fn checked_remove_ru_tx_events(
         &mut self,
         aggregate: &AggregateOrders,
-        fills: &MarketContext,
+        fills: &AggregateFills,
     ) -> Result<(), MarketError> {
         self.check_ru_tx_events(fills, aggregate)?;
         self.absorb(fills);
@@ -253,8 +250,8 @@ impl MarketContext {
 /// A combined context for checking aggregates. This allows us to check with
 /// fills, without mutating the context.
 struct CombinedContext<'a, 'b> {
-    context: &'a MarketContext,
-    extra: &'b MarketContext,
+    context: &'a AggregateFills,
+    extra: &'b AggregateFills,
 }
 
 impl CombinedContext<'_, '_> {
@@ -319,7 +316,7 @@ mod test {
         let order =
             Order { deadline: U256::ZERO, inputs: vec![], outputs: vec![a_to_a, b_to_b, a_to_b] };
 
-        let mut context = MarketContext::default();
+        let mut context = AggregateFills::default();
         context.add_fill(1, &fill);
 
         assert_eq!(context.fills().len(), 2);

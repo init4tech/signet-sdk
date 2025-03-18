@@ -2,4 +2,4 @@ mod error;
 pub use error::MarketError;
 
 mod context;
-pub use context::MarketContext;
+pub use context::AggregateFills;

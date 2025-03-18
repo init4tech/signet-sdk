@@ -1,4 +1,4 @@
-use signet_types::MarketContext;
+use signet_types::AggregateFills;
 use signet_zenith::{AggregateOrders, RollupOrders};
 
 /// A [`Framed`] containing [`RollupOrders::Order`] instances.
@@ -86,10 +86,10 @@ impl FramedOrders {
 }
 
 impl FramedFilleds {
-    /// Aggregate all fills, producing a single [`MarketContext`] instance. The
+    /// Aggregate all fills, producing a single [`AggregateFills`] instance. The
     /// chain ID is the ID of the chain that emitted the events.
-    pub fn aggregate(&self, chain_id: u64) -> MarketContext {
-        let mut ctx = MarketContext::default();
+    pub fn aggregate(&self, chain_id: u64) -> AggregateFills {
+        let mut ctx = AggregateFills::default();
         for fill in &self.events {
             ctx.add_fill(chain_id, fill);
         }
