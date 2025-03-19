@@ -53,22 +53,22 @@ alloy = { version = "=0.11.1", features = ["full", "rpc-types-mev", "genesis", "
 alloy-contract = { version = "=0.11.1", features = ["pubsub"] }
 
 # Reth
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-db-common = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-eth-wire-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-prune-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
-reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.0" }
+reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-db-common = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-eth-wire-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-prune-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
+reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.2.2" }
 
 # Foundry periphery
 foundry-blob-explorers = "0.10"
@@ -104,10 +104,9 @@ hex = { package = "const-hex", version = "1.10", default-features = false, featu
 ] }
 
 # pinned for compatibility with reth
-enr = { version = "=0.12.1", default-features = false, features = [
-    "k256",
-    "rust-secp256k1",
-] }
+# TODO:
+# https://linear.app/initiates/issue/ENG-947/remove-hickory-resolver-dep-spec
+hickory-resolver = "=0.25.0-alpha.4"
 
 # Test Utils
 alloy-rlp = "0.3.11"
