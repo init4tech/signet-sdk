@@ -88,3 +88,6 @@ pub mod test_utils {
         trevm
     }
 }
+
+// TODO: https://linear.app/initiates/issue/ENG-947/remove-hickory-resolver-dep-spec
+use hickory_resolver as _;
