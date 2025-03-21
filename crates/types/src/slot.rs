@@ -22,19 +22,47 @@ impl SlotCalculator {
 
     /// Creates a new slot calculator for Holesky.
     pub const fn holesky() -> Self {
-        Self { start_timestamp: 1695902400, slot_offset: 0, slot_duration: 12 }
+        // begin slot calculation for Holesky from block number 1, slot number 2
+        // because of a strange 324 second gap between block 0 and 1 which
+        // should have been 27 slots, but which is recorded as 2 slots in chain data
+        // since slot 2 was mined at timestamp 1695902424, slot 3 begins at this same timestamp
+        Self { start_timestamp: 1695902424, slot_offset: 3, slot_duration: 12 }
     }
 
     /// Creates a new slot calculator for Ethereum mainnet.
     pub const fn mainnet() -> Self {
-        Self { start_timestamp: 1663224179, slot_offset: 4700013, slot_duration: 12 }
+        Self { start_timestamp: 1663224179, slot_offset: 4700014, slot_duration: 12 }
     }
 
     /// Calculates the slot for a given timestamp.
+    /// This only works for timestamps that are greater than the start timestamp.
     pub const fn calculate_slot(&self, timestamp: u64) -> u64 {
         let elapsed = timestamp - self.start_timestamp;
         let slots = elapsed.saturating_div(self.slot_duration);
         slots + self.slot_offset
+    }
+
+    /// Calculates how many seconds into the block window for a given timestamp.
+    pub const fn calculate_timepoint_within_slot(&self, timestamp: u64) -> u64 {
+        (timestamp - self.slot_utc_offset()) % self.slot_duration
+    }
+
+    /// Calculates the start and end timestamps for a given slot
+    pub const fn calculate_slot_window(&self, slot_number: u64) -> (u64, u64) {
+        let start_of_slot =
+            ((slot_number - self.slot_offset) * self.slot_duration) + self.start_timestamp;
+        let end_of_slot = start_of_slot + self.slot_duration;
+        (start_of_slot, end_of_slot)
+    }
+
+    /// The current slot number.
+    pub fn current_slot(&self) -> u64 {
+        self.calculate_slot(chrono::Utc::now().timestamp() as u64)
+    }
+
+    /// The current number of seconds into the block window.
+    pub fn current_timepoint_within_slot(&self) -> u64 {
+        self.calculate_timepoint_within_slot(chrono::Utc::now().timestamp() as u64)
     }
 
     /// The timestamp of the first PoS block in the chain.
@@ -50,6 +78,11 @@ impl SlotCalculator {
     /// The slot duration, usually 12 seconds.
     pub const fn slot_duration(&self) -> u64 {
         self.slot_duration
+    }
+
+    /// The offset in seconds between UTC time and slot mining times
+    const fn slot_utc_offset(&self) -> u64 {
+        self.start_timestamp % self.slot_duration
     }
 }
 
@@ -69,17 +102,54 @@ mod tests {
     #[test]
     fn test_holesky_slot_calculations() {
         let calculator = SlotCalculator::holesky();
-        assert_eq!(calculator.calculate_slot(1695902400), 0);
-        assert_eq!(calculator.calculate_slot(1695902412), 1);
-        assert_eq!(calculator.calculate_slot(1695902416), 1);
-        assert_eq!(calculator.calculate_slot(1738866996), 3580383);
+        // calculate slot
+        assert_eq!(calculator.calculate_slot(1695902424), 3);
+        assert_eq!(calculator.calculate_slot(1695902425), 3);
+        assert_eq!(calculator.calculate_slot(1742586984), 3890383);
+    }
+
+    #[test]
+    fn test_holesky_slot_timepoint_calculations() {
+        let calculator = SlotCalculator::holesky();
+        // calculate timepoint in slot
+        assert_eq!(calculator.calculate_timepoint_within_slot(1695902424), 0);
+        assert_eq!(calculator.calculate_timepoint_within_slot(1695902425), 1);
+        assert_eq!(calculator.calculate_timepoint_within_slot(1695902435), 11);
+        assert_eq!(calculator.calculate_timepoint_within_slot(1695902436), 0);
+    }
+
+    #[test]
+    fn test_holesky_slot_window() {
+        let calculator = SlotCalculator::holesky();
+        // calculate slot window
+        assert_eq!(calculator.calculate_slot_window(3), (1695902424, 1695902436));
     }
 
     #[test]
     fn test_mainnet_slot_calculations() {
         let calculator = SlotCalculator::mainnet();
-        assert_eq!(calculator.calculate_slot(1738863035), 11003251);
-        assert_eq!(calculator.calculate_slot(1738866239), 11003518);
-        assert_eq!(calculator.calculate_slot(1738866227), 11003517);
+        // calculate slot
+        assert_eq!(calculator.calculate_slot(1663224179), 4700014);
+        assert_eq!(calculator.calculate_slot(1738863035), 11003252);
+        assert_eq!(calculator.calculate_slot(1738866239), 11003519);
+        assert_eq!(calculator.calculate_slot(1738866227), 11003518);
+        assert_eq!(calculator.calculate_slot(1742587235), 11313602);
+    }
+
+    #[test]
+    fn test_mainnet_slot_timepoint_calculations() {
+        let calculator = SlotCalculator::mainnet();
+        // calculate timepoint in slot
+        assert_eq!(calculator.calculate_timepoint_within_slot(1663224179), 0);
+        assert_eq!(calculator.calculate_timepoint_within_slot(1663224180), 1);
+        assert_eq!(calculator.calculate_timepoint_within_slot(1663224190), 11);
+        assert_eq!(calculator.calculate_timepoint_within_slot(1663224191), 0);
+    }
+
+    #[test]
+    fn test_ethereum_slot_window() {
+        let calculator = SlotCalculator::mainnet();
+        // calculate slot window
+        assert_eq!(calculator.calculate_slot_window(4700014), (1663224179, 1663224191));
     }
 }
