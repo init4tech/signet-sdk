@@ -93,7 +93,7 @@ pub async fn serve_axum(
 
     let cors = CorsLayer::new().allow_methods([Method::GET, Method::POST]).allow_origin(cors);
 
-    let service = router.clone().into_axum("/rpc").layer(cors);
+    let service = router.clone().into_axum("/").layer(cors);
 
     let listener = tokio::net::TcpListener::bind(addrs).await?;
 
