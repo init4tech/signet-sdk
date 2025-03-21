@@ -98,7 +98,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 reqwest = "0.12.9"
 url = "2.5.4"
 proptest = "1.6.0"
-
+chrono = "0.4.38"
 hex = { package = "const-hex", version = "1.10", default-features = false, features = [
     "alloc",
 ] }
