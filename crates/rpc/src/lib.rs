@@ -49,6 +49,9 @@ pub use ctx::RpcCtx;
 mod eth;
 pub use eth::{eth, CallErrorData, EthError, TxCacheForwarder};
 
+mod signet;
+pub use signet::signet;
+
 mod interest;
 
 pub(crate) mod util;
