@@ -22,6 +22,9 @@ pub use convert::ToRethPrimitive;
 mod driver;
 pub use driver::SignetDriver;
 
+mod journal;
+pub use journal::HostJournal;
+
 mod orders;
 pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector};
 
