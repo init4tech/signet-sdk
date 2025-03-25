@@ -22,7 +22,7 @@ impl SlotCalculator {
 
     /// Creates a new slot calculator for Holesky.
     pub const fn holesky() -> Self {
-        Self { start_timestamp: 1695902400, slot_offset: 0, slot_duration: 12 }
+        Self { start_timestamp: 1695902424, slot_offset: 2, slot_duration: 12 }
     }
 
     /// Creates a new slot calculator for Ethereum mainnet.
@@ -33,7 +33,7 @@ impl SlotCalculator {
     /// Calculates the slot for a given timestamp.
     pub const fn calculate_slot(&self, timestamp: u64) -> u64 {
         let elapsed = timestamp - self.start_timestamp;
-        let slots = elapsed.saturating_div(self.slot_duration);
+        let slots = elapsed.div_ceil(self.slot_duration);
         slots + self.slot_offset
     }
 
@@ -61,23 +61,42 @@ mod tests {
     fn test_basic_slot_calculations() {
         let calculator = SlotCalculator::new(0, 0, 12);
         assert_eq!(calculator.calculate_slot(0), 0);
+
+        assert_eq!(calculator.calculate_slot(1), 1);
+        assert_eq!(calculator.calculate_slot(11), 1);
         assert_eq!(calculator.calculate_slot(12), 1);
-        assert_eq!(calculator.calculate_slot(35), 2);
+
+        assert_eq!(calculator.calculate_slot(13), 2);
+        assert_eq!(calculator.calculate_slot(23), 2);
+        assert_eq!(calculator.calculate_slot(24), 2);
+
+        assert_eq!(calculator.calculate_slot(25), 3);
+        assert_eq!(calculator.calculate_slot(35), 3);
         assert_eq!(calculator.calculate_slot(36), 3);
     }
 
     #[test]
     fn test_holesky_slot_calculations() {
         let calculator = SlotCalculator::holesky();
-        assert_eq!(calculator.calculate_slot(1695902400), 0);
-        assert_eq!(calculator.calculate_slot(1695902412), 1);
-        assert_eq!(calculator.calculate_slot(1695902416), 1);
-        assert_eq!(calculator.calculate_slot(1738866996), 3580383);
+        // block 1 == slot 2 == timestamp 1695902424
+        // timestamp 1695902424 == slot 2
+        assert_eq!(calculator.calculate_slot(1695902424), 2);
+        // the next second, timestamp 1695902425 == slot 3
+        assert_eq!(calculator.calculate_slot(1695902425), 3);
+
+        // block 3557085 == slot 3919127 == timestamp 1742931924
+        // timestamp 1742931924 == slot 3919127
+        assert_eq!(calculator.calculate_slot(1742931924), 3919127);
+        // the next second, timestamp 1742931925 == slot 3919128
+        assert_eq!(calculator.calculate_slot(1742931925), 3919128);
     }
 
     #[test]
     fn test_mainnet_slot_calculations() {
         let calculator = SlotCalculator::mainnet();
+        assert_eq!(calculator.calculate_slot(1663224179), 4700013);
+        assert_eq!(calculator.calculate_slot(1663224180), 4700014);
+
         assert_eq!(calculator.calculate_slot(1738863035), 11003251);
         assert_eq!(calculator.calculate_slot(1738866239), 11003518);
         assert_eq!(calculator.calculate_slot(1738866227), 11003517);
