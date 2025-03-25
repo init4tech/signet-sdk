@@ -82,7 +82,7 @@ where
     Host: FullNodeComponents,
     Signet: Pnt,
 {
-    ajj::Router::new().nest("eth", eth::<Host, Signet>())
+    ajj::Router::new().nest("eth", eth::<Host, Signet>()).nest("signet", signet::<Host, Signet>())
 }
 
 /// Serve the router on the given addresses using axum.
