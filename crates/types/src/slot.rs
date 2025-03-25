@@ -34,7 +34,7 @@ impl SlotCalculator {
     }
 
     /// Calculates the slot for a given timestamp.
-    /// This only works for timestamps that are greater than the start timestamp.
+    /// This only works for timestamps that are GEQ to the chain's start_timestamp.
     pub const fn calculate_slot(&self, timestamp: u64) -> u64 {
         let elapsed = timestamp - self.start_timestamp;
         let slots = elapsed.div_ceil(self.slot_duration);
