@@ -2,6 +2,16 @@ use reth::{primitives::EthPrimitives, providers::providers::ProviderNodeTypes};
 use reth_chainspec::ChainSpec;
 use std::{iter::StepBy, ops::RangeInclusive};
 
+macro_rules! await_jh_option {
+    ($h:expr) => {
+        match $h.await {
+            Ok(Some(res)) => res,
+            _ => return Err("task panicked or cancelled".to_string()),
+        }
+    };
+}
+pub(crate) use await_jh_option;
+
 /// Convenience trait for specifying the [`ProviderNodeTypes`] implementation
 /// required for Signet RPC functionality.
 pub trait Pnt: ProviderNodeTypes<ChainSpec = ChainSpec, Primitives = EthPrimitives> {}

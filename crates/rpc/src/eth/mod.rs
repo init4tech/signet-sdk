@@ -4,9 +4,6 @@ use endpoints::*;
 mod error;
 pub use error::EthError;
 
-mod forwarder;
-pub use forwarder::TxCacheForwarder;
-
 mod helpers;
 pub use helpers::CallErrorData;
 

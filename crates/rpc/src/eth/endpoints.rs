@@ -2,6 +2,7 @@ use crate::{
     ctx::RpcCtx,
     eth::{CallErrorData, EthError},
     interest::{FilterOutput, InterestKind},
+    util::await_jh_option,
     Pnt,
 };
 use ajj::{HandlerCtx, ResponsePayload};
@@ -30,15 +31,6 @@ use signet_evm::EvmErrored;
 use std::borrow::Cow;
 use tracing::{trace_span, Instrument};
 use trevm::revm::context::result::ExecutionResult;
-
-macro_rules! await_jh_option {
-    ($h:expr) => {
-        match $h.await {
-            Ok(Some(res)) => res,
-            _ => return Err("task panicked or cancelled".to_string()),
-        }
-    };
-}
 
 macro_rules! await_jh_option_response {
     ($h:expr) => {

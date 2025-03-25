@@ -47,12 +47,15 @@ mod ctx;
 pub use ctx::RpcCtx;
 
 mod eth;
-pub use eth::{eth, CallErrorData, EthError, TxCacheForwarder};
+pub use eth::{eth, CallErrorData, EthError};
 
 mod signet;
 pub use signet::signet;
 
 mod interest;
+
+mod forwarder;
+use forwarder::TxCacheForwarder;
 
 pub(crate) mod util;
 pub use util::Pnt;
