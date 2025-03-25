@@ -48,9 +48,9 @@ impl SlotCalculator {
 
     /// Calculates the start and end timestamps for a given slot
     pub const fn calculate_slot_window(&self, slot_number: u64) -> (u64, u64) {
-        let start_of_slot =
+        let end_of_slot =
             ((slot_number - self.slot_offset) * self.slot_duration) + self.start_timestamp;
-        let end_of_slot = start_of_slot + self.slot_duration;
+        let start_of_slot = end_of_slot - self.slot_duration;
         (start_of_slot, end_of_slot)
     }
 
