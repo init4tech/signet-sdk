@@ -29,7 +29,7 @@ use serde::Deserialize;
 use signet_evm::EvmErrored;
 use std::borrow::Cow;
 use tracing::{trace_span, Instrument};
-use trevm::revm::primitives::ExecutionResult;
+use trevm::revm::context::result::ExecutionResult;
 
 macro_rules! await_jh_option {
     ($h:expr) => {

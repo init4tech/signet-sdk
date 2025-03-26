@@ -2,11 +2,12 @@ use crate::{Passage::EnterToken, Transactor, Zenith};
 use alloy::{
     primitives::{Address, U256},
     rlp::BufMut,
+    rpc::types::AccessList,
     sol_types::SolCall,
 };
 use trevm::{
     journal::{JournalDecode, JournalDecodeError, JournalEncode},
-    revm::primitives::{TransactTo, TxEnv},
+    revm::context::{TransactTo, TxEnv},
     Tx,
 };
 
@@ -18,10 +19,11 @@ impl Tx for Transactor::Transact {
         // in breaking changes here, ensuring that they never silently add new
         // fields
         let TxEnv {
+            tx_type,
             caller,
             gas_limit,
             gas_price,
-            transact_to,
+            kind,
             value,
             data,
             nonce,
@@ -32,32 +34,33 @@ impl Tx for Transactor::Transact {
             max_fee_per_blob_gas,
             authorization_list,
         } = tx_env;
-
+        *tx_type = 5; // Custom
         *caller = self.sender;
         *gas_limit = self.gas.as_limbs()[0];
-        *gas_price = self.maxFeePerGas;
-        *gas_priority_fee = Some(U256::ZERO);
-        *transact_to = TransactTo::Call(self.to);
+        *gas_price = self.maxFeePerGas.saturating_to();
+        *gas_priority_fee = Some(0);
+        *kind = TransactTo::Call(self.to);
         *value = self.value;
         *data = self.data.clone();
         *chain_id = Some(self.rollup_chain_id());
         // This causes nonce validation to be skipped. i.e. the Transact event
         // will always use the next available nonce
-        *nonce = None;
-        *access_list = vec![];
+        *nonce = 0;
+        *access_list = Default::default();
         blob_hashes.clear();
-        max_fee_per_blob_gas.take();
-        authorization_list.take();
+        *max_fee_per_blob_gas = 0;
+        authorization_list.clear();
     }
 }
 
 impl Tx for EnterToken {
     fn fill_tx_env(&self, tx_env: &mut TxEnv) {
         let TxEnv {
+            tx_type,
             caller,
             gas_limit,
             gas_price,
-            transact_to,
+            kind,
             value,
             data,
             nonce,
@@ -69,21 +72,22 @@ impl Tx for EnterToken {
             authorization_list,
         } = tx_env;
 
+        *tx_type = 5; // Custom
         *caller = crate::MINTER_ADDRESS;
         *gas_limit = 1_000_000;
-        *gas_price = U256::ZERO;
+        *gas_price = 0;
         // This is deliberately not set, as it is not known by the event.
-        *transact_to = Address::ZERO.into();
+        *kind = Address::ZERO.into();
         *value = U256::ZERO;
         *data =
             crate::mintCall { amount: self.amount(), to: self.rollupRecipient }.abi_encode().into();
-        *nonce = None;
+        *nonce = 0;
         *chain_id = Some(self.rollup_chain_id());
-        *access_list = vec![];
-        *gas_priority_fee = Some(U256::ZERO);
+        *access_list = AccessList::default();
+        *gas_priority_fee = Some(0);
         blob_hashes.clear();
-        max_fee_per_blob_gas.take();
-        authorization_list.take();
+        *max_fee_per_blob_gas = 0;
+        authorization_list.clear();
     }
 }
 

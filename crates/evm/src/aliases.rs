@@ -1,7 +1,7 @@
 use super::*;
 #[allow(unused_imports)]
 use trevm::{
-    revm::{inspectors::NoOpInspector, primitives::EVMError, Database},
+    revm::{context::result::EVMError, inspector::NoOpInspector, Database},
     Block, Cfg, Trevm,
 };
 
@@ -12,7 +12,7 @@ use trevm::{
 ///
 /// [`Cfg`]: trevm::Cfg
 /// [`Trevm`]: trevm::Trevm
-pub type EvmNeedsCfg<'a, Db, I = NoOpInspector> = trevm::EvmNeedsCfg<'a, OrderDetector<I>, Db>;
+pub type EvmNeedsCfg<Db, I = NoOpInspector> = trevm::EvmNeedsCfg<Db, OrderDetector<I>>;
 
 /// A [`Trevm`] that requires a [`Block`] and contains no
 /// outputs. This EVM has not yet executed any transactions or state changes.
@@ -22,7 +22,7 @@ pub type EvmNeedsCfg<'a, Db, I = NoOpInspector> = trevm::EvmNeedsCfg<'a, OrderDe
 ///
 /// [`Block`]: trevm::Block
 /// [`Trevm`]: trevm::Trevm
-pub type EvmNeedsBlock<'a, Db, I = NoOpInspector> = trevm::EvmNeedsBlock<'a, OrderDetector<I>, Db>;
+pub type EvmNeedsBlock<Db, I = NoOpInspector> = trevm::EvmNeedsBlock<Db, OrderDetector<I>>;
 
 /// A [`Trevm`] that requires a [`Tx`].
 ///
@@ -33,7 +33,7 @@ pub type EvmNeedsBlock<'a, Db, I = NoOpInspector> = trevm::EvmNeedsBlock<'a, Ord
 ///
 /// [`Tx`]: trevm::Tx
 /// [`Trevm`]: trevm::Trevm
-pub type EvmNeedsTx<'a, Db, I = NoOpInspector> = trevm::EvmNeedsTx<'a, OrderDetector<I>, Db>;
+pub type EvmNeedsTx<Db, I = NoOpInspector> = trevm::EvmNeedsTx<Db, OrderDetector<I>>;
 
 /// A [`Trevm`] that is ready to execute a transaction.
 ///
@@ -41,7 +41,7 @@ pub type EvmNeedsTx<'a, Db, I = NoOpInspector> = trevm::EvmNeedsTx<'a, OrderDete
 /// with [`EvmReady::clear_tx`].
 ///
 /// [`Trevm`]: trevm::Trevm
-pub type EvmReady<'a, Db, I = NoOpInspector> = trevm::EvmReady<'a, OrderDetector<I>, Db>;
+pub type EvmReady<Db, I = NoOpInspector> = trevm::EvmReady<Db, OrderDetector<I>>;
 
 /// A [`Trevm`] that encountered an error during transaction execution.
 ///
@@ -50,7 +50,7 @@ pub type EvmReady<'a, Db, I = NoOpInspector> = trevm::EvmReady<'a, OrderDetector
 /// - [`EvmTransacted::accept`]
 ///
 /// [`Trevm`]: trevm::Trevm
-pub type EvmTransacted<'a, Db, I = NoOpInspector> = trevm::EvmTransacted<'a, OrderDetector<I>, Db>;
+pub type EvmTransacted<Db, I = NoOpInspector> = trevm::EvmTransacted<Db, OrderDetector<I>>;
 
 /// A [`Trevm`] that encountered an error during transaction execution.
 ///
@@ -59,13 +59,12 @@ pub type EvmTransacted<'a, Db, I = NoOpInspector> = trevm::EvmTransacted<'a, Ord
 /// - [`EvmErrored::into_error`]
 ///
 /// [`Trevm`]: trevm::Trevm
-pub type EvmErrored<'a, Db, I = NoOpInspector, E = EVMError<<Db as Database>::Error>> =
-    trevm::EvmErrored<'a, OrderDetector<I>, Db, E>;
+pub type EvmErrored<Db, I = NoOpInspector, E = EVMError<<Db as Database>::Error>> =
+    trevm::EvmErrored<Db, OrderDetector<I>, E>;
 
 /// The result of running transactions for a block driver.
-pub type RunTxResult<'a, Db, T, I = NoOpInspector> =
-    trevm::RunTxResult<'a, OrderDetector<I>, Db, T>;
+pub type RunTxResult<Db, T, I = NoOpInspector> = trevm::RunTxResult<Db, OrderDetector<I>, T>;
 
 /// The result of driving a bundle.
-pub type DriveBundleResult<'a, Db, T, I = NoOpInspector> =
-    trevm::DriveBundleResult<'a, OrderDetector<I>, Db, T>;
+pub type DriveBundleResult<Db, T, I = NoOpInspector> =
+    trevm::DriveBundleResult<Db, OrderDetector<I>, T>;

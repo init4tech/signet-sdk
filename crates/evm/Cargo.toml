@@ -18,11 +18,6 @@ signet-zenith.workspace = true
 alloy.workspace = true
 reth.workspace = true
 
-# pinned for reth-compat
-# TODO:
-# https://linear.app/initiates/issue/ENG-947/remove-hickory-resolver-dep-spec
-hickory-resolver.workspace = true
-
 thiserror.workspace = true
 tracing.workspace = true
 

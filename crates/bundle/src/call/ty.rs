@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use signet_types::AggregateFills;
 use signet_zenith::AggregateOrders;
 use trevm::{
-    revm::{primitives::ExecutionResult, Database},
+    revm::{context::result::ExecutionResult, Database},
     BundleError,
 };
 
@@ -255,7 +255,7 @@ impl SignetCallBundleResponse {
         &mut self,
         tx: &TxEnvelope,
         coinbase_diff: U256,
-        base_fee: U256,
+        base_fee: u64,
         execution_result: ExecutionResult,
     ) -> Result<(), BundleError<Db>> {
         if let TxEnvelope::Eip4844(_) = tx {
@@ -269,7 +269,7 @@ impl SignetCallBundleResponse {
             tx.recover_signer().map_err(|e| BundleError::TransactionSenderRecoveryError(e))?;
 
         // Calculate the gas price and fees
-        result.gas_price = U256::from(tx.effective_gas_price(Some(base_fee.saturating_to())));
+        result.gas_price = U256::from(tx.effective_gas_price(Some(base_fee)));
         result.gas_used = execution_result.gas_used();
         result.gas_fees = result.gas_price * U256::from(result.gas_used);
 
