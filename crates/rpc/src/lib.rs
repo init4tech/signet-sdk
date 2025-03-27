@@ -52,7 +52,6 @@ pub use eth::{eth, CallErrorData, EthError, TxCacheForwarder};
 mod interest;
 
 pub(crate) mod util;
-use tracing::error;
 pub use util::Pnt;
 
 /// Re-exported for convenience
@@ -69,6 +68,7 @@ use reth_node_api::FullNodeComponents;
 use std::{future::IntoFuture, net::SocketAddr};
 use tokio::task::JoinHandle;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tracing::error;
 
 /// Create a new router with the given host and signet types.
 pub fn router<Host, Signet>() -> Router<ctx::RpcCtx<Host, Signet>>

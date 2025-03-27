@@ -1,11 +1,10 @@
+use crate::journal::HostJournal;
 use alloy::primitives::B256;
 use reth::{
     primitives::{Block, RecoveredBlock},
     providers::ExecutionOutcome,
 };
 use trevm::journal::BundleStateIndex;
-
-use crate::journal::HostJournal;
 
 /// Output of a block execution.
 ///
