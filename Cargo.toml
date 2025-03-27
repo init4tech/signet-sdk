@@ -46,8 +46,7 @@ signet-zenith = { path = "crates/zenith" }
 ajj = { version = "0.3.1" }
 
 # trevm
-# trevm = { version = "^0.19.12", features = ["full_env_cfg"] }
-trevm = { path = "../trevm", features = ["full_env_cfg"] }
+trevm = { version = "0.20.0", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
 alloy = { version = "=0.12.6", features = ["full", "rpc-types-mev", "genesis", "arbitrary"] }
