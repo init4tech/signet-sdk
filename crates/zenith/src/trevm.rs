@@ -7,7 +7,7 @@ use alloy::{
 };
 use trevm::{
     journal::{JournalDecode, JournalDecodeError, JournalEncode},
-    revm::context::{TransactTo, TxEnv},
+    revm::context::{TransactTo, TransactionType, TxEnv},
     Tx,
 };
 
@@ -34,7 +34,8 @@ impl Tx for Transactor::Transact {
             max_fee_per_blob_gas,
             authorization_list,
         } = tx_env;
-        *tx_type = 5; // Custom
+        // TransactionType::Custom disables tx pre-validation
+        *tx_type = TransactionType::Custom as u8;
         *caller = self.sender;
         *gas_limit = self.gas.as_limbs()[0];
         *gas_price = self.maxFeePerGas.saturating_to();
@@ -69,8 +70,8 @@ impl Tx for EnterToken {
             max_fee_per_blob_gas,
             authorization_list,
         } = tx_env;
-
-        *tx_type = 5; // Custom
+        // TransactionType::Custom disables tx pre-validation
+        *tx_type = TransactionType::Custom as u8;
         *caller = crate::MINTER_ADDRESS;
         *gas_limit = 1_000_000;
         *gas_price = 0;
