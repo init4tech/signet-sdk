@@ -114,7 +114,6 @@ impl Extractor {
                             enters.push(event.try_into_enter().expect("checked by match guard"))
                         }
                         Events::Filled(fill) => {
-                            tracing::debug!("filling host swap");
                             // Fill the swap, ignoring overflows
                             // host swaps are pre-filtered to only include the
                             // host chain, so no need to check the chain id

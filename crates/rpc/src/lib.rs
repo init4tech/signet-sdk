@@ -52,6 +52,7 @@ pub use eth::{eth, CallErrorData, EthError, TxCacheForwarder};
 mod interest;
 
 pub(crate) mod util;
+use tracing::error;
 pub use util::Pnt;
 
 /// Re-exported for convenience
@@ -100,7 +101,7 @@ pub async fn serve_axum(
     let fut = async move {
         match axum::serve(listener, service).into_future().await {
             Ok(_) => (),
-            Err(err) => tracing::error!(%err, "Error serving RPC via axum"),
+            Err(err) => error!(%err, "Error serving RPC via axum"),
         }
     };
 

@@ -12,6 +12,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+use tracing::trace;
 
 type FilterId = U64;
 
@@ -295,7 +296,7 @@ impl FilterCleanTask {
     fn spawn(self) {
         std::thread::spawn(move || loop {
             std::thread::sleep(self.sleep);
-            tracing::trace!("cleaning stale filters");
+            trace!("cleaning stale filters");
             match self.manager.upgrade() {
                 Some(manager) => manager.clean_stale(self.age_limit),
                 None => break,

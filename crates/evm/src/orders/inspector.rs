@@ -134,15 +134,12 @@ where
     fn log(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>, log: Log) {
         // skip if the log is not from the orders contract
         if log.address != self.contract() {
-            tracing::warn!(contract = %self.contract(), address = %log.address, "skipping");
             return;
         }
 
         if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log, true) {
-            tracing::warn!(?data, "order");
             self.orders.add(data);
         } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log, true) {
-            tracing::warn!(?data, "filled");
             self.filleds.add(data);
         }
 
