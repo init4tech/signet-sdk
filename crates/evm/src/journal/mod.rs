@@ -23,7 +23,7 @@ pub struct HostJournal<'a> {
 
 impl<'a> HostJournal<'a> {
     /// Create a new journal.
-    pub fn new(host_height: u64, prev_journal_hash: B256, journal: BundleStateIndex<'a>) -> Self {
+    pub const fn new(host_height: u64, prev_journal_hash: B256, journal: BundleStateIndex<'a>) -> Self {
         Self {
             host_height,
             prev_journal_hash,

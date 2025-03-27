@@ -23,17 +23,17 @@ pub struct BlockResult {
 
 impl BlockResult {
     /// Create a new block result.
-    pub fn new(sealed_block: RecoveredBlock<Block>, execution_outcome: ExecutionOutcome) -> Self {
+    pub const fn new(sealed_block: RecoveredBlock<Block>, execution_outcome: ExecutionOutcome) -> Self {
         Self { sealed_block, execution_outcome }
     }
 
     /// Get the sealed block.
-    pub fn sealed_block(&self) -> &RecoveredBlock<Block> {
+    pub const fn sealed_block(&self) -> &RecoveredBlock<Block> {
         &self.sealed_block
     }
 
     /// Get the execution outcome.
-    pub fn execution_outcome(&self) -> &ExecutionOutcome {
+    pub const fn execution_outcome(&self) -> &ExecutionOutcome {
         &self.execution_outcome
     }
 
