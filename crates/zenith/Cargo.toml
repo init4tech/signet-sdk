@@ -13,9 +13,9 @@ repository.workspace = true
 [dependencies]
 trevm.workspace = true
 
-alloy = { version = "=0.11.1", features = ["full", "json-rpc", "signer-aws", "rpc-types-mev", "rlp"] }
+alloy = { workspace = true, features = ["full", "json-rpc", "signer-aws", "rpc-types-mev", "rlp"] }
 
-serde = { version = "1.0.197", features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 serde_json = "1.0.94"
