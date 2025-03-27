@@ -20,7 +20,7 @@ use reth::{
         ProviderBlock, ProviderError, ProviderReceipt, ReceiptProvider, StateProviderFactory,
         TransactionsProvider,
     },
-    revm::database::StateProviderDatabase,
+    revm::{database::StateProviderDatabase, primitives::hardfork::SpecId},
     rpc::{
         compat::block::from_block,
         eth::{filter::EthFilterError, EthTxBuilder},
@@ -44,10 +44,7 @@ use signet_types::{config::SignetSystemConstants, MagicSig};
 use std::{marker::PhantomData, sync::Arc};
 use tracing::{instrument, trace, Level};
 use trevm::{
-    revm::{
-        primitives::{AnalysisKind, CfgEnv},
-        StateBuilder,
-    },
+    revm::{context::CfgEnv, database::StateBuilder},
     Cfg,
 };
 
@@ -159,7 +156,7 @@ where
         &self,
         block_id: BlockId,
         block: &Header,
-    ) -> Result<EvmNeedsTx<'_, RuRevmState>, EthApiError> {
+    ) -> Result<EvmNeedsTx<RuRevmState>, EthApiError> {
         // decrement if the id is pending, so that the state is on the latest block
         let height = block.number() - block_id.is_pending() as u64;
         let spec_id = self.signet.evm_spec_id(block);
@@ -283,7 +280,7 @@ where
     }
 
     /// Get the EVM spec ID for a given block.
-    pub fn evm_spec_id(&self, header: &Header) -> trevm::revm::primitives::SpecId {
+    pub fn evm_spec_id(&self, header: &Header) -> SpecId {
         reth_evm_ethereum::revm_spec(&self.chain_spec(), header)
     }
 
@@ -316,11 +313,7 @@ where
             return Ok(None);
         };
 
-        self.cache
-            .get_sealed_block_with_senders(hash)
-            .await
-            .map_err(Into::into)
-            .map(|b| b.map(|b| (hash, b)))
+        self.cache.get_recovered_block(hash).await.map_err(Into::into).map(|b| b.map(|b| (hash, b)))
     }
 
     /// Get the block for a given block, formatting the block for
@@ -334,7 +327,7 @@ where
             return Ok(None);
         };
 
-        let Some(block) = self.cache.get_sealed_block_with_senders(hash).await? else {
+        let Some(block) = self.cache.get_recovered_block(hash).await? else {
             return Ok(None);
         };
 
@@ -348,7 +341,7 @@ where
             return Ok(None);
         };
 
-        if let Some(block) = self.cache.get_sealed_block_with_senders(hash).await? {
+        if let Some(block) = self.cache.get_recovered_block(hash).await? {
             // ambiguous function names
             let txns = BlockBody::transactions(block.body());
             Ok(Some(U64::from(txns.len())))
@@ -400,7 +393,7 @@ where
         let hash = *tx.hash();
         let signature = *tx.signature();
 
-        let inner: TxEnvelope = match tx.into_tx().into_transaction() {
+        let inner: TxEnvelope = match tx.into_inner().into_transaction() {
             reth::primitives::Transaction::Legacy(tx) => {
                 Signed::new_unchecked(tx, signature, hash).into()
             }
@@ -417,6 +410,7 @@ where
                 Signed::new_unchecked(tx, signature, hash).into()
             }
         };
+        let inner = Recovered::new_unchecked(inner, from);
 
         let egp = base_fee
             .map(|base_fee| {
@@ -429,7 +423,6 @@ where
             block_hash: Some(block_hash),
             block_number: Some(block_number),
             transaction_index: Some(index as u64),
-            from,
             effective_gas_price: Some(egp as u128),
         })
     }
@@ -981,9 +974,8 @@ where
     Inner: Pnt,
 {
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnv) {
-        let CfgEnv { chain_id, perf_analyse_created_bytecodes, .. } = cfg_env;
+        let CfgEnv { chain_id, .. } = cfg_env;
         *chain_id = self.constants.ru_chain_id();
-        *perf_analyse_created_bytecodes = AnalysisKind::Raw;
     }
 }
 

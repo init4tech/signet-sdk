@@ -3,7 +3,7 @@ use reth::rpc::server_types::eth::EthResult;
 use serde::Serialize;
 use signet_bundle::SignetEthBundle;
 use signet_zenith::SignedOrder;
-use tracing::warn;
+use tracing::{instrument, warn};
 
 /// Signet's Transaction Cache forwarder. Forwards transactions to a URL via
 /// simple post.
@@ -50,19 +50,19 @@ impl TxCacheForwarder {
     }
 
     /// Forwards a raw transaction to the URL.
-    #[tracing::instrument(skip_all)]
+    #[instrument(skip_all)]
     pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> EthResult<()> {
         self.forward_inner("transactions", tx).await
     }
 
     /// Forward a bundle to the URL.
-    #[tracing::instrument(skip_all)]
+    #[instrument(skip_all)]
     pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> EthResult<()> {
         self.forward_inner("bundles", bundle).await
     }
 
     /// Forward an order to the URL.
-    #[tracing::instrument(skip_all)]
+    #[instrument(skip_all)]
     pub async fn forward_order(&self, order: SignedOrder) -> EthResult<()> {
         self.forward_inner("orders", order).await
     }

@@ -1,7 +1,7 @@
 //! Signet Bundle Library
 //!
-//! Contains the [`SignetBundle`] type, and utilities related to creating and
-//! simulating Signet bundles.
+//! Contains the [`SignetCallBundle`] and [`SignetEthBundle`] type, and
+//! utilities related to creating and simulating Signet bundles.
 
 #![warn(
     missing_copy_implementations,

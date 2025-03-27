@@ -5,20 +5,23 @@ use alloy::{
 };
 use signet_types::{config::SignetSystemConstants, AggregateFills};
 use signet_zenith::RollupOrders;
-use trevm::revm::{
-    inspectors::NoOpInspector,
-    interpreter::{
-        CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter,
+use trevm::{
+    helpers::Ctx,
+    revm::{
+        inspector::NoOpInspector,
+        interpreter::{
+            CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter,
+        },
+        Database, Inspector,
     },
-    Database, EvmContext, Inspector,
 };
 
 /// Inspector used to detect Signet Orders and inform the builder of the
 /// fill requirements.
 ///
 /// This inspector is intended to be used with `trevm`. The EVM driver should
-/// - call [`OrderDetector::take_aggregate`] to get the aggregate orders
-///   produced by that transaction.
+/// - call [`OrderDetector::take_aggregates`] to get the aggregate orders
+///   and fills produced by that transaction.
 /// - ensure that net fills are sufficient to cover the order inputs via
 ///   [`AggregateFills::checked_remove_ru_tx_events`].
 /// - reject transactions which are not sufficiently filled.
@@ -55,7 +58,7 @@ impl<T> AsMut<T> for OrderDetector<T> {
     }
 }
 
-impl<T> OrderDetector<T> {
+impl OrderDetector<NoOpInspector> {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and `outputs` mapping.
     pub fn new(constants: SignetSystemConstants) -> OrderDetector<NoOpInspector> {
@@ -66,7 +69,9 @@ impl<T> OrderDetector<T> {
             inner: NoOpInspector,
         }
     }
+}
 
+impl<T> OrderDetector<T> {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and an inner inspector.
     pub fn new_with_inspector(constants: SignetSystemConstants, inner: T) -> Self {
@@ -121,41 +126,32 @@ impl<T> OrderDetector<T> {
     }
 }
 
-impl<Db, T> Inspector<Db> for OrderDetector<T>
+impl<Db, T> Inspector<Ctx<Db>> for OrderDetector<T>
 where
     Db: Database,
-    T: Inspector<Db>,
+    T: Inspector<Ctx<Db>>,
 {
-    fn log(&mut self, interp: &mut Interpreter, context: &mut EvmContext<Db>, log: &Log) {
+    fn log(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>, log: Log) {
         // skip if the log is not from the orders contract
         if log.address != self.contract() {
             return;
         }
 
-        if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(log, true) {
+        if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log, true) {
             self.orders.add(data);
-        } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(log, true) {
+        } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log, true) {
             self.filleds.add(data);
         }
 
         self.inner.log(interp, context, log)
     }
 
-    fn call(
-        &mut self,
-        context: &mut EvmContext<Db>,
-        inputs: &mut CallInputs,
-    ) -> Option<CallOutcome> {
+    fn call(&mut self, context: &mut Ctx<Db>, inputs: &mut CallInputs) -> Option<CallOutcome> {
         self.orders.enter_frame();
         self.inner.call(context, inputs)
     }
 
-    fn call_end(
-        &mut self,
-        context: &mut EvmContext<Db>,
-        inputs: &CallInputs,
-        outcome: CallOutcome,
-    ) -> CallOutcome {
+    fn call_end(&mut self, context: &mut Ctx<Db>, inputs: &CallInputs, outcome: &mut CallOutcome) {
         if outcome.result.is_ok() {
             self.orders.exit_frame();
         } else {
@@ -167,7 +163,7 @@ where
 
     fn create(
         &mut self,
-        context: &mut EvmContext<Db>,
+        context: &mut Ctx<Db>,
         inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
         self.orders.enter_frame();
@@ -176,10 +172,10 @@ where
 
     fn create_end(
         &mut self,
-        context: &mut EvmContext<Db>,
+        context: &mut Ctx<Db>,
         inputs: &CreateInputs,
-        outcome: CreateOutcome,
-    ) -> CreateOutcome {
+        outcome: &mut CreateOutcome,
+    ) {
         if outcome.result.is_ok() {
             self.orders.exit_frame();
         } else {
@@ -190,7 +186,7 @@ where
 
     fn eofcreate(
         &mut self,
-        context: &mut EvmContext<Db>,
+        context: &mut Ctx<Db>,
         inputs: &mut EOFCreateInputs,
     ) -> Option<CreateOutcome> {
         self.orders.enter_frame();
@@ -199,10 +195,10 @@ where
 
     fn eofcreate_end(
         &mut self,
-        context: &mut EvmContext<Db>,
+        context: &mut Ctx<Db>,
         inputs: &EOFCreateInputs,
-        outcome: CreateOutcome,
-    ) -> CreateOutcome {
+        outcome: &mut CreateOutcome,
+    ) {
         if outcome.result.is_ok() {
             self.orders.exit_frame();
         } else {
@@ -216,15 +212,15 @@ where
         self.inner.selfdestruct(contract, target, value)
     }
 
-    fn initialize_interp(&mut self, interp: &mut Interpreter, context: &mut EvmContext<Db>) {
+    fn initialize_interp(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>) {
         self.inner.initialize_interp(interp, context)
     }
 
-    fn step(&mut self, interp: &mut Interpreter, context: &mut EvmContext<Db>) {
+    fn step(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>) {
         self.inner.step(interp, context)
     }
 
-    fn step_end(&mut self, interp: &mut Interpreter, context: &mut EvmContext<Db>) {
+    fn step_end(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>) {
         self.inner.step_end(interp, context)
     }
 }

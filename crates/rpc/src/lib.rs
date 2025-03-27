@@ -68,6 +68,7 @@ use reth_node_api::FullNodeComponents;
 use std::{future::IntoFuture, net::SocketAddr};
 use tokio::task::JoinHandle;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tracing::error;
 
 /// Create a new router with the given host and signet types.
 pub fn router<Host, Signet>() -> Router<ctx::RpcCtx<Host, Signet>>
@@ -100,7 +101,7 @@ pub async fn serve_axum(
     let fut = async move {
         match axum::serve(listener, service).into_future().await {
             Ok(_) => (),
-            Err(err) => tracing::error!(%err, "Error serving RPC via axum"),
+            Err(err) => error!(%err, "Error serving RPC via axum"),
         }
     };
 

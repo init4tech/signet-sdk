@@ -5,14 +5,14 @@ use alloy::{
     primitives::{Address, PrimitiveSignature as Signature, U256},
     sol_types::SolCall,
 };
-use reth::primitives::{Transaction, TransactionSigned};
+use reth::{
+    primitives::{Transaction, TransactionSigned},
+    revm::context::TransactTo,
+};
 use signet_extract::ExtractedEvent;
 use signet_types::{MagicSig, MagicSigInfo};
 use signet_zenith::{Passage, Transactor};
-use trevm::{
-    revm::primitives::{TransactTo, TxEnv},
-    Tx,
-};
+use trevm::{revm::context::TxEnv, Tx};
 
 /// This is the default minimum gas cost for a transaction, used by Ethereum
 /// for simple sends to accounts without code.
@@ -151,11 +151,12 @@ impl EnterToken<'_, '_> {
         self.magic_sig().into()
     }
 }
+
 impl Tx for EnterToken<'_, '_> {
     fn fill_tx_env(&self, tx_env: &mut TxEnv) {
         self.enter_token.fill_tx_env(tx_env);
-        tx_env.transact_to = TransactTo::Call(self.token);
-        tx_env.nonce = Some(self.nonce);
+        tx_env.kind = TransactTo::Call(self.token);
+        tx_env.nonce = self.nonce;
     }
 }
 

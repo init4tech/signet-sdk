@@ -1,11 +1,12 @@
 use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
-use signet_evm::OrderDetector;
+use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, OrderDetector};
 use std::fmt::Debug;
 use tracing::{debug_span, instrument, Level};
 use trevm::{
-    revm::{primitives::EVMError, Database, DatabaseCommit},
-    trevm_bail, trevm_ensure, unwrap_or_trevm_err, BundleDriver, BundleError,
+    helpers::Ctx,
+    revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
+    trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
 
 /// A bundle driver for the Signet EVM.
@@ -56,20 +57,27 @@ impl SignetBundleDriver<'_> {
 
     /// Check the aggregate fills, accept the result, accumulate the transaction
     /// details into the response.
-    fn accept_and_accumulate<'a, Db: Database + DatabaseCommit, I>(
+    fn accept_and_accumulate<Db, Insp>(
         &mut self,
-        trevm: signet_evm::EvmTransacted<'a, Db, I>,
+        trevm: EvmTransacted<Db, Insp>,
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: &mut U256,
-        basefee: U256,
-    ) -> signet_evm::DriveBundleResult<'a, Db, Self, I> {
-        let coinbase = trevm.inner().block().coinbase;
+        basefee: u64,
+    ) -> DriveBundleResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
+        let beneficiary = trevm.beneficiary();
 
         let (execution_result, mut trevm) = trevm.accept();
 
         // Get the post simulation coinbase balance
-        let post_sim_coinbase_balance = unwrap_or_trevm_err!(
-            trevm.try_read_balance(coinbase).map_err(EVMError::Database).map_err(BundleError::from),
+        let post_sim_coinbase_balance = trevm_try!(
+            trevm
+                .try_read_balance(beneficiary)
+                .map_err(EVMError::Database)
+                .map_err(BundleError::from),
             trevm
         );
 
@@ -77,7 +85,7 @@ impl SignetBundleDriver<'_> {
         let coinbase_diff = post_sim_coinbase_balance.saturating_sub(*pre_sim_coinbase_balance);
 
         // Accumulate the transaction
-        unwrap_or_trevm_err!(
+        trevm_try!(
             self.response.accumulate_tx(tx, coinbase_diff, basefee, execution_result),
             trevm
         );
@@ -92,14 +100,15 @@ impl SignetBundleDriver<'_> {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting aggregate fills.
-impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
+impl<Insp> BundleDriver<OrderDetector<Insp>> for SignetBundleDriver<'_> {
     type Error<Db: Database + DatabaseCommit> = BundleError<Db>;
 
     #[instrument(skip_all, level = Level::DEBUG)]
-    fn run_bundle<'a, Db: Database + DatabaseCommit>(
-        &mut self,
-        trevm: signet_evm::EvmNeedsTx<'a, Db, I>,
-    ) -> signet_evm::DriveBundleResult<'a, Db, Self, I> {
+    fn run_bundle<Db>(&mut self, trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // convenience binding to make usage later less verbose
         let bundle = &self.bundle.bundle;
 
@@ -108,12 +117,12 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
-            trevm.block_number().to::<u64>() == bundle.block_number,
+            trevm.block_number() == bundle.block_number,
             trevm,
             BundleError::BlockNumberMismatch
         );
         // Set the state block number this simulation was based on
-        self.response.state_block_number = trevm.block_number().to::<u64>();
+        self.response.state_block_number = trevm.block_number();
 
         // Check if the state block number is valid (not 0, and not a tag)
         trevm_ensure!(
@@ -124,17 +133,17 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
         );
 
         // Decode and validate the transactions in the bundle
-        let txs = unwrap_or_trevm_err!(self.bundle.decode_and_validate_txs(), trevm);
+        let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
 
         trevm.try_with_block(self.bundle, |mut trevm| {
             // Get the coinbase and basefee from the block
             // NB: Do not move these outside the `try_with_block` closure, as
             // they may be rewritten by the bundle
-            let coinbase = trevm.block().coinbase;
+            let coinbase = trevm.beneficiary();
             let basefee = trevm.block().basefee;
 
             // Cache the pre simulation coinbase balance, so we can use it to calculate the coinbase diff after every tx simulated.
-            let initial_coinbase_balance = unwrap_or_trevm_err!(
+            let initial_coinbase_balance = trevm_try!(
                 trevm
                     .try_read_balance(coinbase)
                     .map_err(EVMError::Database)
@@ -175,7 +184,7 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
             self.response.bundle_hash = self.bundle.bundle_hash();
 
             // Taking these clears the order detector
-            let (orders, fills) = trevm.inner_mut_unchecked().context.external.take_aggregates();
+            let (orders, fills) = trevm.inner_mut_unchecked().data.inspector.take_aggregates();
             self.response.orders = orders;
             self.response.fills = fills;
 
@@ -184,10 +193,11 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
         })
     }
 
-    fn post_bundle<Db: Database + DatabaseCommit>(
-        &mut self,
-        _trevm: &signet_evm::EvmNeedsTx<'_, Db, I>,
-    ) -> Result<(), Self::Error<Db>> {
+    fn post_bundle<Db>(&mut self, _trevm: &EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error<Db>>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         Ok(())
     }
 }

@@ -22,6 +22,9 @@ pub use convert::ToRethPrimitive;
 mod driver;
 pub use driver::SignetDriver;
 
+mod journal;
+pub use journal::HostJournal;
+
 mod orders;
 pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector};
 
@@ -30,10 +33,8 @@ pub use result::BlockResult;
 
 use signet_types::config::SignetSystemConstants;
 use trevm::{
-    revm::{
-        inspector_handle_register, inspectors::NoOpInspector, Database, DatabaseCommit, EvmBuilder,
-        Inspector,
-    },
+    helpers::Ctx,
+    revm::{inspector::NoOpInspector, Database, DatabaseCommit, Inspector},
     TrevmBuilder,
 };
 
@@ -41,6 +42,8 @@ pub(crate) const BASE_GAS: usize = 21_000;
 
 /// Type alias for EVMs using a [`StateProviderBox`] as the `DB` type for
 /// trevm.
+///
+/// [`StateProviderBox`]: reth::providers::StateProviderBox
 pub type RuRevmState = reth::revm::db::State<
     reth::revm::database::StateProviderDatabase<reth::providers::StateProviderBox>,
 >;
@@ -49,12 +52,12 @@ pub type RuRevmState = reth::revm::db::State<
 pub fn signet_evm<Db: Database + DatabaseCommit>(
     db: Db,
     constants: SignetSystemConstants,
-) -> EvmNeedsCfg<'static, Db> {
-    EvmBuilder::default()
+) -> EvmNeedsCfg<Db> {
+    TrevmBuilder::new()
         .with_db(db)
-        .with_external_context(OrderDetector::<NoOpInspector>::new(constants))
-        .append_handler_register(inspector_handle_register)
+        .with_insp(OrderDetector::<NoOpInspector>::new(constants))
         .build_trevm()
+        .expect("db set")
 }
 
 /// Create a new EVM with the given database and inspector.
@@ -62,32 +65,30 @@ pub fn signet_evm_with_inspector<Db, I>(
     db: Db,
     inner: I,
     constants: SignetSystemConstants,
-) -> EvmNeedsCfg<'static, Db, I>
+) -> EvmNeedsCfg<Db, I>
 where
-    I: Inspector<Db>,
+    I: Inspector<Ctx<Db>>,
     Db: Database + DatabaseCommit,
 {
     let inspector = OrderDetector::new_with_inspector(constants, inner);
-    EvmBuilder::default()
-        .with_db(db)
-        .with_external_context(inspector)
-        .append_handler_register(inspector_handle_register)
-        .build_trevm()
+    TrevmBuilder::new().with_db(db).with_insp(inspector).build_trevm().expect("db set")
 }
 
 /// Test utilities for the Signet EVM impl.
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
     use signet_types::test_utils::*;
-    use trevm::revm::InMemoryDB;
+    use trevm::revm::database::in_memory_db::InMemoryDB;
 
     /// Create a new Signet EVM with an in-memory database for testing.
-    pub fn test_signet_evm() -> super::EvmNeedsCfg<'static, trevm::revm::db::InMemoryDB> {
+    pub fn test_signet_evm() -> super::EvmNeedsCfg<trevm::revm::database::in_memory_db::InMemoryDB>
+    {
         let mut trevm = super::signet_evm(InMemoryDB::default(), TEST_CONSTANTS);
-        trevm.inner_mut_unchecked().cfg_mut().chain_id = TEST_RU_CHAIN_ID;
+
+        trevm.inner_mut_unchecked().data.ctx.modify_cfg(|cfg| {
+            cfg.chain_id = TEST_RU_CHAIN_ID;
+        });
+
         trevm
     }
 }
-
-// TODO: https://linear.app/initiates/issue/ENG-947/remove-hickory-resolver-dep-spec
-use hickory_resolver as _;
