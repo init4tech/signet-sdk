@@ -151,6 +151,7 @@ impl EnterToken<'_, '_> {
         self.magic_sig().into()
     }
 }
+
 impl Tx for EnterToken<'_, '_> {
     fn fill_tx_env(&self, tx_env: &mut TxEnv) {
         self.enter_token.fill_tx_env(tx_env);

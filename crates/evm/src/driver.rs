@@ -25,7 +25,7 @@ use signet_zenith::MINTER_ADDRESS;
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, debug_span, trace_span, warn};
 use trevm::{
-    fillers::DisableGasChecks,
+    fillers::{DisableGasChecks, DisableNonceCheck},
     revm::{
         context::{
             result::{EVMError, ExecutionResult},
@@ -609,11 +609,13 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
     ) -> RunTxResult<Db, Self, Insp> {
-        trevm = trevm.try_with_cfg(&DisableGasChecks, |mut trevm| {
-            for i in 0..self.extracts.enter_tokens.len() {
-                trevm = self.execute_enter_token(trevm, i)?;
-            }
-            Ok(trevm)
+        trevm = trevm.try_with_cfg(&DisableGasChecks, |trevm| {
+            trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
+                for i in 0..self.extracts.enter_tokens.len() {
+                    trevm = self.execute_enter_token(trevm, i)?;
+                }
+                Ok(trevm)
+            })
         })?;
         Ok(trevm)
     }
@@ -702,12 +704,14 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// Execute all transact events.
     fn execute_all_transacts<Db: Database + DatabaseCommit, Insp>(
         &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
+        trevm: EvmNeedsTx<Db, Insp>,
     ) -> RunTxResult<Db, Self, Insp> {
-        for i in 0..self.extracts.transacts.len() {
-            trevm = self.execute_transact_event(trevm, i)?;
-        }
-        Ok(trevm)
+        trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
+            for i in 0..self.extracts.transacts.len() {
+                trevm = self.execute_transact_event(trevm, i)?;
+            }
+            Ok(trevm)
+        })
     }
 
     /// Clear the balance of the rollup passage. This is run at the end of the

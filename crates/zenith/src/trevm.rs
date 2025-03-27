@@ -43,8 +43,6 @@ impl Tx for Transactor::Transact {
         *value = self.value;
         *data = self.data.clone();
         *chain_id = Some(self.rollup_chain_id());
-        // This causes nonce validation to be skipped. i.e. the Transact event
-        // will always use the next available nonce
         *nonce = 0;
         *access_list = Default::default();
         blob_hashes.clear();
