@@ -1,6 +1,7 @@
 use crate::{
     convert::{Enter, EnterToken, Transact},
-    BlockResult, EvmNeedsTx, EvmTransacted, OrderDetector, RunTxResult, ToRethPrimitive, BASE_GAS,
+    BlockResult, EvmNeedsBlock, EvmNeedsTx, EvmTransacted, OrderDetector, RunTxResult,
+    ToRethPrimitive, BASE_GAS,
 };
 use alloy::{
     consensus::{ReceiptEnvelope, Transaction as _},
@@ -349,7 +350,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Consume the driver and trevm, producing a [`BlockResult`].
-    pub fn finish_trevm<Db: Database>(self, trevm: crate::EvmNeedsBlock<State<Db>>) -> BlockResult {
+    pub fn finish_trevm<Db: Database>(self, trevm: EvmNeedsBlock<State<Db>>) -> BlockResult {
         let ru_height = self.extracts.ru_height;
         let (sealed_block, receipts) = self.finish();
         BlockResult {
@@ -432,8 +433,6 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         // Taking these clears the context for reuse.
         let (agg_orders, agg_fills) = trevm.inner_mut_unchecked().data.inspector.take_aggregates();
 
-        tracing::warn!(wc = ?self.working_context, ?agg_orders, ?agg_fills, "Checking fills");
-
         // We check the AggregateFills here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
         if let Err(err) = self.working_context.checked_remove_ru_tx_events(&agg_orders, &agg_fills)
@@ -473,7 +472,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
         // Create a receipt for the transaction.
         let tx_env = trevm.inner().data.ctx.tx();
-        let sender: Address = tx_env.caller;
+        let sender = tx_env.caller;
         // 4844 transactions are not allowed
         let receipt = self.make_receipt(result).into();
         let receipt = if tx_env.gas_priority_fee.is_some() {
@@ -1043,7 +1042,7 @@ mod test {
             )
         }
 
-        fn trevm(&self) -> crate::EvmNeedsBlock<InMemoryDB> {
+        fn trevm(&self) -> EvmNeedsBlock<InMemoryDB> {
             let mut trevm = test_signet_evm().fill_cfg(&NoopCfg);
             for wallet in &self.wallets {
                 let address = wallet.address();
