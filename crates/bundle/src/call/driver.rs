@@ -57,7 +57,7 @@ impl SignetBundleDriver<'_> {
 
     /// Check the aggregate fills, accept the result, accumulate the transaction
     /// details into the response.
-    fn accept_and_accumulate<Db: Database + DatabaseCommit, Insp>(
+    fn accept_and_accumulate<Db, Insp>(
         &mut self,
         trevm: EvmTransacted<Db, Insp>,
         tx: &TxEnvelope,
@@ -65,6 +65,7 @@ impl SignetBundleDriver<'_> {
         basefee: u64,
     ) -> DriveBundleResult<Db, Self, Insp>
     where
+        Db: Database + DatabaseCommit,
         OrderDetector<Insp>: Inspector<Ctx<Db>>,
     {
         let beneficiary = trevm.beneficiary();
