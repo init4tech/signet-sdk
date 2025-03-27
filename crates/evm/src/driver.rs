@@ -17,6 +17,7 @@ use reth::{
     revm::{
         context::{ContextTr, TransactTo},
         context_interface::block::BlobExcessGasAndPrice,
+        Inspector,
     },
 };
 use signet_extract::Extracts;
@@ -26,6 +27,7 @@ use std::collections::{HashSet, VecDeque};
 use tracing::{debug, debug_span, trace_span, warn};
 use trevm::{
     fillers::{DisableGasChecks, DisableNonceCheck},
+    helpers::Ctx,
     revm::{
         context::{
             result::{EVMError, ExecutionResult},
@@ -73,7 +75,11 @@ macro_rules! run_tx_early_return {
 }
 
 /// Used internally to signal that the transaction should be discarded.
-enum ControlFlow<Db: Database + DatabaseCommit, Insp> {
+enum ControlFlow<Db, Insp>
+where
+    Db: Database + DatabaseCommit,
+    OrderDetector<Insp>: Inspector<Ctx<Db>>,
+{
     Discard(EvmNeedsTx<Db, Insp>),
     Keep(EvmTransacted<Db, Insp>),
 }
@@ -414,13 +420,19 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// This path is used by
     /// - [`TransactionSigned`] objects
     /// - [`Transact`] events
-    fn check_fills_and_accept<Db: Database + DatabaseCommit, Insp>(
+    fn check_fills_and_accept<Db, Insp>(
         &mut self,
         mut trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // Taking these clears the context for reuse.
         let (agg_orders, agg_fills) = trevm.inner_mut_unchecked().data.inspector.take_aggregates();
+
+        tracing::warn!(wc = ?self.working_context, ?agg_orders, ?agg_fills, "Checking fills");
 
         // We check the AggregateFills here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
@@ -445,11 +457,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// - [`TransactionSigned`] objects
     /// - [`Transact`] events
     /// - [`Enter`] events
-    fn accept_tx<Db: Database + DatabaseCommit, Insp>(
+    fn accept_tx<Db, Insp>(
         &mut self,
         trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
-    ) -> EvmNeedsTx<Db, Insp> {
+    ) -> EvmNeedsTx<Db, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // Push the transaction to the block.
         self.processed.push(tx);
         // Accept the result.
@@ -479,11 +495,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// - Run the transaction.
     /// - Check the [`AggregateFills`].
     /// - Create a receipt.
-    fn execute_transaction<Db: Database + DatabaseCommit, Insp>(
+    fn execute_transaction<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
         tx: TransactionSigned,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // We set up the span here so that tx details are captured in the event
         // of signature recovery failure.
         let s =
@@ -502,10 +522,14 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Execute all transactions. This is run before enters and transacts
-    fn execute_all_transactions<Db: Database + DatabaseCommit, Insp>(
+    fn execute_all_transactions<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         while !self.to_process.is_empty() {
             let tx = self.to_process.pop_front().expect("checked");
             trevm = self.execute_transaction(trevm, tx)?;
@@ -522,6 +546,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ) -> RunTxResult<Db, Self, Insp>
     where
         Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
     {
         let mut eth_minted = U256::ZERO;
         let mut accts: HashSet<Address> = HashSet::with_capacity(self.extracts.enters.len());
@@ -573,11 +598,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// Execute an [`EnterToken`] event.
     ///
     /// [`EnterToken`]: signet_zenith::Passage::EnterToken
-    fn execute_enter_token<Db: Database + DatabaseCommit, Insp>(
+    fn execute_enter_token<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
         idx: usize,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         let _span = {
             let e = &self.extracts.enter_tokens[idx];
             debug_span!("signet::evm::execute_enter_token", idx, host_tx = %e.tx_hash(), log_index = e.log_index).entered()
@@ -605,10 +634,14 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Execute all [`EnterToken`] events.
-    fn execute_all_enter_tokens<Db: Database + DatabaseCommit, Insp>(
+    fn execute_all_enter_tokens<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         trevm = trevm.try_with_cfg(&DisableGasChecks, |trevm| {
             trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
                 for i in 0..self.extracts.enter_tokens.len() {
@@ -630,11 +663,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// - Create a transaction and push it to the block.
     ///
     /// [`Transactor::Transact`]: signet_zenith::Transactor::Transact
-    fn execute_transact_event<Db: Database + DatabaseCommit, Insp>(
+    fn execute_transact_event<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
         idx: usize,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         let _span = {
             let e = &self.extracts.transacts[idx];
             debug_span!("execute_transact_event", idx,
@@ -702,10 +739,14 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Execute all transact events.
-    fn execute_all_transacts<Db: Database + DatabaseCommit, Insp>(
+    fn execute_all_transacts<Db, Insp>(
         &mut self,
         trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
             for i in 0..self.extracts.transacts.len() {
                 trevm = self.execute_transact_event(trevm, i)?;
@@ -718,10 +759,14 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// block, after all transactions, enters, and transact events have been
     /// processed. It ensures that ETH sent to the rollup passage is burned,
     /// and before the base fee is credited.
-    fn clear_ru_passage_balance<Db: Database + DatabaseCommit, Insp>(
+    fn clear_ru_passage_balance<Db, Insp>(
         &self,
         mut trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // Zero the balance of the rollup passage (deleting any exited ETH).
         match trevm.try_set_balance_unchecked(self.constants.rollup().passage(), U256::ZERO) {
             Ok(eth_burned) => debug!(%eth_burned, "Zeroed rollup passage balance"),
@@ -733,11 +778,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// Credit the base fee to the base fee beneficiary. This is run at the end
     /// of the block, after all transactions, enters, and transact events have
     /// been processed, and after the rollup passage balance has been cleared.
-    fn credit_base_fee<Db: Database + DatabaseCommit, Insp>(
+    fn credit_base_fee<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
         gas_used: u64,
-    ) -> RunTxResult<Db, Self, Insp> {
+    ) -> RunTxResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // We subtract the fake gas used for enters here. This
         // gives us the gas used for transactions and transact events.
         let base_fee = self.base_fee();
@@ -767,7 +816,7 @@ impl trevm::Cfg for SignetDriver<'_, '_> {
     }
 }
 
-impl<I> BlockDriver<OrderDetector<I>> for SignetDriver<'_, '_> {
+impl<Insp> BlockDriver<OrderDetector<Insp>> for SignetDriver<'_, '_> {
     type Block = Self;
 
     type Error<Db: Database + DatabaseCommit> = SignetDriverError<Db>;
@@ -776,10 +825,14 @@ impl<I> BlockDriver<OrderDetector<I>> for SignetDriver<'_, '_> {
         self
     }
 
-    fn run_txns<Db: Database + DatabaseCommit>(
+    fn run_txns<Db>(
         &mut self,
-        mut trevm: EvmNeedsTx<Db, I>,
-    ) -> trevm::RunTxResult<Db, OrderDetector<I>, Self> {
+        mut trevm: EvmNeedsTx<Db, Insp>,
+    ) -> trevm::RunTxResult<Db, OrderDetector<Insp>, Self>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         let _span = debug_span!(
             "run_txns",
             txn_count = self.to_process.len(),
@@ -826,10 +879,14 @@ impl<I> BlockDriver<OrderDetector<I>> for SignetDriver<'_, '_> {
         self.credit_base_fee(trevm, self.payable_gas_used())
     }
 
-    fn post_block<Db: Database + DatabaseCommit>(
+    fn post_block<Db>(
         &mut self,
-        _trevm: &trevm::EvmNeedsBlock<Db, OrderDetector<I>>,
-    ) -> Result<(), Self::Error<Db>> {
+        _trevm: &trevm::EvmNeedsBlock<Db, OrderDetector<Insp>>,
+    ) -> Result<(), Self::Error<Db>>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         Ok(())
     }
 }

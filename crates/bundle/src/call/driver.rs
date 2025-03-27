@@ -1,10 +1,11 @@
 use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
-use signet_evm::OrderDetector;
+use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, OrderDetector};
 use std::fmt::Debug;
 use tracing::{debug_span, instrument, Level};
 use trevm::{
-    revm::{context::result::EVMError, Database, DatabaseCommit},
+    helpers::Ctx,
+    revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
 
@@ -56,13 +57,16 @@ impl SignetBundleDriver<'_> {
 
     /// Check the aggregate fills, accept the result, accumulate the transaction
     /// details into the response.
-    fn accept_and_accumulate<Db: Database + DatabaseCommit, I>(
+    fn accept_and_accumulate<Db: Database + DatabaseCommit, Insp>(
         &mut self,
-        trevm: signet_evm::EvmTransacted<Db, I>,
+        trevm: EvmTransacted<Db, Insp>,
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: &mut U256,
         basefee: u64,
-    ) -> signet_evm::DriveBundleResult<Db, Self, I> {
+    ) -> DriveBundleResult<Db, Self, Insp>
+    where
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         let beneficiary = trevm.beneficiary();
 
         let (execution_result, mut trevm) = trevm.accept();
@@ -95,14 +99,15 @@ impl SignetBundleDriver<'_> {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting aggregate fills.
-impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
+impl<Insp> BundleDriver<OrderDetector<Insp>> for SignetBundleDriver<'_> {
     type Error<Db: Database + DatabaseCommit> = BundleError<Db>;
 
     #[instrument(skip_all, level = Level::DEBUG)]
-    fn run_bundle<Db: Database + DatabaseCommit>(
-        &mut self,
-        trevm: signet_evm::EvmNeedsTx<Db, I>,
-    ) -> signet_evm::DriveBundleResult<Db, Self, I> {
+    fn run_bundle<Db>(&mut self, trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Db, Self, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         // convenience binding to make usage later less verbose
         let bundle = &self.bundle.bundle;
 
@@ -187,10 +192,11 @@ impl<I> BundleDriver<OrderDetector<I>> for SignetBundleDriver<'_> {
         })
     }
 
-    fn post_bundle<Db: Database + DatabaseCommit>(
-        &mut self,
-        _trevm: &signet_evm::EvmNeedsTx<Db, I>,
-    ) -> Result<(), Self::Error<Db>> {
+    fn post_bundle<Db>(&mut self, _trevm: &EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error<Db>>
+    where
+        Db: Database + DatabaseCommit,
+        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+    {
         Ok(())
     }
 }

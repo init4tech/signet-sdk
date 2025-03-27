@@ -33,6 +33,7 @@ pub use result::BlockResult;
 
 use signet_types::config::SignetSystemConstants;
 use trevm::{
+    helpers::Ctx,
     revm::{inspector::NoOpInspector, Database, DatabaseCommit, Inspector},
     TrevmBuilder,
 };
@@ -66,7 +67,7 @@ pub fn signet_evm_with_inspector<Db, I>(
     constants: SignetSystemConstants,
 ) -> EvmNeedsCfg<Db, I>
 where
-    I: Inspector<Db>,
+    I: Inspector<Ctx<Db>>,
     Db: Database + DatabaseCommit,
 {
     let inspector = OrderDetector::new_with_inspector(constants, inner);

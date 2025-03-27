@@ -58,7 +58,7 @@ impl<T> AsMut<T> for OrderDetector<T> {
     }
 }
 
-impl<T> OrderDetector<T> {
+impl OrderDetector<NoOpInspector> {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and `outputs` mapping.
     pub fn new(constants: SignetSystemConstants) -> OrderDetector<NoOpInspector> {
@@ -69,7 +69,9 @@ impl<T> OrderDetector<T> {
             inner: NoOpInspector,
         }
     }
+}
 
+impl<T> OrderDetector<T> {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and an inner inspector.
     pub fn new_with_inspector(constants: SignetSystemConstants, inner: T) -> Self {
@@ -132,12 +134,15 @@ where
     fn log(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>, log: Log) {
         // skip if the log is not from the orders contract
         if log.address != self.contract() {
+            tracing::warn!(contract = %self.contract(), address = %log.address, "skipping");
             return;
         }
 
         if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log, true) {
+            tracing::warn!(?data, "order");
             self.orders.add(data);
         } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log, true) {
+            tracing::warn!(?data, "filled");
             self.filleds.add(data);
         }
 
