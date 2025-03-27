@@ -1,5 +1,5 @@
 use crate::{interest::InterestKind, Pnt};
-use ajj::serde_json;
+use ajj::{serde_json, HandlerCtx};
 use alloy::{primitives::U64, rpc::types::Log};
 use dashmap::DashMap;
 use reth::{
@@ -171,7 +171,7 @@ impl<N: Pnt> SubscriptionManagerInner<N> {
 
     /// Subscribe to notifications. Returns `None` if notifications are
     /// disabled.
-    pub fn subscribe(&self, ajj_ctx: &ajj::HandlerCtx, filter: InterestKind) -> Option<U64> {
+    pub fn subscribe(&self, ajj_ctx: &HandlerCtx, filter: InterestKind) -> Option<U64> {
         if !ajj_ctx.notifications_enabled() {
             return None;
         }
@@ -205,7 +205,7 @@ impl SubscriptionTask {
     /// Create the task future.
     pub(crate) async fn task_future(
         self,
-        ajj_ctx: ajj::HandlerCtx,
+        ajj_ctx: HandlerCtx,
         ajj_cancel: WaitForCancellationFutureOwned,
     ) {
         let SubscriptionTask { id, filter, token, mut notifs } = self;
@@ -323,7 +323,7 @@ impl SubscriptionTask {
     }
 
     /// Spawn on the ajj [`HandlerCtx`].
-    pub(crate) fn spawn(self, ctx: &ajj::HandlerCtx) {
+    pub(crate) fn spawn(self, ctx: &HandlerCtx) {
         ctx.spawn_graceful_with_ctx(|ctx, ajj_cancel| self.task_future(ctx, ajj_cancel));
     }
 }

@@ -20,8 +20,8 @@ use trevm::{
 /// fill requirements.
 ///
 /// This inspector is intended to be used with `trevm`. The EVM driver should
-/// - call [`OrderDetector::take_aggregate`] to get the aggregate orders
-///   produced by that transaction.
+/// - call [`OrderDetector::take_aggregates`] to get the aggregate orders
+///   and fills produced by that transaction.
 /// - ensure that net fills are sufficient to cover the order inputs via
 ///   [`AggregateFills::checked_remove_ru_tx_events`].
 /// - reject transactions which are not sufficiently filled.
