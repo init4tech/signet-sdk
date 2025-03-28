@@ -50,7 +50,7 @@ mod eth;
 pub use eth::{eth, CallErrorData, EthError};
 
 mod signet;
-pub use signet::signet;
+pub use signet::{error::SignetError, signet};
 
 mod interest;
 

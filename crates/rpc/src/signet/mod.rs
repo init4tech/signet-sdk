@@ -1,7 +1,10 @@
 //! Signet RPC methods and related code.
+pub(crate) mod error;
+
 use crate::util::await_jh_option;
 use crate::{ctx::RpcCtx, Pnt};
 use ajj::HandlerCtx;
+use error::SignetError;
 use reth_node_api::FullNodeComponents;
 use signet_bundle::SignetEthBundle;
 use signet_zenith::SignedOrder;
@@ -26,12 +29,15 @@ where
 {
     let task = |hctx: HandlerCtx| async move {
         let Some(forwarder) = ctx.signet().forwarder() else {
-            return Err("tx-cache URL not provided".to_string());
+            return Err(SignetError::TxCacheUrlNotProvided.into_string());
         };
 
-        hctx.spawn(
-            async move { forwarder.forward_bundle(bundle).await.map_err(|e| e.to_string()) },
-        );
+        hctx.spawn(async move {
+            forwarder
+                .forward_bundle(bundle)
+                .await
+                .map_err(|e| SignetError::EthApiError(e).into_string())
+        });
 
         Ok(())
     };
@@ -50,10 +56,15 @@ where
 {
     let task = |hctx: HandlerCtx| async move {
         let Some(forwarder) = ctx.signet().forwarder() else {
-            return Err("tx-cache URL not provided".to_string());
+            return Err(SignetError::TxCacheUrlNotProvided.into_string());
         };
 
-        hctx.spawn(async move { forwarder.forward_order(order).await.map_err(|e| e.to_string()) });
+        hctx.spawn(async move {
+            forwarder
+                .forward_order(order)
+                .await
+                .map_err(|e| SignetError::EthApiError(e).into_string())
+        });
 
         Ok(())
     };
