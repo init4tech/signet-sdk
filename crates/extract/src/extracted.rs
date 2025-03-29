@@ -79,7 +79,7 @@ impl<'a> ExtractedEvent<'a, Events> {
         self.event.is_enter()
     }
 
-    /// Get a refernce to the inner event, if it is an [`Enter`].
+    /// Get a reference to the inner event, if it is an [`Enter`].
     ///
     /// [`Enter`]: Passage::Enter
     pub const fn as_enter(&self) -> Option<&Passage::Enter> {
@@ -107,7 +107,7 @@ impl<'a> ExtractedEvent<'a, Events> {
         self.event.is_block_submitted()
     }
 
-    /// Get a refernce to the inner event, if it is an [`BlockSubmitted`].
+    /// Get a reference to the inner event, if it is an [`BlockSubmitted`].
     ///
     /// [`BlockSubmitted`]: Zenith::BlockSubmitted
     pub const fn as_block_submitted(&self) -> Option<&Zenith::BlockSubmitted> {
@@ -137,7 +137,7 @@ impl<'a> ExtractedEvent<'a, Events> {
         self.event.is_transact()
     }
 
-    /// Get a refernce to the inner event, if it is an [`Transactor::Transact`].
+    /// Get a reference to the inner event, if it is an [`Transactor::Transact`].
     pub const fn as_transact(&self) -> Option<&Transactor::Transact> {
         self.event.as_transact()
     }
@@ -163,7 +163,7 @@ impl<'a> ExtractedEvent<'a, Events> {
         self.event.is_filled()
     }
 
-    /// Get a refernce to the inner event, if it is an [`RollupOrders::Filled`].
+    /// Get a reference to the inner event, if it is an [`RollupOrders::Filled`].
     pub const fn as_filled(&self) -> Option<&RollupOrders::Filled> {
         self.event.as_filled()
     }
