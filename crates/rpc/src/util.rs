@@ -12,6 +12,56 @@ macro_rules! await_jh_option {
 }
 pub(crate) use await_jh_option;
 
+macro_rules! await_jh_option_response {
+    ($h:expr) => {
+        match $h.await {
+            Ok(Some(res)) => res,
+            _ => {
+                return ResponsePayload::internal_error_message(Cow::Borrowed(
+                    "task panicked or cancelled",
+                ))
+            }
+        }
+    };
+}
+pub(crate) use await_jh_option_response;
+
+macro_rules! response_tri {
+    ($h:expr) => {
+        match $h {
+            Ok(res) => res,
+            Err(err) => return ResponsePayload::internal_error_message(err.to_string().into()),
+        }
+    };
+
+    ($h:expr, $msg:literal) => {
+        match $h {
+            Ok(res) => res,
+            Err(_) => return ResponsePayload::internal_error_message($msg.into()),
+        }
+    };
+
+    ($h:expr, $obj:expr) => {
+        match $h {
+            Ok(res) => res,
+            Err(err) => returnResponsePayload::internal_error_with_message_and_obj(
+                err.to_string().into(),
+                $obj,
+            ),
+        }
+    };
+
+    ($h:expr, $msg:literal, $obj:expr) => {
+        match $h {
+            Ok(res) => res,
+            Err(err) => {
+                return ResponsePayload::internal_error_with_message_and_obj($msg.into(), $obj)
+            }
+        }
+    };
+}
+pub(crate) use response_tri;
+
 /// Convenience trait for specifying the [`ProviderNodeTypes`] implementation
 /// required for Signet RPC functionality.
 pub trait Pnt: ProviderNodeTypes<ChainSpec = ChainSpec, Primitives = EthPrimitives> {}
