@@ -1,8 +1,8 @@
 use crate::{
-    eth::{EthError, TxCacheForwarder},
+    eth::EthError,
     interest::{ActiveFilter, FilterManager, FilterOutput, SubscriptionManager},
     util::BlockRangeInclusiveIter,
-    Pnt,
+    Pnt, TxCacheForwarder,
 };
 use alloy::{
     consensus::{BlockHeader, Header, Signed, Transaction, TxEnvelope},

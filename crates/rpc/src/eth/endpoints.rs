@@ -2,6 +2,7 @@ use crate::{
     ctx::RpcCtx,
     eth::{CallErrorData, EthError},
     interest::{FilterOutput, InterestKind},
+    util::{await_jh_option, await_jh_option_response, response_tri},
     Pnt,
 };
 use ajj::{HandlerCtx, ResponsePayload};
@@ -30,63 +31,6 @@ use signet_evm::EvmErrored;
 use std::borrow::Cow;
 use tracing::{trace_span, Instrument};
 use trevm::revm::context::result::ExecutionResult;
-
-macro_rules! await_jh_option {
-    ($h:expr) => {
-        match $h.await {
-            Ok(Some(res)) => res,
-            _ => return Err("task panicked or cancelled".to_string()),
-        }
-    };
-}
-
-macro_rules! await_jh_option_response {
-    ($h:expr) => {
-        match $h.await {
-            Ok(Some(res)) => res,
-            _ => {
-                return ResponsePayload::internal_error_message(Cow::Borrowed(
-                    "task panicked or cancelled",
-                ))
-            }
-        }
-    };
-}
-
-macro_rules! response_tri {
-    ($h:expr) => {
-        match $h {
-            Ok(res) => res,
-            Err(err) => return ResponsePayload::internal_error_message(err.to_string().into()),
-        }
-    };
-
-    ($h:expr, $msg:literal) => {
-        match $h {
-            Ok(res) => res,
-            Err(_) => return ResponsePayload::internal_error_message($msg.into()),
-        }
-    };
-
-    ($h:expr, $obj:expr) => {
-        match $h {
-            Ok(res) => res,
-            Err(err) => returnResponsePayload::internal_error_with_message_and_obj(
-                err.to_string().into(),
-                $obj,
-            ),
-        }
-    };
-
-    ($h:expr, $msg:literal, $obj:expr) => {
-        match $h {
-            Ok(res) => res,
-            Err(err) => {
-                return ResponsePayload::internal_error_with_message_and_obj($msg.into(), $obj)
-            }
-        }
-    };
-}
 
 /// Args for `eth_estimateGas` and `eth_call`.
 #[derive(Debug, Deserialize)]

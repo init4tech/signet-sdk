@@ -47,9 +47,15 @@ mod ctx;
 pub use ctx::RpcCtx;
 
 mod eth;
-pub use eth::{eth, CallErrorData, EthError, TxCacheForwarder};
+pub use eth::{eth, CallErrorData, EthError};
+
+mod signet;
+pub use signet::{error::SignetError, signet};
 
 mod interest;
+
+mod forwarder;
+use forwarder::TxCacheForwarder;
 
 pub(crate) mod util;
 pub use util::Pnt;
@@ -76,7 +82,7 @@ where
     Host: FullNodeComponents,
     Signet: Pnt,
 {
-    ajj::Router::new().nest("eth", eth::<Host, Signet>())
+    ajj::Router::new().nest("eth", eth::<Host, Signet>()).nest("signet", signet::<Host, Signet>())
 }
 
 /// Serve the router on the given addresses using axum.
