@@ -63,7 +63,7 @@ pub use signet::{error::SignetError, signet};
 mod interest;
 
 mod forwarder;
-use forwarder::TxCacheForwarder;
+pub use forwarder::TxCacheForwarder;
 
 /// Utils and simple serve functions.
 pub mod util;
