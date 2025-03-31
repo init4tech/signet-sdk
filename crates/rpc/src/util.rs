@@ -160,7 +160,7 @@ pub async fn serve_ws(
     let handle = tasks.handle().clone();
     let cors = make_cors(cors);
 
-    let service = router.into_axum_with_ws_and_handle("/", "/ws", handle).layer(cors);
+    let service = router.into_axum_with_ws_and_handle("/rpc", "/", handle).layer(cors);
 
     serve(tasks, addrs, service).await
 }
