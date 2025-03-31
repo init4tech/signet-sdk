@@ -23,8 +23,9 @@
 //!
 //! let cfg = ServeConfig {
 //!     http: vec!["localhost:8080".parse()?],
+//!     http_cors: None,
 //!     ws: vec![],
-//!     cors: None,
+//!     ws_cors: None,
 //!     ipc: None,
 //! };
 //!

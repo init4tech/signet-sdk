@@ -41,10 +41,12 @@ impl Drop for RpcServerGuard {
 pub struct ServeConfig {
     /// HTTP server addresses.
     pub http: Vec<SocketAddr>,
+    /// CORS header to be used for HTTP (if any).
+    pub http_cors: Option<String>,
     /// WS server addresses.
     pub ws: Vec<SocketAddr>,
-    /// CORS header to be used for HTTP and WS servers (if any).
-    pub cors: Option<String>,
+    /// CORS header to be used for WS (if any).
+    pub ws_cors: Option<String>,
     /// IPC name info.
     pub ipc: Option<String>,
 }
@@ -59,11 +61,12 @@ impl From<RpcServerArgs> for ServeConfig {
         let ws =
             if args.ws { vec![SocketAddr::from((args.ws_addr, args.ws_port))] } else { vec![] };
 
-        let cors = args.http_corsdomain;
+        let http_cors = args.http_corsdomain;
+        let ws_cors = args.ws_allowed_origins;
 
         let ipc = if !args.ipcdisable { Some(args.ipcpath) } else { None };
 
-        Self { http, ws, cors, ipc }
+        Self { http, http_cors, ws, ws_cors, ipc }
     }
 }
 
@@ -77,7 +80,7 @@ impl ServeConfig {
         if self.http.is_empty() {
             return Ok(None);
         }
-        serve_axum(tasks, router, &self.http, self.cors.as_deref()).await.map(Some)
+        serve_axum(tasks, router, &self.http, self.http_cors.as_deref()).await.map(Some)
     }
 
     /// Serve the router on the given addresses.
@@ -89,7 +92,7 @@ impl ServeConfig {
         if self.ws.is_empty() {
             return Ok(None);
         }
-        serve_ws(tasks, router, &self.ws, self.cors.as_deref()).await.map(Some)
+        serve_ws(tasks, router, &self.ws, self.ws_cors.as_deref()).await.map(Some)
     }
 
     /// Serve the router on the given ipc path.
