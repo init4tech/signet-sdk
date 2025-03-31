@@ -85,13 +85,7 @@ where
     ajj::Router::new().nest("eth", eth::<Host, Signet>()).nest("signet", signet::<Host, Signet>())
 }
 
-/// Serve the router on the given addresses using axum.
-pub async fn serve_axum(
-    tasks: &TaskExecutor,
-    router: &Router<()>,
-    addrs: &[SocketAddr],
-    cors: Option<&str>,
-) -> eyre::Result<JoinHandle<()>> {
+fn make_cors(cors: Option<&str>) -> CorsLayer {
     let cors = cors
         .unwrap_or("*")
         .parse::<HeaderValue>()
@@ -99,8 +93,20 @@ pub async fn serve_axum(
         .unwrap_or_else(|_| AllowOrigin::any());
 
     let cors = CorsLayer::new().allow_methods([Method::GET, Method::POST]).allow_origin(cors);
+    cors
+}
 
-    let service = router.clone().into_axum("/").layer(cors);
+/// Serve the router on the given addresses using axum.
+pub async fn serve_axum(
+    tasks: &TaskExecutor,
+    router: Router<()>,
+    addrs: &[SocketAddr],
+    cors: Option<&str>,
+) -> eyre::Result<JoinHandle<()>> {
+    let handle = tasks.handle().clone();
+    let cors = make_cors(cors);
+
+    let service = router.into_axum_with_handle("/", handle).layer(cors);
 
     let listener = tokio::net::TcpListener::bind(addrs).await?;
 
@@ -115,8 +121,27 @@ pub async fn serve_axum(
 }
 
 /// Serve the router on the given address using a Websocket.
-pub const fn serve_ws(_tasks: &TaskExecutor, _router: &Router<()>, _addr: SocketAddr) {
-    // TODO: ENG-826
+pub async fn serve_ws(
+    tasks: &TaskExecutor,
+    router: Router<()>,
+    addr: SocketAddr,
+    cors: Option<&str>,
+) -> eyre::Result<JoinHandle<()>> {
+    let handle = tasks.handle().clone();
+    let cors = make_cors(cors);
+
+    let service = router.into_axum_with_ws_and_handle("/", "/ws", handle).layer(cors);
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+
+    let fut = async move {
+        match axum::serve(listener, service).into_future().await {
+            Ok(_) => (),
+            Err(err) => error!(%err, "Error serving RPC via axum"),
+        }
+    };
+
+    Ok(tasks.spawn(fut))
 }
 
 fn to_name(path: &std::ffi::OsStr) -> std::io::Result<ls::Name<'_>> {
