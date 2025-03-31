@@ -85,7 +85,7 @@ where
             Err(e) => {
                 return ResponsePayload::internal_error_with_message_and_obj(
                     "error while loading block cfg".into(),
-                    e.to_string().into(),
+                    e.to_string(),
                 )
             }
         };
