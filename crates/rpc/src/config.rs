@@ -1,5 +1,5 @@
 use ajj::{pubsub::ServerShutdown, Router};
-use reth::tasks::TaskExecutor;
+use reth::{args::RpcServerArgs, tasks::TaskExecutor};
 use std::net::SocketAddr;
 use tokio::task::JoinHandle;
 
@@ -47,6 +47,24 @@ pub struct ServeConfig {
     pub cors: Option<String>,
     /// IPC name info.
     pub ipc: Option<String>,
+}
+
+impl From<RpcServerArgs> for ServeConfig {
+    fn from(args: RpcServerArgs) -> Self {
+        let http = if args.http {
+            vec![SocketAddr::from((args.http_addr, args.http_port))]
+        } else {
+            vec![]
+        };
+        let ws =
+            if args.ws { vec![SocketAddr::from((args.ws_addr, args.ws_port))] } else { vec![] };
+
+        let cors = args.http_corsdomain;
+
+        let ipc = if !args.ipcdisable { Some(args.ipcpath) } else { None };
+
+        Self { http, ws, cors, ipc }
+    }
 }
 
 impl ServeConfig {
