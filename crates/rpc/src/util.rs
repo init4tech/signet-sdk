@@ -1,6 +1,18 @@
-use reth::{primitives::EthPrimitives, providers::providers::ProviderNodeTypes};
+use ajj::{
+    pubsub::{Connect, ServerShutdown},
+    Router,
+};
+use axum::http::HeaderValue;
+use interprocess::local_socket as ls;
+use reqwest::Method;
+use reth::{
+    primitives::EthPrimitives, providers::providers::ProviderNodeTypes, tasks::TaskExecutor,
+};
 use reth_chainspec::ChainSpec;
-use std::{iter::StepBy, ops::RangeInclusive};
+use std::{future::IntoFuture, iter::StepBy, net::SocketAddr, ops::RangeInclusive};
+use tokio::task::JoinHandle;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tracing::error;
 
 macro_rules! await_jh_option {
     ($h:expr) => {
@@ -93,6 +105,87 @@ impl Iterator for BlockRangeInclusiveIter {
         }
         Some((start, end))
     }
+}
+
+fn make_cors(cors: Option<&str>) -> CorsLayer {
+    let cors = cors
+        .unwrap_or("*")
+        .parse::<HeaderValue>()
+        .map(Into::<AllowOrigin>::into)
+        .unwrap_or_else(|_| AllowOrigin::any());
+
+    CorsLayer::new().allow_methods([Method::GET, Method::POST]).allow_origin(cors)
+}
+
+/// Serve the axum router on the specified addresses.
+async fn serve(
+    tasks: &TaskExecutor,
+    addrs: &[SocketAddr],
+    service: axum::Router,
+) -> Result<JoinHandle<()>, eyre::Error> {
+    let listener = tokio::net::TcpListener::bind(addrs).await?;
+
+    let fut = async move {
+        match axum::serve(listener, service).into_future().await {
+            Ok(_) => (),
+            Err(err) => error!(%err, "Error serving RPC via axum"),
+        }
+    };
+
+    Ok(tasks.spawn(fut))
+}
+
+/// Serve the router on the given addresses using axum.
+pub async fn serve_axum(
+    tasks: &TaskExecutor,
+    router: Router<()>,
+    addrs: &[SocketAddr],
+    cors: Option<&str>,
+) -> eyre::Result<JoinHandle<()>> {
+    let handle = tasks.handle().clone();
+    let cors = make_cors(cors);
+
+    let service = router.into_axum_with_handle("/", handle).layer(cors);
+
+    serve(tasks, addrs, service).await
+}
+
+/// Serve the router on the given address using a Websocket.
+pub async fn serve_ws(
+    tasks: &TaskExecutor,
+    router: Router<()>,
+    addrs: &[SocketAddr],
+    cors: Option<&str>,
+) -> eyre::Result<JoinHandle<()>> {
+    let handle = tasks.handle().clone();
+    let cors = make_cors(cors);
+
+    let service = router.into_axum_with_ws_and_handle("/", "/ws", handle).layer(cors);
+
+    serve(tasks, addrs, service).await
+}
+
+fn to_name(path: &std::ffi::OsStr) -> std::io::Result<ls::Name<'_>> {
+    if cfg!(windows) && !path.as_encoded_bytes().starts_with(br"\\.\pipe\") {
+        ls::ToNsName::to_ns_name::<ls::GenericNamespaced>(path)
+    } else {
+        ls::ToFsName::to_fs_name::<ls::GenericFilePath>(path)
+    }
+}
+
+/// Serve the router on the given address using IPC.
+pub async fn serve_ipc(
+    tasks: &TaskExecutor,
+    router: &Router<()>,
+    endpoint: &str,
+) -> eyre::Result<ServerShutdown> {
+    let name = std::ffi::OsStr::new(endpoint);
+    let name = to_name(name).expect("invalid name");
+    ls::ListenerOptions::new()
+        .name(name)
+        .serve_with_handle(router.clone(), tasks.handle().clone())
+        .await
+        .map_err(Into::into)
 }
 
 // Some code in this file has been copied and modified from reth
