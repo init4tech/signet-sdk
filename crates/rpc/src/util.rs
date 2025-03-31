@@ -29,7 +29,7 @@ macro_rules! await_jh_option_response {
         match $h.await {
             Ok(Some(res)) => res,
             _ => {
-                return ResponsePayload::internal_error_message(Cow::Borrowed(
+                return ResponsePayload::internal_error_message(std::borrow::Cow::Borrowed(
                     "task panicked or cancelled",
                 ))
             }
