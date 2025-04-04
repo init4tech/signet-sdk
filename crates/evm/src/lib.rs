@@ -26,7 +26,7 @@ mod journal;
 pub use journal::HostJournal;
 
 mod orders;
-pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector};
+pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector, SignetInspector};
 
 mod result;
 pub use result::BlockResult;
@@ -34,6 +34,7 @@ pub use result::BlockResult;
 use signet_types::config::SignetSystemConstants;
 use trevm::{
     helpers::Ctx,
+    inspectors::Layered,
     revm::{inspector::NoOpInspector, Database, DatabaseCommit, Inspector},
     TrevmBuilder,
 };
@@ -55,7 +56,7 @@ pub fn signet_evm<Db: Database + DatabaseCommit>(
 ) -> EvmNeedsCfg<Db> {
     TrevmBuilder::new()
         .with_db(db)
-        .with_insp(OrderDetector::<NoOpInspector>::new(constants))
+        .with_insp(Layered::new(NoOpInspector, OrderDetector::new(constants)))
         .build_trevm()
         .expect("db set")
 }
@@ -70,7 +71,8 @@ where
     I: Inspector<Ctx<Db>>,
     Db: Database + DatabaseCommit,
 {
-    let inspector = OrderDetector::new_with_inspector(constants, inner);
+    let inspector = SignetLayered::new(inner, OrderDetector::new(constants));
+
     TrevmBuilder::new().with_db(db).with_insp(inspector).build_trevm().expect("db set")
 }
 
