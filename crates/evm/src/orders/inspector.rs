@@ -3,12 +3,12 @@ use alloy::{
     primitives::{Address, Log, U256},
     sol_types::SolEvent,
 };
+use reth::revm::interpreter::InterpreterTypes;
 use signet_types::{config::SignetSystemConstants, AggregateFills};
 use signet_zenith::RollupOrders;
 use trevm::{
     helpers::Ctx,
     revm::{
-        inspector::NoOpInspector,
         interpreter::{
             CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter,
         },
@@ -35,47 +35,20 @@ use trevm::{
 /// [`SignetDriver`]: crate::SignetDriver
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OrderDetector<T = NoOpInspector> {
+pub struct OrderDetector {
     /// The signet system constants.
     constants: SignetSystemConstants,
     /// Orders detected so far, account for EVM reverts
     orders: FramedOrders,
     /// Fills detected so far, accounting for EVM reverts
     filleds: FramedFilleds,
-    /// The inner inspector (if any)
-    inner: T,
 }
 
-impl<T> AsRef<T> for OrderDetector<T> {
-    fn as_ref(&self) -> &T {
-        &self.inner
-    }
-}
-
-impl<T> AsMut<T> for OrderDetector<T> {
-    fn as_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-}
-
-impl OrderDetector<NoOpInspector> {
+impl OrderDetector {
     /// Create a new [`OrderDetector`] with the given `orders` contract address
     /// and `outputs` mapping.
-    pub fn new(constants: SignetSystemConstants) -> OrderDetector<NoOpInspector> {
-        OrderDetector {
-            constants,
-            orders: Default::default(),
-            filleds: Default::default(),
-            inner: NoOpInspector,
-        }
-    }
-}
-
-impl<T> OrderDetector<T> {
-    /// Create a new [`OrderDetector`] with the given `orders` contract address
-    /// and an inner inspector.
-    pub fn new_with_inspector(constants: SignetSystemConstants, inner: T) -> Self {
-        Self { constants, orders: Default::default(), filleds: Default::default(), inner }
+    pub fn new(constants: SignetSystemConstants) -> OrderDetector {
+        OrderDetector { constants, orders: Default::default(), filleds: Default::default() }
     }
 
     /// Get the address of the orders contract.
@@ -101,8 +74,8 @@ impl<T> OrderDetector<T> {
     }
 
     /// Take the inner inspector and the framed events.
-    pub fn into_parts(self) -> (FramedOrders, FramedFilleds, T) {
-        (self.orders, self.filleds, self.inner)
+    pub fn into_parts(self) -> (FramedOrders, FramedFilleds) {
+        (self.orders, self.filleds)
     }
 
     /// Get a reference to the framed [`RollupOrders::Order`] events.
@@ -114,24 +87,14 @@ impl<T> OrderDetector<T> {
     pub const fn filleds(&self) -> &FramedFilleds {
         &self.filleds
     }
-
-    /// Get a mutable reference to the inner inspector.
-    pub fn inner_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    /// Get a reference to the inner inspector.
-    pub const fn inner(&self) -> &T {
-        &self.inner
-    }
 }
 
-impl<Db, T> Inspector<Ctx<Db>> for OrderDetector<T>
+impl<Db, Int> Inspector<Ctx<Db>, Int> for OrderDetector
 where
     Db: Database,
-    T: Inspector<Ctx<Db>>,
+    Int: InterpreterTypes,
 {
-    fn log(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>, log: Log) {
+    fn log(&mut self, _interp: &mut Interpreter<Int>, _context: &mut Ctx<Db>, log: Log) {
         // skip if the log is not from the orders contract
         if log.address != self.contract() {
             return;
@@ -142,38 +105,39 @@ where
         } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log, true) {
             self.filleds.add(data);
         }
-
-        self.inner.log(interp, context, log)
     }
 
-    fn call(&mut self, context: &mut Ctx<Db>, inputs: &mut CallInputs) -> Option<CallOutcome> {
+    fn call(&mut self, _context: &mut Ctx<Db>, _inputs: &mut CallInputs) -> Option<CallOutcome> {
         self.orders.enter_frame();
-        self.inner.call(context, inputs)
+        None
     }
 
-    fn call_end(&mut self, context: &mut Ctx<Db>, inputs: &CallInputs, outcome: &mut CallOutcome) {
+    fn call_end(
+        &mut self,
+        _context: &mut Ctx<Db>,
+        _inputs: &CallInputs,
+        outcome: &mut CallOutcome,
+    ) {
         if outcome.result.is_ok() {
             self.orders.exit_frame();
         } else {
             self.orders.revert_frame();
         }
-
-        self.inner.call_end(context, inputs, outcome)
     }
 
     fn create(
         &mut self,
-        context: &mut Ctx<Db>,
-        inputs: &mut CreateInputs,
+        _context: &mut Ctx<Db>,
+        _inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
         self.orders.enter_frame();
-        self.inner.create(context, inputs)
+        None
     }
 
     fn create_end(
         &mut self,
-        context: &mut Ctx<Db>,
-        inputs: &CreateInputs,
+        _context: &mut Ctx<Db>,
+        _inputs: &CreateInputs,
         outcome: &mut CreateOutcome,
     ) {
         if outcome.result.is_ok() {
@@ -181,22 +145,21 @@ where
         } else {
             self.orders.revert_frame();
         }
-        self.inner.create_end(context, inputs, outcome)
     }
 
     fn eofcreate(
         &mut self,
-        context: &mut Ctx<Db>,
-        inputs: &mut EOFCreateInputs,
+        _context: &mut Ctx<Db>,
+        _inputs: &mut EOFCreateInputs,
     ) -> Option<CreateOutcome> {
         self.orders.enter_frame();
-        self.inner.eofcreate(context, inputs)
+        None
     }
 
     fn eofcreate_end(
         &mut self,
-        context: &mut Ctx<Db>,
-        inputs: &EOFCreateInputs,
+        _context: &mut Ctx<Db>,
+        _inputs: &EOFCreateInputs,
         outcome: &mut CreateOutcome,
     ) {
         if outcome.result.is_ok() {
@@ -204,23 +167,9 @@ where
         } else {
             self.orders.revert_frame();
         }
-        self.inner.eofcreate_end(context, inputs, outcome)
     }
 
-    fn selfdestruct(&mut self, contract: Address, target: Address, value: U256) {
+    fn selfdestruct(&mut self, _contract: Address, _target: Address, _value: U256) {
         self.orders.exit_frame();
-        self.inner.selfdestruct(contract, target, value)
-    }
-
-    fn initialize_interp(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>) {
-        self.inner.initialize_interp(interp, context)
-    }
-
-    fn step(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>) {
-        self.inner.step(interp, context)
-    }
-
-    fn step_end(&mut self, interp: &mut Interpreter, context: &mut Ctx<Db>) {
-        self.inner.step_end(interp, context)
     }
 }
