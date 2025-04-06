@@ -66,8 +66,8 @@ pub type EvmErrored<Db, I = NoOpInspector, E = EVMError<<Db as Database>::Error>
     trevm::EvmErrored<Db, SignetLayered<I>, E>;
 
 /// The result of running transactions for a block driver.
-pub type RunTxResult<Db, T, I = NoOpInspector> = trevm::RunTxResult<Db, SignetLayered<I>, T>;
+pub type RunTxResult<T, Db, I = NoOpInspector> = trevm::RunTxResult<T, Db, SignetLayered<I>>;
 
 /// The result of driving a bundle.
-pub type DriveBundleResult<Db, T, I = NoOpInspector> =
-    trevm::DriveBundleResult<Db, SignetLayered<I>, T>;
+pub type DriveBundleResult<T, Db, I = NoOpInspector> =
+    trevm::DriveBundleResult<T, Db, SignetLayered<I>>;

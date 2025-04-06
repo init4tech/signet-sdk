@@ -1,11 +1,11 @@
 use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
-use signet_evm::SignetInspector;
+use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, SignetInspector, SignetLayered};
 use std::fmt::Debug;
 use tracing::{debug_span, instrument, Level};
 use trevm::{
     helpers::Ctx,
-    revm::{context::result::EVMError, Database, DatabaseCommit},
+    revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
 
@@ -59,14 +59,14 @@ impl SignetBundleDriver<'_> {
     /// details into the response.
     fn accept_and_accumulate<Db, Insp>(
         &mut self,
-        trevm: trevm::EvmTransacted<Db, Insp>,
+        trevm: EvmTransacted<Db, Insp>,
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: &mut U256,
         basefee: u64,
-    ) -> trevm::DriveBundleResult<Db, Insp, Self>
+    ) -> DriveBundleResult<Self, Db, Insp>
     where
         Db: Database + DatabaseCommit,
-        Insp: SignetInspector<Ctx<Db>>,
+        Insp: Inspector<Ctx<Db>>,
     {
         let beneficiary = trevm.beneficiary();
 
@@ -100,18 +100,15 @@ impl SignetBundleDriver<'_> {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting aggregate fills.
-impl<Db, Insp> BundleDriver<Db, Insp> for SignetBundleDriver<'_>
+impl<Db, Insp> BundleDriver<Db, SignetLayered<Insp>> for SignetBundleDriver<'_>
 where
     Db: Database + DatabaseCommit,
-    Insp: SignetInspector<Ctx<Db>>,
+    Insp: Inspector<Ctx<Db>>,
 {
     type Error = BundleError<Db>;
 
     #[instrument(skip_all, level = Level::DEBUG)]
-    fn run_bundle(
-        &mut self,
-        trevm: trevm::EvmNeedsTx<Db, Insp>,
-    ) -> trevm::DriveBundleResult<Db, Insp, Self> {
+    fn run_bundle(&mut self, trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Self, Db, Insp> {
         // convenience binding to make usage later less verbose
         let bundle = &self.bundle.bundle;
 
@@ -197,7 +194,7 @@ where
         })
     }
 
-    fn post_bundle(&mut self, _trevm: &trevm::EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error> {
+    fn post_bundle(&mut self, _trevm: &EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
