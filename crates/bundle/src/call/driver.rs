@@ -1,6 +1,6 @@
 use crate::{SignetCallBundle, SignetCallBundleResponse};
 use alloy::{consensus::TxEnvelope, primitives::U256};
-use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, OrderDetector};
+use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, SignetInspector, SignetLayered};
 use std::fmt::Debug;
 use tracing::{debug_span, instrument, Level};
 use trevm::{
@@ -63,10 +63,10 @@ impl SignetBundleDriver<'_> {
         tx: &TxEnvelope,
         pre_sim_coinbase_balance: &mut U256,
         basefee: u64,
-    ) -> DriveBundleResult<Db, Self, Insp>
+    ) -> DriveBundleResult<Self, Db, Insp>
     where
         Db: Database + DatabaseCommit,
-        OrderDetector<Insp>: Inspector<Ctx<Db>>,
+        Insp: Inspector<Ctx<Db>>,
     {
         let beneficiary = trevm.beneficiary();
 
@@ -100,15 +100,15 @@ impl SignetBundleDriver<'_> {
 // [`BundleDriver`] Implementation for [`SignetCallBundle`].
 // This is useful mainly for the `signet_simBundle` endpoint,
 // which is used to simulate a signet bundle while respecting aggregate fills.
-impl<Insp> BundleDriver<OrderDetector<Insp>> for SignetBundleDriver<'_> {
-    type Error<Db: Database + DatabaseCommit> = BundleError<Db>;
+impl<Db, Insp> BundleDriver<Db, SignetLayered<Insp>> for SignetBundleDriver<'_>
+where
+    Db: Database + DatabaseCommit,
+    Insp: Inspector<Ctx<Db>>,
+{
+    type Error = BundleError<Db>;
 
     #[instrument(skip_all, level = Level::DEBUG)]
-    fn run_bundle<Db>(&mut self, trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Db, Self, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        OrderDetector<Insp>: Inspector<Ctx<Db>>,
-    {
+    fn run_bundle(&mut self, trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Self, Db, Insp> {
         // convenience binding to make usage later less verbose
         let bundle = &self.bundle.bundle;
 
@@ -184,7 +184,8 @@ impl<Insp> BundleDriver<OrderDetector<Insp>> for SignetBundleDriver<'_> {
             self.response.bundle_hash = self.bundle.bundle_hash();
 
             // Taking these clears the order detector
-            let (orders, fills) = trevm.inner_mut_unchecked().data.inspector.take_aggregates();
+            let (orders, fills) =
+                trevm.inner_mut_unchecked().data.inspector.as_mut_detector().take_aggregates();
             self.response.orders = orders;
             self.response.fills = fills;
 
@@ -193,11 +194,7 @@ impl<Insp> BundleDriver<OrderDetector<Insp>> for SignetBundleDriver<'_> {
         })
     }
 
-    fn post_bundle<Db>(&mut self, _trevm: &EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error<Db>>
-    where
-        Db: Database + DatabaseCommit,
-        OrderDetector<Insp>: Inspector<Ctx<Db>>,
-    {
+    fn post_bundle(&mut self, _trevm: &EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error> {
         Ok(())
     }
 }

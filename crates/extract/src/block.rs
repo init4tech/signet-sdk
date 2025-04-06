@@ -33,13 +33,13 @@ impl Extracts<'_> {
     }
 
     /// Get the host block number.
-    pub fn host_block_number(&self) -> u64 {
-        self.host_block.number
+    pub const fn host_block_number(&self) -> u64 {
+        self.host_block.sealed_block().header().number
     }
 
     /// Get the host block timestamp.
-    pub fn host_block_timestamp(&self) -> u64 {
-        self.host_block.timestamp
+    pub const fn host_block_timestamp(&self) -> u64 {
+        self.host_block.sealed_block().header().timestamp
     }
 
     /// True if the host block contains a [`BlockSubmitted`] event.

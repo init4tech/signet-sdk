@@ -263,11 +263,13 @@ mod orders {
 
     impl Orders::Order {
         /// Get the inputs of the order.
+        #[allow(clippy::missing_const_for_fn)] // false positive
         pub fn inputs(&self) -> &[IOrders::Input] {
             &self.inputs
         }
 
         /// Get the outputs of the order.
+        #[allow(clippy::missing_const_for_fn)] // false positive
         pub fn outputs(&self) -> &[IOrders::Output] {
             &self.outputs
         }

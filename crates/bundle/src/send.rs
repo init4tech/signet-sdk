@@ -30,6 +30,7 @@ pub struct SignetEthBundle {
 
 impl SignetEthBundle {
     /// Returns the transactions in this bundle.
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn txs(&self) -> &[Bytes] {
         &self.bundle.txs
     }

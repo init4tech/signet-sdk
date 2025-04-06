@@ -125,7 +125,7 @@ impl MagicSigInfo {
 ///     for transact).
 ///   - `[9..12]`: A 3-byte RESERVED region.
 ///   - `[12..32]`: For transact events, (flag byte 3) the sender's address.
-///      RESERVED otherwise.
+///     RESERVED otherwise.
 ///
 /// Because Ethereum-like chains enforce low-S signatures, the S value of the
 /// magic signature is invalid for Ethereum-based chains supporting [EIP-2].

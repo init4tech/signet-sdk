@@ -121,6 +121,7 @@ where
     }
 
     /// Access to the transactions.
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn transactions(&self) -> &[C::Tx] {
         &self.transactions
     }
