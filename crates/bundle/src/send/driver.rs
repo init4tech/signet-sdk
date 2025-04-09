@@ -136,7 +136,7 @@ where
                             return Err(trevm.errored(BundleError::BundleReverted.into()));
                         }
                         _ => {
-                            if !self.bundle.reverting_tx_hashes().contains(&tx_hash) {
+                            if !self.bundle.reverting_tx_hashes().contains(tx_hash) {
                                 return Err(trevm.errored(BundleError::BundleReverted.into()));
                             }
                         }
