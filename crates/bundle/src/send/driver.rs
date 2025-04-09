@@ -3,9 +3,14 @@ use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
 use signet_zenith::SignedOrderError;
 use trevm::{
     helpers::Ctx,
+    inspectors::{Layered, TimeLimit},
     revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
+
+/// Inspector used in the impl of [`BundleDriver`] for
+/// [`SignetEthBundleDriver`].
+pub type SignetEthBundleInsp<I> = Layered<TimeLimit, I>;
 
 /// Erros while running a [`SignetEthBundle`] on the EVM.
 #[derive(thiserror::Error)]
@@ -64,14 +69,18 @@ impl<'a> SignetEthBundleDriver<'a> {
     }
 }
 
-impl<Db, Insp> BundleDriver<Db, SignetLayered<Insp>> for SignetEthBundleDriver<'_>
+impl<Db, Insp> BundleDriver<Db, SignetLayered<Layered<TimeLimit, Insp>>>
+    for SignetEthBundleDriver<'_>
 where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
 {
     type Error = SignetEthBundleError<Db>;
 
-    fn run_bundle(&mut self, mut trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Self, Db, Insp> {
+    fn run_bundle(
+        &mut self,
+        mut trevm: EvmNeedsTx<Db, SignetEthBundleInsp<Insp>>,
+    ) -> DriveBundleResult<Self, Db, SignetEthBundleInsp<Insp>> {
         let bundle = &self.bundle.bundle;
 
         // Ensure that the bundle has transactions
@@ -121,7 +130,10 @@ where
         Ok(trevm)
     }
 
-    fn post_bundle(&mut self, _trevm: &EvmNeedsTx<Db, Insp>) -> Result<(), Self::Error> {
+    fn post_bundle(
+        &mut self,
+        _trevm: &EvmNeedsTx<Db, SignetEthBundleInsp<Insp>>,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
