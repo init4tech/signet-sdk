@@ -16,7 +16,7 @@ use trevm::{
 /// [`SignetEthBundleDriver`].
 pub type SignetEthBundleInsp<I> = Layered<TimeLimit, I>;
 
-/// Erros while running a [`SignetEthBundle`] on the EVM.
+/// Errors while running a [`SignetEthBundle`] on the EVM.
 #[derive(thiserror::Error)]
 pub enum SignetEthBundleError<Db: Database> {
     /// Bundle error.
