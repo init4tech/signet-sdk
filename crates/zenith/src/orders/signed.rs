@@ -59,17 +59,14 @@ impl SignedOrder {
         // if the resulting amount is zero, we remove the entry. This
         // means that the output is satisfied by the permit.
         for permit in self.permit.permit.permitted.iter() {
-            match map.entry(permit.token) {
-                Entry::Occupied(mut occupied_entry) => {
-                    let val = occupied_entry.get();
-                    let update = val.saturating_sub(permit.amount);
-                    if update.is_zero() {
-                        occupied_entry.remove();
-                    } else {
-                        occupied_entry.insert(update);
-                    }
+            if let Entry::Occupied(mut occupied_entry) = map.entry(permit.token) {
+                let val = occupied_entry.get();
+                let update = val.saturating_sub(permit.amount);
+                if update.is_zero() {
+                    occupied_entry.remove();
+                } else {
+                    occupied_entry.insert(update);
                 }
-                _ => {}
             }
         }
 

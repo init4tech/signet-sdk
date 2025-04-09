@@ -55,22 +55,22 @@ pub struct SignetEthBundleDriver<'a> {
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
-    pub fn new(bundle: &'a SignetEthBundle, response: SignetEthBundleResponse) -> Self {
+    pub const fn new(bundle: &'a SignetEthBundle, response: SignetEthBundleResponse) -> Self {
         Self { bundle, response }
     }
 
     /// Get a reference to the bundle.
-    pub fn bundle(&self) -> &SignetEthBundle {
+    pub const fn bundle(&self) -> &SignetEthBundle {
         self.bundle
     }
 
     /// Get a reference to the response.
-    pub fn response(&self) -> &SignetEthBundleResponse {
+    pub const fn response(&self) -> &SignetEthBundleResponse {
         &self.response
     }
 }
 
-impl<'a, Db, Insp> BundleDriver<Db, SignetLayered<Insp>> for SignetEthBundleDriver<'a>
+impl<Db, Insp> BundleDriver<Db, SignetLayered<Insp>> for SignetEthBundleDriver<'_>
 where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
@@ -100,7 +100,7 @@ where
         );
 
         // Check that the `SignedOrder` is valid at the timestamp.
-        if !self.bundle().validate_fills_offchain(timestamp).is_ok() {
+        if self.bundle().validate_fills_offchain(timestamp).is_err() {
             return Err(trevm.errored(BundleError::BundleReverted.into()));
         }
 
