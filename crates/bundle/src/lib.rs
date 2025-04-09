@@ -3,7 +3,6 @@
 //! Contains the [`SignetCallBundle`] and [`SignetEthBundle`] type, and
 //! utilities related to creating and simulating Signet bundles.
 //!
-//!
 //! # Bundles
 //!
 //! The [`SignetCallBundle`] and [`SignetEthBundle`] types are used to simulate
