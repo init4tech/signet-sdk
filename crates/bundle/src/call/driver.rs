@@ -9,7 +9,7 @@ use trevm::{
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
 
-/// A bundle driver for the Signet EVM.
+/// A call bundle driver for the Signet EVM.
 ///
 /// This type allows for the simulation of a [`SignetCallBundle`], outputting
 /// the results of the simulation in a [`SignetCallBundleResponse`].

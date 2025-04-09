@@ -1,10 +1,18 @@
 //! Signet bundle types.
 use alloy::{
+    consensus::TxEnvelope,
+    eips::Decodable2718,
+    network::Network,
     primitives::{Bytes, B256},
+    providers::Provider,
+    rlp::Buf,
     rpc::types::mev::EthSendBundle,
 };
 use serde::{Deserialize, Serialize};
-use signet_zenith::SignedOrder;
+use signet_zenith::{HostOrders::HostOrdersInstance, SignedOrder, SignedOrderError};
+use trevm::{revm::Database, BundleError};
+
+use super::SignetEthBundleError;
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///
@@ -58,6 +66,52 @@ impl SignetEthBundle {
     /// Returns the replacement uuid for this bundle.
     pub fn replacement_uuid(&self) -> Option<&str> {
         self.bundle.replacement_uuid.as_deref()
+    }
+
+    /// Decode and validate the transactions in the bundle.
+    pub fn decode_and_validate_txs<Db: Database>(
+        &self,
+    ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
+        // Decode and validate the transactions in the bundle
+        let txs = self
+            .txs()
+            .iter()
+            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| BundleError::TransactionDecodingError(err))?;
+
+        if txs.iter().any(|tx| tx.is_eip4844()) {
+            return Err(BundleError::UnsupportedTransactionType);
+        }
+
+        Ok(txs)
+    }
+
+    /// Check that this can be syntactically used as a fill.
+    pub fn validate_fills_offchain(&self, timestamp: u64) -> Result<(), SignedOrderError> {
+        if let Some(host_fills) = &self.host_fills {
+            host_fills.validate_as_fill(timestamp)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Check that this fill is valid on-chain as of the current block. This
+    /// checks that the tokens can actually be transferred.
+    pub async fn alloy_validate_fills_onchain<Db, P, N>(
+        &self,
+        orders: HostOrdersInstance<(), P, N>,
+    ) -> Result<(), SignetEthBundleError<Db>>
+    where
+        Db: Database,
+        P: Provider<N>,
+        N: Network,
+    {
+        if let Some(host_fills) = self.host_fills.clone() {
+            orders.try_signed_order(host_fills).await.map_err(Into::into)
+        } else {
+            Ok(())
+        }
     }
 }
 
