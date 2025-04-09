@@ -120,9 +120,7 @@ where
 
                     trevm.accept_state()
                 }
-                Err(err) => {
-                    return Err(trevm.errored(BundleError::BundleReverted.into()));
-                }
+                Err(err) => return Err(err.err_into()),
             };
         }
 
