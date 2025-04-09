@@ -68,10 +68,12 @@ impl Extracts<'_> {
     pub fn aggregate_fills(&self) -> AggregateFills {
         self.context.clone()
     }
+}
 
+impl<'a> Extracts<'a> {
     /// Used for testing.
     #[cfg(any(test, feature = "test-utils"))]
-    pub fn empty(host_block: &RecoveredBlock<Block>) -> Self {
+    pub fn empty(host_block: &'a RecoveredBlock<Block>) -> Self {
         Self {
             host_block,
             chain_id: 0,
