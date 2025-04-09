@@ -1,10 +1,14 @@
 //! Signet bundle types.
 use alloy::{
+    consensus::TxEnvelope,
+    eips::Decodable2718,
     primitives::{Bytes, B256},
+    rlp::Buf,
     rpc::types::mev::EthSendBundle,
 };
 use serde::{Deserialize, Serialize};
-use signet_zenith::SignedOrder;
+use signet_zenith::{HostOrders::Permit2Batch, SignedOrder};
+use trevm::{revm::Database, BundleError};
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///
@@ -25,7 +29,7 @@ pub struct SignetEthBundle {
     /// Host fills to be applied with the bundle, represented as a signed
     /// permit2 order.
     #[serde(default)]
-    pub host_fills: Option<SignedOrder>,
+    pub host_fills: Vec<SignedOrder>,
 }
 
 impl SignetEthBundle {
@@ -58,6 +62,25 @@ impl SignetEthBundle {
     /// Returns the replacement uuid for this bundle.
     pub fn replacement_uuid(&self) -> Option<&str> {
         self.bundle.replacement_uuid.as_deref()
+    }
+
+    /// Decode and validate the transactions in the bundle.
+    pub fn decode_and_validate_txs<Db: Database>(
+        &self,
+    ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
+        // Decode and validate the transactions in the bundle
+        let txs = self
+            .txs()
+            .iter()
+            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| BundleError::TransactionDecodingError(err))?;
+
+        if txs.iter().any(|tx| tx.is_eip4844()) {
+            return Err(BundleError::UnsupportedTransactionType);
+        }
+
+        Ok(txs)
     }
 }
 
@@ -95,7 +118,7 @@ mod test {
                 reverting_tx_hashes: vec![B256::repeat_byte(4), B256::repeat_byte(5)],
                 replacement_uuid: Some("uuid".to_owned()),
             },
-            host_fills: Some(SignedOrder {
+            host_fills: vec![SignedOrder {
                 permit: Permit2Batch {
                     permit: PermitBatchTransferFrom {
                         permitted: vec![TokenPermissions {
@@ -114,7 +137,7 @@ mod test {
                     recipient: Address::repeat_byte(99),
                     chainId: 100,
                 }],
-            }),
+            }],
         };
 
         let serialized = serde_json::to_string(&bundle).unwrap();

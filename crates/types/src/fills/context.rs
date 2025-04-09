@@ -1,7 +1,7 @@
 use crate::MarketError;
 use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
-use signet_zenith::{AggregateOrders, RollupOrders};
+use signet_zenith::{AggregateOrders, HostOrders::Permit2Batch, RollupOrders, SignedOrder};
 use std::collections::HashMap;
 
 /// The aggregate fills, to be populated via block extracts. Generally used to
@@ -105,6 +105,22 @@ impl AggregateFills {
     /// [`U256::MAX`], re-examine life choices and don't do that.
     pub fn add_fill(&mut self, chain_id: u64, fill: &RollupOrders::Filled) {
         fill.outputs.iter().for_each(|o| self.add_fill_output(chain_id, o));
+    }
+
+    /// Ingest a bundle fill (represented as a [`SignedOrder`]) into the
+    /// context. The `chain_id` is the ID of the chain on which the
+    /// [`SignedOrder`] was executed.
+    ///
+    /// # Note:
+    ///
+    /// This uses saturating arithmetic to avoid panics. If filling more than
+    /// [`U256::MAX`], re-examine life choices and don't do that.
+    pub fn add_bundle_fill(&mut self, chain_id: u64, batch: &SignedOrder) -> Self {
+        let mut context = Self::default();
+        for output in &batch.outputs {
+            context.add_fill_output(chain_id, output);
+        }
+        context
     }
 
     /// Absorb the fills from another context.

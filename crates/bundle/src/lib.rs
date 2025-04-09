@@ -19,4 +19,4 @@ mod call;
 pub use call::{SignetBundleDriver, SignetCallBundle, SignetCallBundleResponse};
 
 mod send;
-pub use send::{SignetEthBundle, SignetEthBundleResponse};
+pub use send::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleResponse};

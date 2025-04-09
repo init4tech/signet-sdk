@@ -1,4 +1,4 @@
-use crate::bindings::HostOrders::{Output, Permit2Batch};
+use crate::bindings::RollupOrders::{Output, Permit2Batch};
 use serde::{Deserialize, Serialize};
 
 /// A signed order.
