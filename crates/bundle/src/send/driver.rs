@@ -108,15 +108,20 @@ where
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
 
         for tx in txs.into_iter() {
+            let tx_hash = tx.hash();
+
             trevm = match trevm.run_tx(&tx) {
-                Ok(trevm) => trevm.accept_state(),
-                Err(err) => {
-                    let trevm = err.discard_error();
-                    if bundle.reverting_tx_hashes.contains(tx.tx_hash()) {
-                        trevm
-                    } else {
+                Ok(trevm) => {
+                    // Check if the transaction was reverted or halted
+                    let result = trevm.result();
+                    if !result.is_success() && !bundle.reverting_tx_hashes.contains(tx_hash) {
                         return Err(trevm.errored(BundleError::BundleReverted.into()));
                     }
+
+                    trevm.accept_state()
+                }
+                Err(err) => {
+                    return Err(trevm.errored(BundleError::BundleReverted.into()));
                 }
             };
         }
