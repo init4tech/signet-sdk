@@ -4,7 +4,9 @@ use signet_zenith::SignedOrderError;
 use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
-    revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
+    revm::{
+        context::result::EVMError, inspector::InspectorEvmTr, Database, DatabaseCommit, Inspector,
+    },
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
 
@@ -54,13 +56,14 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
 #[derive(Debug, Clone)]
 pub struct SignetEthBundleDriver<'a> {
     bundle: &'a SignetEthBundle,
+    deadline: std::time::Instant,
 }
 
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
-    pub const fn new(bundle: &'a SignetEthBundle) -> Self {
-        Self { bundle }
+    pub const fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
+        Self { bundle, deadline }
     }
 
     /// Get a reference to the bundle.
@@ -111,6 +114,10 @@ where
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
 
         for tx in txs.into_iter() {
+            // Update the inner deadline.
+            let limit = trevm.inner_mut_unchecked().ctx_inspector().1.outer_mut().outer_mut();
+            *limit = TimeLimit::new(self.deadline - std::time::Instant::now());
+
             let tx_hash = tx.hash();
 
             trevm = match trevm.run_tx(&tx) {
