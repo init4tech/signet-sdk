@@ -27,7 +27,7 @@ impl AggregateOrders {
     }
 
     /// Ingest an output into the aggregate orders.
-    fn ingest_output(&mut self, output: &RollupOrders::Output) {
+    pub(crate) fn ingest_output(&mut self, output: &RollupOrders::Output) {
         let entry = self
             .outputs
             .entry((output.chain_id() as u64, output.token))
@@ -38,7 +38,7 @@ impl AggregateOrders {
     }
 
     /// Ingest an input into the aggregate orders.
-    fn ingest_input(&mut self, input: &RollupOrders::Input) {
+    pub(crate) fn ingest_input(&mut self, input: &RollupOrders::Input) {
         let entry = self.inputs.entry(input.token).or_default();
         *entry = entry.saturating_add(input.amount);
     }

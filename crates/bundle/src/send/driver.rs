@@ -1,12 +1,49 @@
-use std::u64;
-
 use crate::send::{SignetEthBundle, SignetEthBundleResponse};
 use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
+use signet_zenith::SignedOrderError;
 use trevm::{
     helpers::Ctx,
-    revm::{Database, DatabaseCommit, Inspector},
+    revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
+
+/// Erros while running a [`SignetEthBundle`] on the EVM.
+#[derive(thiserror::Error)]
+pub enum SignetEthBundleError<Db: Database> {
+    /// Bundle error.
+    #[error(transparent)]
+    BundleError(#[from] BundleError<Db>),
+
+    /// SignedOrderError.
+    #[error(transparent)]
+    SignedOrderError(#[from] SignedOrderError),
+
+    /// Contract error.
+    #[error(transparent)]
+    ContractError(#[from] alloy::contract::Error),
+}
+
+impl<Db: Database> core::fmt::Debug for SignetEthBundleError<Db> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SignetEthBundleError::BundleError(bundle_error) => {
+                f.debug_tuple("BundleError").field(bundle_error).finish()
+            }
+            SignetEthBundleError::SignedOrderError(signed_order_error) => {
+                f.debug_tuple("SignedOrderError").field(signed_order_error).finish()
+            }
+            SignetEthBundleError::ContractError(contract_error) => {
+                f.debug_tuple("ContractError").field(contract_error).finish()
+            }
+        }
+    }
+}
+
+impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
+    fn from(err: EVMError<Db::Error>) -> Self {
+        Self::BundleError(BundleError::from(err))
+    }
+}
 
 /// Driver for applying a Signet Ethereum bundle to an EVM.
 #[derive(Debug, Clone)]
@@ -38,19 +75,19 @@ where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
 {
-    type Error = BundleError<Db>;
+    type Error = SignetEthBundleError<Db>;
 
     fn run_bundle(&mut self, mut trevm: EvmNeedsTx<Db, Insp>) -> DriveBundleResult<Self, Db, Insp> {
         let bundle = &self.bundle.bundle;
 
         // Ensure that the bundle has transactions
-        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty);
+        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
             trevm.block_number() == bundle.block_number,
             trevm,
-            BundleError::BlockNumberMismatch
+            BundleError::BlockNumberMismatch.into()
         );
 
         // Check if the state block number is valid (not 0, and not a tag)
@@ -59,8 +96,13 @@ where
             timestamp >= bundle.min_timestamp.unwrap_or_default()
                 && timestamp <= bundle.max_timestamp.unwrap_or(u64::MAX),
             trevm,
-            BundleError::TimestampOutOfRange
+            BundleError::TimestampOutOfRange.into()
         );
+
+        // Check that the `SignedOrder` is valid at the timestamp.
+        if !self.bundle().validate_fills_offchain(timestamp).is_ok() {
+            return Err(trevm.errored(BundleError::BundleReverted.into()));
+        }
 
         // Decode and validate the transactions in the bundle
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
@@ -73,7 +115,7 @@ where
                     if bundle.reverting_tx_hashes.contains(tx.tx_hash()) {
                         trevm
                     } else {
-                        return Err(trevm.errored(BundleError::BundleReverted));
+                        return Err(trevm.errored(BundleError::BundleReverted.into()));
                     }
                 }
             };

@@ -2,13 +2,17 @@
 use alloy::{
     consensus::TxEnvelope,
     eips::Decodable2718,
+    network::Network,
     primitives::{Bytes, B256},
+    providers::Provider,
     rlp::Buf,
     rpc::types::mev::EthSendBundle,
 };
 use serde::{Deserialize, Serialize};
-use signet_zenith::{HostOrders::Permit2Batch, SignedOrder};
+use signet_zenith::{HostOrders::HostOrdersInstance, SignedOrder, SignedOrderError};
 use trevm::{revm::Database, BundleError};
+
+use super::SignetEthBundleError;
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///
@@ -29,7 +33,7 @@ pub struct SignetEthBundle {
     /// Host fills to be applied with the bundle, represented as a signed
     /// permit2 order.
     #[serde(default)]
-    pub host_fills: Vec<SignedOrder>,
+    pub host_fills: Option<SignedOrder>,
 }
 
 impl SignetEthBundle {
@@ -82,6 +86,33 @@ impl SignetEthBundle {
 
         Ok(txs)
     }
+
+    /// Check that this can be syntactically used as a fill.
+    pub fn validate_fills_offchain(&self, timestamp: u64) -> Result<(), SignedOrderError> {
+        if let Some(host_fills) = &self.host_fills {
+            host_fills.validate_as_fill(timestamp)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Check that this fill is valid on-chain as of the current block. This
+    /// checks that the tokens can actually be transferred.
+    pub async fn alloy_validate_fills_onchain<Db, P, N>(
+        &self,
+        orders: HostOrdersInstance<(), P, N>,
+    ) -> Result<(), SignetEthBundleError<Db>>
+    where
+        Db: Database,
+        P: Provider<N>,
+        N: Network,
+    {
+        if let Some(host_fills) = self.host_fills.clone() {
+            orders.try_signed_order(host_fills).await.map_err(Into::into)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// Response for `signet_sendBundle`.
@@ -118,7 +149,7 @@ mod test {
                 reverting_tx_hashes: vec![B256::repeat_byte(4), B256::repeat_byte(5)],
                 replacement_uuid: Some("uuid".to_owned()),
             },
-            host_fills: vec![SignedOrder {
+            host_fills: Some(SignedOrder {
                 permit: Permit2Batch {
                     permit: PermitBatchTransferFrom {
                         permitted: vec![TokenPermissions {
@@ -137,7 +168,7 @@ mod test {
                     recipient: Address::repeat_byte(99),
                     chainId: 100,
                 }],
-            }],
+            }),
         };
 
         let serialized = serde_json::to_string(&bundle).unwrap();
