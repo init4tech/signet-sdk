@@ -48,16 +48,18 @@ impl SignedOrder {
             return Err(SignedOrderError::DeadlinePassed { current: timestamp, deadline });
         }
 
-        // Check that
+        // Check that the permits satisfy the outputs.
+        // We create a map of the outputs, where the key is the token and the
+        // value is the amount. We then iterate over the permits and remove
+        // the amount from the map. If the amount is zero, we remove the entry
+        // from the map. If the map is not empty, then we have some tokens that
+        // are not satisfied by the permits.
         let mut map = HashMap::with_capacity(self.outputs.len());
 
         for output in self.outputs.iter() {
             map.insert(output.token, output.amount);
         }
 
-        // We now remove the amounts of the permits from the map
-        // if the resulting amount is zero, we remove the entry. This
-        // means that the output is satisfied by the permit.
         for permit in self.permit.permit.permitted.iter() {
             if let Entry::Occupied(mut occupied_entry) = map.entry(permit.token) {
                 let val = occupied_entry.get();
