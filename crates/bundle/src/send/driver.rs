@@ -5,7 +5,9 @@ use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
     revm::{
-        context::result::EVMError, inspector::InspectorEvmTr, Database, DatabaseCommit, Inspector,
+        context::result::{EVMError, ExecutionResult, HaltReason},
+        inspector::InspectorEvmTr,
+        Database, DatabaseCommit, Inspector,
     },
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
@@ -124,10 +126,21 @@ where
                 Ok(trevm) => {
                     // Check if the transaction was reverted or halted
                     let result = trevm.result();
-                    if !result.is_success() && !bundle.reverting_tx_hashes.contains(tx_hash) {
-                        return Err(trevm.errored(BundleError::BundleReverted.into()));
-                    }
 
+                    match result {
+                        ExecutionResult::Success { .. } => {}
+                        ExecutionResult::Halt { reason, .. }
+                            if *reason == HaltReason::CallTooDeep =>
+                        {
+                            // Timelimit reached
+                            return Err(trevm.errored(BundleError::BundleReverted.into()));
+                        }
+                        _ => {
+                            if !self.bundle.reverting_tx_hashes().contains(&tx_hash) {
+                                return Err(trevm.errored(BundleError::BundleReverted.into()));
+                            }
+                        }
+                    }
                     trevm.accept_state()
                 }
                 Err(err) => return Err(err.err_into()),
