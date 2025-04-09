@@ -1,4 +1,4 @@
-use crate::send::{SignetEthBundle, SignetEthBundleResponse};
+use crate::send::SignetEthBundle;
 use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
 use signet_zenith::SignedOrderError;
 use trevm::{
@@ -49,24 +49,18 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
 #[derive(Debug, Clone)]
 pub struct SignetEthBundleDriver<'a> {
     bundle: &'a SignetEthBundle,
-    response: SignetEthBundleResponse,
 }
 
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
-    pub const fn new(bundle: &'a SignetEthBundle, response: SignetEthBundleResponse) -> Self {
-        Self { bundle, response }
+    pub const fn new(bundle: &'a SignetEthBundle) -> Self {
+        Self { bundle }
     }
 
     /// Get a reference to the bundle.
     pub const fn bundle(&self) -> &SignetEthBundle {
         self.bundle
-    }
-
-    /// Get a reference to the response.
-    pub const fn response(&self) -> &SignetEthBundleResponse {
-        &self.response
     }
 }
 
