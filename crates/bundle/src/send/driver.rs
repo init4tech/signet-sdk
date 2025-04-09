@@ -72,6 +72,11 @@ impl<'a> SignetEthBundleDriver<'a> {
     pub const fn bundle(&self) -> &SignetEthBundle {
         self.bundle
     }
+
+    /// Get the deadline for this driver.
+    pub const fn deadline(&self) -> std::time::Instant {
+        self.deadline
+    }
 }
 
 impl<Db, Insp> BundleDriver<Db, SignetLayered<Layered<TimeLimit, Insp>>>
