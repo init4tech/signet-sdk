@@ -197,7 +197,6 @@ impl From<MagicSig> for Signature {
 
 #[cfg(test)]
 mod test {
-    use alloy::primitives::address;
 
     use super::*;
 
@@ -243,6 +242,6 @@ mod test {
         let msig = MagicSig::try_from_signature(sig).unwrap();
         // The sender should be equivalent to the minter address.
         // Only on transact events the sender is the actual initiator of the tx on L1.
-        assert_eq!(msig.sender(), address!("0x00000000000000000000746f6b656e61646d696e"))
+        assert_eq!(msig.sender(), MINTER_ADDRESS)
     }
 }
