@@ -1,6 +1,7 @@
 use crate::{
     eth::EthError,
     interest::{ActiveFilter, FilterManager, FilterOutput, SubscriptionManager},
+    receipts::SignetReceiptBuilder,
     util::BlockRangeInclusiveIter,
     Pnt, TxCacheForwarder,
 };
@@ -29,8 +30,8 @@ use reth::{
                 calculate_reward_percentiles_for_block, fee_history_cache_new_blocks_task,
             },
             logs_utils::{self, append_matching_block_logs, ProviderOrBlock},
-            EthApiError, EthConfig, EthReceiptBuilder, EthStateCache, FeeHistoryCache,
-            FeeHistoryEntry, GasPriceOracle,
+            EthApiError, EthConfig, EthStateCache, FeeHistoryCache, FeeHistoryEntry,
+            GasPriceOracle,
         },
         types::{FilterBlockOption, FilteredParams},
     },
@@ -492,9 +493,8 @@ where
             return Ok(None);
         };
 
-        // last arg is blobparams, which we don't have
-        EthReceiptBuilder::new(&tx, meta, &receipt, &all_receipts, None)
-            .map(EthReceiptBuilder::build)
+        SignetReceiptBuilder::new(&tx, meta, &receipt, &all_receipts)
+            .map(SignetReceiptBuilder::build)
             .map(Some)
     }
 

@@ -2,6 +2,7 @@ use crate::{
     ctx::RpcCtx,
     eth::{CallErrorData, EthError},
     interest::{FilterOutput, InterestKind},
+    receipts::SignetReceiptBuilder,
     util::{await_jh_option, await_jh_option_response, response_tri},
     Pnt,
 };
@@ -22,7 +23,6 @@ use reth::{
     network::NetworkInfo,
     primitives::TransactionMeta,
     providers::{BlockNumReader, StateProviderFactory, TransactionsProvider},
-    rpc::server_types::eth::EthReceiptBuilder,
 };
 use reth_node_api::FullNodeComponents;
 use reth_rpc_eth_api::{RpcBlock, RpcHeader, RpcReceipt, RpcTransaction};
@@ -203,8 +203,7 @@ where
                     excess_blob_gas,
                     timestamp,
                 };
-                // last arg is blob params, which we'll never have
-                EthReceiptBuilder::new(tx, meta, receipt, &receipts, None)
+                SignetReceiptBuilder::new(tx, meta, receipt, &receipts)
                     .map(|builder| builder.build())
             })
             .collect::<Result<Vec<_>, _>>()
