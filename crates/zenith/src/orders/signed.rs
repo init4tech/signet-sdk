@@ -2,7 +2,7 @@ use crate::bindings::RollupOrders::{Output, Permit2Batch};
 use serde::{Deserialize, Serialize};
 
 /// An error that can occur when validating a signed order as a fill.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SignedOrderError {
     /// Mismatched permits and outputs.
     #[error("Permits and Outputs do not match.")]
@@ -55,7 +55,7 @@ impl SignedOrder {
             if output.token != self.permit.permit.permitted[i].token {
                 return Err(SignedOrderError::PermitMismatch());
             }
-            // check that the amount is equal to the output
+            // check that the amount is exactly equal
             if output.amount != self.permit.permit.permitted[i].amount {
                 return Err(SignedOrderError::PermitMismatch());
             }
