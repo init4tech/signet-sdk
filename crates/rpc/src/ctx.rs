@@ -493,7 +493,7 @@ where
             return Ok(None);
         };
 
-        build_signet_receipt(&tx, meta, &receipt, &all_receipts).map(Some)
+        build_signet_receipt(tx, meta, receipt, all_receipts.to_vec()).map(Some)
     }
 
     /// Create the [`Block`] object for a specific [`BlockId`].

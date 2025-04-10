@@ -11,60 +11,58 @@ use signet_types::MagicSig;
 
 /// Builds an [`TransactionReceipt`] obtaining the inner receipt envelope from the given closure.
 pub fn build_signet_receipt(
-    transaction: &TransactionSigned,
+    transaction: TransactionSigned,
     meta: TransactionMeta,
-    receipt: &Receipt,
-    all_receipts: &[Receipt],
+    receipt: Receipt,
+    all_receipts: Vec<Receipt>,
 ) -> EthResult<TransactionReceipt<ReceiptEnvelope<reth::rpc::types::Log>>> {
     // Recover the transaction sender.
     // Some transactions are emitted by Signet itself in behalf of the sender,
     // in which case they'll use [`MagicSig`]s to preserve the sender with additional metadata.
     // Therefore, in case recovering the signer fails, we try to parse the signature as a magic signature.
-    let from = transaction.recover_signer_unchecked().or_else(|_| {
-        MagicSig::try_from_signature(transaction.signature())
-            .map(|magic_sig| magic_sig.sender())
-            .ok_or(EthApiError::InvalidTransactionSignature)
-    })?;
+    let from = MagicSig::try_from_signature(transaction.signature())
+        .map(|magic_sig| magic_sig.sender())
+        .or_else(|| transaction.recover_signer_unchecked().ok())
+        .ok_or_else(|| EthApiError::InvalidTransactionSignature)?;
 
     // get the previous transaction cumulative gas used
-    let gas_used = if meta.index == 0 {
-        receipt.cumulative_gas_used()
-    } else {
-        let prev_tx_idx = (meta.index - 1) as usize;
-        all_receipts
-            .get(prev_tx_idx)
-            .map(|prev_receipt| receipt.cumulative_gas_used() - prev_receipt.cumulative_gas_used())
-            .unwrap_or_default()
-    };
+    let prev_cumulative = meta
+        .index
+        .checked_sub(1)
+        .and_then(|i| all_receipts.get(i as usize))
+        .map(|r| r.cumulative_gas_used())
+        .unwrap_or_default();
+
+    let gas_used = receipt.cumulative_gas_used() - prev_cumulative;
 
     let logs_bloom = receipt.bloom();
+    let receipt_status = receipt.status_or_post_state();
+    let receipt_cumulative_gas_used = receipt.cumulative_gas_used();
 
     // get number of logs in the block
-    let mut num_logs = 0;
-    for prev_receipt in all_receipts.iter().take(meta.index as usize) {
-        num_logs += prev_receipt.logs().len();
-    }
+    let num_logs: u64 =
+        all_receipts.iter().take(meta.index as usize).map(|r| r.logs().len() as u64).sum();
 
     // Retrieve all corresponding logs for the receipt.
     let logs: Vec<Log> = receipt
-        .logs()
-        .iter()
+        .logs
+        .into_iter()
         .enumerate()
         .map(|(tx_log_idx, log)| Log {
-            inner: log.clone(),
+            inner: log,
             block_hash: Some(meta.block_hash),
             block_number: Some(meta.block_number),
             block_timestamp: Some(meta.timestamp),
             transaction_hash: Some(meta.tx_hash),
             transaction_index: Some(meta.index),
-            log_index: Some((num_logs + tx_log_idx) as u64),
+            log_index: Some(num_logs + tx_log_idx as u64),
             removed: false,
         })
         .collect();
 
     let rpc_receipt = alloy::rpc::types::eth::Receipt {
-        status: receipt.status_or_post_state(),
-        cumulative_gas_used: receipt.cumulative_gas_used(),
+        status: receipt_status,
+        cumulative_gas_used: receipt_cumulative_gas_used,
         logs,
     };
 

@@ -203,7 +203,7 @@ where
                     excess_blob_gas,
                     timestamp,
                 };
-                build_signet_receipt(tx, meta, receipt, &receipts)
+                build_signet_receipt(tx.to_owned(), meta, receipt.to_owned(), receipts.to_vec())
             })
             .collect::<Result<Vec<_>, _>>()
             .map(Some)
