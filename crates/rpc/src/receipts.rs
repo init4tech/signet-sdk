@@ -1,5 +1,6 @@
 //! Signet RPC receipt response builder.
 
+use alloy::consensus::Transaction;
 use alloy::consensus::{transaction::TransactionMeta, ReceiptEnvelope, TxReceipt};
 use alloy::primitives::{Address, TxKind};
 use alloy::rpc::types::eth::{Log, ReceiptWithBloom, TransactionReceipt};
@@ -9,16 +10,13 @@ use reth::rpc::server_types::eth::{EthApiError, EthResult};
 use signet_types::MagicSig;
 
 /// Builds an [`TransactionReceipt`] obtaining the inner receipt envelope from the given closure.
-pub fn build_receipt<R, T, E>(
-    transaction: &T,
+pub fn build_signet_receipt(
+    transaction: &TransactionSigned,
     meta: TransactionMeta,
-    receipt: &R,
-    all_receipts: &[R],
-    build_envelope: impl FnOnce(ReceiptWithBloom<alloy::consensus::Receipt<Log>>) -> E,
-) -> EthResult<TransactionReceipt<E>>
+    receipt: &Receipt,
+    all_receipts: &[Receipt],
+) -> EthResult<TransactionReceipt<ReceiptEnvelope<reth::rpc::types::Log>>>
 where
-    R: TxReceipt<Log = alloy::primitives::Log>,
-    T: SignedTransaction,
 {
     // Recover the transaction sender.
     // Some transactions are emitted by Signet itself in behalf of the sender,
@@ -49,6 +47,7 @@ where
         num_logs += prev_receipt.logs().len();
     }
 
+    // Retrieve all corresponding logs for the receipt.
     let logs: Vec<Log> = receipt
         .logs()
         .iter()
@@ -77,7 +76,10 @@ where
     };
 
     Ok(TransactionReceipt {
-        inner: build_envelope(ReceiptWithBloom { receipt: rpc_receipt, logs_bloom }),
+        inner: build_envelope(
+            ReceiptWithBloom { receipt: rpc_receipt, logs_bloom },
+            transaction.tx_type(),
+        ),
         transaction_hash: meta.tx_hash,
         transaction_index: Some(meta.index),
         block_hash: Some(meta.block_hash),
@@ -93,42 +95,18 @@ where
     })
 }
 
-/// Receipt response builder.
-#[derive(Debug)]
-pub struct SignetReceiptBuilder {
-    /// The base response body, contains L1 fields.
-    pub base: TransactionReceipt,
-}
-
-impl SignetReceiptBuilder {
-    /// Returns a new builder with the base response body (L1 fields) set.
-    ///
-    /// Note: This requires _all_ block receipts because we need to calculate the gas used by the
-    /// transaction.
-    pub fn new(
-        transaction: &TransactionSigned,
-        meta: TransactionMeta,
-        receipt: &Receipt,
-        all_receipts: &[Receipt],
-    ) -> EthResult<Self> {
-        let base = build_receipt(transaction, meta, receipt, all_receipts, |receipt_with_bloom| {
-            match receipt.tx_type {
-                TxType::Legacy => ReceiptEnvelope::Legacy(receipt_with_bloom),
-                TxType::Eip2930 => ReceiptEnvelope::Eip2930(receipt_with_bloom),
-                TxType::Eip1559 => ReceiptEnvelope::Eip1559(receipt_with_bloom),
-                TxType::Eip4844 => ReceiptEnvelope::Eip4844(receipt_with_bloom),
-                TxType::Eip7702 => ReceiptEnvelope::Eip7702(receipt_with_bloom),
-                #[allow(unreachable_patterns)]
-                _ => unreachable!(),
-            }
-        })?;
-
-        Ok(Self { base })
-    }
-
-    /// Builds a receipt response from the base response body, and any set additional fields.
-    pub fn build(self) -> TransactionReceipt {
-        self.base
+fn build_envelope(
+    receipt_with_bloom: ReceiptWithBloom<alloy::consensus::Receipt<reth::rpc::types::Log>>,
+    tx_type: TxType,
+) -> ReceiptEnvelope<reth::rpc::types::Log> {
+    match tx_type {
+        TxType::Legacy => ReceiptEnvelope::Legacy(receipt_with_bloom),
+        TxType::Eip2930 => ReceiptEnvelope::Eip2930(receipt_with_bloom),
+        TxType::Eip1559 => ReceiptEnvelope::Eip1559(receipt_with_bloom),
+        TxType::Eip4844 => ReceiptEnvelope::Eip4844(receipt_with_bloom),
+        TxType::Eip7702 => ReceiptEnvelope::Eip7702(receipt_with_bloom),
+        #[allow(unreachable_patterns)]
+        _ => unreachable!(),
     }
 }
 

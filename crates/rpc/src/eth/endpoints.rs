@@ -2,7 +2,7 @@ use crate::{
     ctx::RpcCtx,
     eth::{CallErrorData, EthError},
     interest::{FilterOutput, InterestKind},
-    receipts::SignetReceiptBuilder,
+    receipts::build_signet_receipt,
     util::{await_jh_option, await_jh_option_response, response_tri},
     Pnt,
 };
@@ -203,8 +203,7 @@ where
                     excess_blob_gas,
                     timestamp,
                 };
-                SignetReceiptBuilder::new(tx, meta, receipt, &receipts)
-                    .map(|builder| builder.build())
+                build_signet_receipt(tx, meta, receipt, &receipts)
             })
             .collect::<Result<Vec<_>, _>>()
             .map(Some)

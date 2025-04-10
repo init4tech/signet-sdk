@@ -1,7 +1,7 @@
 use crate::{
     eth::EthError,
     interest::{ActiveFilter, FilterManager, FilterOutput, SubscriptionManager},
-    receipts::SignetReceiptBuilder,
+    receipts::build_signet_receipt,
     util::BlockRangeInclusiveIter,
     Pnt, TxCacheForwarder,
 };
@@ -493,9 +493,7 @@ where
             return Ok(None);
         };
 
-        SignetReceiptBuilder::new(&tx, meta, &receipt, &all_receipts)
-            .map(SignetReceiptBuilder::build)
-            .map(Some)
+        build_signet_receipt(&tx, meta, &receipt, &all_receipts).map(Some)
     }
 
     /// Create the [`Block`] object for a specific [`BlockId`].
