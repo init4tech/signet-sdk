@@ -1,4 +1,5 @@
 use crate::send::SignetEthBundle;
+use alloy::primitives::U256;
 use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
 use signet_zenith::SignedOrderError;
 use trevm::{
@@ -59,13 +60,16 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
 pub struct SignetEthBundleDriver<'a> {
     bundle: &'a SignetEthBundle,
     deadline: std::time::Instant,
+
+    total_gas_used: u64,
+    beneficiary_balance_increase: U256,
 }
 
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
     pub const fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
-        Self { bundle, deadline }
+        Self { bundle, deadline, total_gas_used: 0, beneficiary_balance_increase: U256::ZERO }
     }
 
     /// Get a reference to the bundle.
@@ -76,6 +80,16 @@ impl<'a> SignetEthBundleDriver<'a> {
     /// Get the deadline for this driver.
     pub const fn deadline(&self) -> std::time::Instant {
         self.deadline
+    }
+
+    /// Get the total gas used by this driver during tx execution.
+    pub const fn total_gas_used(&self) -> u64 {
+        self.total_gas_used
+    }
+
+    /// Get the beneficiary balance increase for this driver during tx execution.
+    pub const fn beneficiary_balance_increase(&self) -> U256 {
+        self.beneficiary_balance_increase
     }
 }
 
@@ -92,6 +106,16 @@ where
         mut trevm: EvmNeedsTx<Db, SignetEthBundleInsp<Insp>>,
     ) -> DriveBundleResult<Self, Db, SignetEthBundleInsp<Insp>> {
         let bundle = &self.bundle.bundle;
+
+        // Reset the total gas used and beneficiary balance increase
+        // to 0 before running the bundle.
+        self.total_gas_used = 0;
+        self.beneficiary_balance_increase = U256::ZERO;
+
+        // Get the beneficiary address and its initial balance
+        let beneficiary = trevm.beneficiary();
+        let inital_beneficiary_balance =
+            trevm_try!(trevm.try_read_balance(beneficiary).map_err(EVMError::Database), trevm);
 
         // Ensure that the bundle has transactions
         trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
@@ -133,17 +157,21 @@ where
                     let result = trevm.result();
 
                     match result {
-                        ExecutionResult::Success { .. } => {}
+                        ExecutionResult::Success { gas_used, .. } => {
+                            self.total_gas_used = self.total_gas_used.saturating_add(*gas_used);
+                        }
+                        // `CallTooDeep` represents the timelimit being reached
                         ExecutionResult::Halt { reason, .. }
                             if *reason == HaltReason::CallTooDeep =>
                         {
-                            // Timelimit reached
                             return Err(trevm.errored(BundleError::BundleReverted.into()));
                         }
-                        _ => {
+                        ExecutionResult::Halt { gas_used, .. }
+                        | ExecutionResult::Revert { gas_used, .. } => {
                             if !self.bundle.reverting_tx_hashes().contains(tx_hash) {
                                 return Err(trevm.errored(BundleError::BundleReverted.into()));
                             }
+                            self.total_gas_used = self.total_gas_used.saturating_add(*gas_used);
                         }
                     }
                     trevm.accept_state()
@@ -151,6 +179,12 @@ where
                 Err(err) => return Err(err.err_into()),
             };
         }
+
+        let beneficiary_balance =
+            trevm_try!(trevm.try_read_balance(beneficiary).map_err(EVMError::Database), trevm);
+
+        self.beneficiary_balance_increase =
+            beneficiary_balance.saturating_sub(inital_beneficiary_balance);
 
         Ok(trevm)
     }
