@@ -65,6 +65,8 @@ mod interest;
 mod forwarder;
 pub use forwarder::TxCacheForwarder;
 
+pub mod receipts;
+
 /// Utils and simple serve functions.
 pub mod util;
 pub use util::Pnt;
