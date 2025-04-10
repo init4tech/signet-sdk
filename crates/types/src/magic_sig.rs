@@ -197,7 +197,12 @@ impl From<MagicSig> for Signature {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
+
+    // Enter token transaction, from Pecorino.
+    // Corresponding to tx hash 0xb67ee8b269385dee5e4b454a3fe64a75e1073144cf1b71836e00e35b38e8ee5a
+    const ENTER_TOKEN_TX: &str = include_str!("../../../tests/artifacts/enter_tx.json");
 
     #[test]
     fn test_enter_roundtrip() {
@@ -228,5 +233,15 @@ mod test {
         let sig: Signature = msig.into();
 
         assert_eq!(MagicSig::try_from_signature(&sig), Some(msig))
+    }
+
+    #[test]
+    fn test_tx_decode_sig() {
+        let tx: alloy::consensus::TxEnvelope = serde_json::from_str(ENTER_TOKEN_TX).unwrap();
+        let sig = tx.signature();
+        let msig = MagicSig::try_from_signature(sig).unwrap();
+        // The sender should be equivalent to the minter address.
+        // Only on transact events the sender is the actual initiator of the tx on L1.
+        assert_eq!(msig.sender(), MINTER_ADDRESS)
     }
 }
