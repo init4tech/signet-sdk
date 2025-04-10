@@ -15,9 +15,7 @@ pub fn build_signet_receipt(
     meta: TransactionMeta,
     receipt: &Receipt,
     all_receipts: &[Receipt],
-) -> EthResult<TransactionReceipt<ReceiptEnvelope<reth::rpc::types::Log>>>
-where
-{
+) -> EthResult<TransactionReceipt<ReceiptEnvelope<reth::rpc::types::Log>>> {
     // Recover the transaction sender.
     // Some transactions are emitted by Signet itself in behalf of the sender,
     // in which case they'll use [`MagicSig`]s to preserve the sender with additional metadata.
