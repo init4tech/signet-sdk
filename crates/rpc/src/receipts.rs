@@ -24,15 +24,11 @@ where
     // Some transactions are emitted by Signet itself in behalf of the sender,
     // in which case they'll use [`MagicSig`]s to preserve the sender with additional metadata.
     // Therefore, in case recovering the signer fails, we try to parse the signature as a magic signature.
-    let from = match transaction.recover_signer_unchecked() {
-        Ok(address) => address,
-        Err(_) => {
-            // If the transaction is not signed by the sender, it is a magic signature.
-            let magic_sig = MagicSig::try_from_signature(transaction.signature())
-                .ok_or_else(|| EthApiError::InvalidTransactionSignature)?;
-            magic_sig.sender()
-        }
-    };
+    let from = transaction.recover_signer_unchecked().or_else(|_| {
+        MagicSig::try_from_signature(transaction.signature())
+            .map(|magic_sig| magic_sig.sender())
+            .ok_or(EthApiError::InvalidTransactionSignature)
+    })?;
 
     // get the previous transaction cumulative gas used
     let gas_used = if meta.index == 0 {
