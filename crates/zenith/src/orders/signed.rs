@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum SignedOrderError {
     /// Mismatched permits and outputs.
     #[error("Permits and Outputs do not match.")]
-    PermitMismatch(),
+    PermitMismatch,
     /// The deadline for the order has passed.
     #[error("Deadline has passed: current time is: {current}, deadline was: {deadline}")]
     DeadlinePassed {
@@ -47,17 +47,17 @@ impl SignedOrder {
 
         // ensure Permits exactly match Outputs
         if self.outputs.len() != self.permit.permit.permitted.len() {
-            return Err(SignedOrderError::PermitMismatch());
+            return Err(SignedOrderError::PermitMismatch);
         }
 
-        for (i, output) in self.outputs.iter().enumerate() {
+        for (output, permit) in self.outputs.iter().zip(self.permit.permit.permitted.iter()) {
             // check that the token is the same
-            if output.token != self.permit.permit.permitted[i].token {
-                return Err(SignedOrderError::PermitMismatch());
+            if output.token != permit.token {
+                return Err(SignedOrderError::PermitMismatch);
             }
             // check that the amount is exactly equal
-            if output.amount != self.permit.permit.permitted[i].amount {
-                return Err(SignedOrderError::PermitMismatch());
+            if output.amount != permit.amount {
+                return Err(SignedOrderError::PermitMismatch);
             }
         }
 
