@@ -1,5 +1,6 @@
 use crate::{outcome::SimulatedItem, InnerDb, SimCache, SimDb, SimItem, SimOutcomeWithCache};
 use alloy::{consensus::TxEnvelope, primitives::U256};
+use core::fmt;
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetLayered;
 use signet_types::config::SignetSystemConstants;
@@ -21,8 +22,20 @@ use trevm::{
     Block, BundleDriver, Cfg, DbConnect, EvmFactory,
 };
 
+/// A simulation environment.
+///
+/// Contains enough information to run a simulation.
 pub struct SimEnv<Db, Insp = NoOpInspector> {
     inner: Arc<SimEnvInner<Db, Insp>>,
+}
+
+impl<Db, Insp> fmt::Debug for SimEnv<Db, Insp> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SimEnv")
+            .field("finish_by", &self.inner.finish_by)
+            .field("concurrency_limit", &self.inner.concurrency_limit)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<Db, Insp> Deref for SimEnv<Db, Insp> {
@@ -168,6 +181,15 @@ pub struct SimEnvInner<Db, Insp = NoOpInspector> {
     _pd: PhantomData<fn() -> Insp>,
 }
 
+impl<Db, Insp> fmt::Debug for SimEnvInner<Db, Insp> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SimEnvInner")
+            .field("finish_by", &self.finish_by)
+            .field("concurrency_limit", &self.concurrency_limit)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<Db, Insp> SimEnvInner<Db, Insp> {
     /// Creates a new `SimFactory` instance.
     pub fn new(
@@ -197,7 +219,7 @@ impl<Db, Insp> SimEnvInner<Db, Insp> {
     }
 
     /// Get a reference to the system constants.
-    pub fn constants(&self) -> &SignetSystemConstants {
+    pub const fn constants(&self) -> &SignetSystemConstants {
         &self.constants
     }
 
@@ -212,7 +234,7 @@ impl<Db, Insp> SimEnvInner<Db, Insp> {
     }
 
     /// Get the exectuion timeout.
-    pub fn finish_by(&self) -> std::time::Instant {
+    pub const fn finish_by(&self) -> std::time::Instant {
         self.finish_by
     }
 

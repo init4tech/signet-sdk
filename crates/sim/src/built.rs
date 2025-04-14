@@ -4,6 +4,7 @@ use alloy::{
     primitives::{keccak256, Bytes, B256},
     rlp::Buf,
 };
+use core::fmt;
 use signet_bundle::SignetEthBundle;
 use signet_zenith::{encode_txns, Alloy2718Coder, SignedOrder};
 use std::sync::OnceLock;
@@ -12,7 +13,7 @@ use tracing::{error, trace};
 use crate::{outcome::SimulatedItem, SimItem};
 
 /// A block that has been built by the simulator.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct BuiltBlock {
     /// The host fill actions.
     pub(crate) host_fills: Vec<SignedOrder>,
@@ -28,6 +29,16 @@ pub struct BuiltBlock {
     pub(crate) hash: OnceLock<B256>,
 }
 
+impl fmt::Debug for BuiltBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BuiltBlock")
+            .field("host_fills", &self.host_fills.len())
+            .field("transactions", &self.transactions.len())
+            .field("gas_used", &self.gas_used)
+            .finish()
+    }
+}
+
 impl BuiltBlock {
     /// Create a new `BuiltBlock`
     pub const fn new() -> Self {
@@ -41,7 +52,7 @@ impl BuiltBlock {
     }
 
     /// Get the amount of gas used by the block.
-    pub fn gas_used(&self) -> u64 {
+    pub const fn gas_used(&self) -> u64 {
         self.gas_used
     }
 
@@ -105,6 +116,7 @@ impl BuiltBlock {
         }
     }
 
+    /// Ingest a simulated item, extending the block.
     pub fn ingest(&mut self, item: SimulatedItem) {
         self.gas_used += item.gas_used;
 

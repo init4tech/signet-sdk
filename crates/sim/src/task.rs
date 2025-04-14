@@ -6,6 +6,7 @@ use trevm::{
 };
 
 /// Builds a single block by repeatedly invoking [`SimEnv`].
+#[derive(Debug)]
 pub struct BlockBuild<Db, Insp = NoOpInspector> {
     env: SimEnv<Db, Insp>,
     block: BuiltBlock,

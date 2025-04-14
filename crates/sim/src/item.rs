@@ -28,7 +28,7 @@ impl From<TxEnvelope> for SimItem {
 
 impl SimItem {
     /// Get the bundle if it is a bundle.
-    pub fn as_bundle(&self) -> Option<&SignetEthBundle> {
+    pub const fn as_bundle(&self) -> Option<&SignetEthBundle> {
         match self {
             Self::Bundle(bundle) => Some(bundle),
             Self::Tx(_) => None,
@@ -36,7 +36,7 @@ impl SimItem {
     }
 
     /// Get the transaction if it is a transaction.
-    pub fn as_tx(&self) -> Option<&TxEnvelope> {
+    pub const fn as_tx(&self) -> Option<&TxEnvelope> {
         match self {
             Self::Bundle(_) => None,
             Self::Tx(tx) => Some(tx),
