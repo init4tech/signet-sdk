@@ -11,7 +11,7 @@ use reth::{
 use reth_chainspec::ChainSpec;
 use std::{future::IntoFuture, iter::StepBy, net::SocketAddr, ops::RangeInclusive};
 use tokio::task::JoinHandle;
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::error;
 
 macro_rules! await_jh_option {
@@ -108,22 +108,17 @@ impl Iterator for BlockRangeInclusiveIter {
 }
 
 fn make_cors(cors: Option<&str>) -> CorsLayer {
-    let cors = cors
-        .unwrap_or("*")
-        .parse::<HeaderValue>()
-        .map(Into::<AllowOrigin>::into)
-        .unwrap_or_else(|_| AllowOrigin::any());
-    match cors {
+    let cors = match cors.unwrap_or("*") {
         "*" => CorsLayer::new()
             .allow_methods([Method::GET, Method::POST])
             .allow_origin(Any)
             .allow_headers(Any),
         _ => {
-            let iter = http_cors_domains.split(',');
+            let iter = cors.unwrap().split(',');
             if iter.clone().any(|o| o == "*") {
                 return Err(CorsDomainError::WildCardNotAllowed {
                     input: http_cors_domains.to_string(),
-                })
+                });
             }
 
             let origins = iter
@@ -141,6 +136,7 @@ fn make_cors(cors: Option<&str>) -> CorsLayer {
                 .allow_headers(Any)
         }
     };
+    cors
 }
 
 /// Serve the axum router on the specified addresses.
