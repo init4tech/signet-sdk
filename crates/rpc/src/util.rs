@@ -114,7 +114,10 @@ fn make_cors(cors: Option<&str>) -> CorsLayer {
         .map(Into::<AllowOrigin>::into)
         .unwrap_or_else(|_| AllowOrigin::any());
 
-    CorsLayer::new().allow_methods([Method::GET, Method::POST]).allow_origin(cors)
+    CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(Any)
+        .allow_headers(Any)
 }
 
 /// Serve the axum router on the specified addresses.
