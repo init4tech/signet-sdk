@@ -113,11 +113,34 @@ fn make_cors(cors: Option<&str>) -> CorsLayer {
         .parse::<HeaderValue>()
         .map(Into::<AllowOrigin>::into)
         .unwrap_or_else(|_| AllowOrigin::any());
+    match cors {
+        "*" => CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST])
+            .allow_origin(Any)
+            .allow_headers(Any),
+        _ => {
+            let iter = http_cors_domains.split(',');
+            if iter.clone().any(|o| o == "*") {
+                return Err(CorsDomainError::WildCardNotAllowed {
+                    input: http_cors_domains.to_string(),
+                })
+            }
 
-    CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
-        .allow_origin(Any)
-        .allow_headers(Any)
+            let origins = iter
+                .map(|domain| {
+                    domain
+                        .parse::<HeaderValue>()
+                        .map_err(|_| CorsDomainError::InvalidHeader { domain: domain.to_string() })
+                })
+                .collect::<Result<Vec<HeaderValue>, _>>()?;
+
+            let origin = AllowOrigin::list(origins);
+            CorsLayer::new()
+                .allow_methods([Method::GET, Method::POST])
+                .allow_origin(origin)
+                .allow_headers(Any)
+        }
+    };
 }
 
 /// Serve the axum router on the specified addresses.
