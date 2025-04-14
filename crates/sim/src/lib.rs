@@ -5,10 +5,9 @@ mod cache;
 pub use cache::SimCache;
 
 mod env;
-pub use env::SimEnv;
-
-mod inst;
-pub use inst::{SimInstruction, SimItem};
+pub use env::{InnerDb, SimDb, SimEnv};
 
 mod outcome;
 pub use outcome::SimOutcome;
+
+mod task;

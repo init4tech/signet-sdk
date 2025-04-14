@@ -4,7 +4,10 @@ use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError
 use signet_evm::SignetLayered;
 use signet_types::config::SignetSystemConstants;
 use std::{convert::Infallible, marker::PhantomData, ops::Deref, sync::Arc, time::Instant};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::{
+    select,
+    sync::{mpsc, oneshot, watch},
+};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
@@ -42,10 +45,7 @@ where
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
 {
     /// Run a simulation round, returning the best item.
-    pub async fn sim_round(
-        &mut self,
-        finish_by: std::time::Instant,
-    ) -> Option<(U256, Arc<SimItem>)> {
+    pub async fn sim_round(&mut self, finish_by: std::time::Instant) -> Option<(U256, SimItem)> {
         let (best_tx, mut best_watcher) = watch::channel(None);
 
         let (done_tx, done_rx) = oneshot::channel();
@@ -74,6 +74,9 @@ where
                         // channel.
                         if let Ok(candidate) = this_ref.simulate(*identifier, item) {
                             let _ = c.blocking_send(candidate);
+                        } else {
+                            // if the sim fails, remove the item from the cache
+                            this_ref.sim_items.remove(*identifier);
                         };
                     });
                 }
@@ -92,7 +95,7 @@ where
         });
 
         // Either simulation is done, or we time out
-        tokio::select! {
+        select! {
             _ = tokio::time::sleep_until(finish_by.into()) => {},
             _ = done_rx => {},
         }

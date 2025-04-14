@@ -10,7 +10,7 @@ use std::{
 /// This cache is used to store the items that are being simulated.
 #[derive(Clone)]
 pub struct SimCache {
-    inner: Arc<RwLock<BTreeMap<u128, Arc<SimItem>>>>,
+    inner: Arc<RwLock<BTreeMap<u128, SimItem>>>,
     capacity: usize,
 }
 
@@ -38,23 +38,23 @@ impl SimCache {
     }
 
     /// Get an iterator over the best items in the cache.
-    pub fn read_best(&self, n: usize) -> Vec<(u128, Arc<SimItem>)> {
+    pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
         self.inner.read().unwrap().iter().rev().take(n).map(|(k, v)| (*k, v.clone())).collect()
     }
 
     /// Get an item by key.
-    pub fn get(&self, key: u128) -> Option<Arc<SimItem>> {
+    pub fn get(&self, key: u128) -> Option<SimItem> {
         self.inner.read().unwrap().get(&key).cloned()
     }
 
     /// Remove an item by key.
-    pub fn remove(&self, key: u128) -> Option<Arc<SimItem>> {
+    pub fn remove(&self, key: u128) -> Option<SimItem> {
         self.inner.write().unwrap().remove(&key)
     }
 
     /// Create a new `SimCache` instance.
     pub fn add_item(&self, item: impl Into<SimItem>) {
-        let item = Arc::new(item.into());
+        let item = item.into();
 
         // Calculate the total fee for the item.
         let mut score = item.calculate_total_fee();
@@ -79,7 +79,7 @@ impl SimCache {
         }
 
         inner.retain(|_, value| {
-            let SimItem::Bundle(bundle) = value.as_ref() else {
+            let SimItem::Bundle(bundle) = value else {
                 return true;
             };
             if bundle.bundle.block_number != block_number {

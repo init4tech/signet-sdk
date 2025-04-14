@@ -9,6 +9,8 @@ use signet_zenith::{encode_txns, Alloy2718Coder, SignedOrder};
 use std::sync::OnceLock;
 use tracing::{error, trace};
 
+use crate::SimItem;
+
 /// A block that has been built by the simulator.
 #[derive(Debug, Clone, Default)]
 pub struct BuiltBlock {
@@ -62,17 +64,10 @@ impl BuiltBlock {
     }
 
     /// Ingest a transaction into the in-progress block. Fails
-    pub fn ingest_tx(&mut self, tx: &TxEnvelope) {
+    pub fn ingest_tx(&mut self, tx: TxEnvelope) {
         trace!(hash = %tx.tx_hash(), "ingesting tx");
         self.unseal();
-        self.transactions.push(tx.clone());
-    }
-
-    /// Remove a transaction from the in-progress block.
-    pub fn remove_tx(&mut self, tx: &TxEnvelope) {
-        trace!(hash = %tx.tx_hash(), "removing tx");
-        self.unseal();
-        self.transactions.retain(|t| t.tx_hash() != tx.tx_hash());
+        self.transactions.push(tx);
     }
 
     /// Ingest a bundle into the in-progress block.
@@ -98,6 +93,13 @@ impl BuiltBlock {
             }
         } else {
             error!("failed to decode bundle. dropping");
+        }
+    }
+
+    pub fn ingest(&mut self, item: SimItem) {
+        match item {
+            SimItem::Bundle(bundle) => self.ingest_bundle(bundle),
+            SimItem::Tx(tx) => self.ingest_tx(tx),
         }
     }
 
