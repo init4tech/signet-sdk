@@ -10,8 +10,6 @@ repository.workspace = true
 
 [dependencies]
 alloy.workspace = true
-dashmap = "6.1.0"
-future-utils = "0.12.1"
 signet-bundle.workspace = true
 signet-evm.workspace = true
 signet-types.workspace = true
