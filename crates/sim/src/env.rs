@@ -1,4 +1,4 @@
-use crate::{outcome::SimulatedItem, SimCache, SimItem, SimOutcomeWithCache};
+use crate::{outcome::SimulatedItem, InnerDb, SimCache, SimDb, SimItem, SimOutcomeWithCache};
 use alloy::{consensus::TxEnvelope, primitives::U256};
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetLayered;
@@ -20,12 +20,6 @@ use trevm::{
     },
     Block, BundleDriver, Cfg, DbConnect, EvmFactory,
 };
-
-/// A type alias for the database underlying the simulation.
-pub type InnerDb<Db> = Arc<CacheDB<Db>>;
-
-/// A type alias for the database used in the simulation.
-pub type SimDb<Db> = CacheOnWrite<InnerDb<Db>>;
 
 pub struct SimEnv<Db, Insp = NoOpInspector> {
     inner: Arc<SimEnvInner<Db, Insp>>,
