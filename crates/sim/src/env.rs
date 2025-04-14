@@ -39,11 +39,34 @@ impl<Db, Insp> Deref for SimEnv<Db, Insp> {
     }
 }
 
+impl<Db, Insp> From<SimEnvInner<Db, Insp>> for SimEnv<Db, Insp>
+where
+    Db: DatabaseRef + Send + Sync + 'static,
+    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
+{
+    fn from(inner: SimEnvInner<Db, Insp>) -> Self {
+        Self { inner: Arc::new(inner) }
+    }
+}
+
 impl<Db, Insp> SimEnv<Db, Insp>
 where
     Db: DatabaseRef + Send + Sync + 'static,
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
 {
+    /// Creates a new `SimEnv` instance.
+    pub fn new(
+        db: Db,
+        constants: SignetSystemConstants,
+        cfg: Box<dyn Cfg>,
+        block: Box<dyn Block>,
+        finish_by: std::time::Instant,
+        concurrency_limit: usize,
+        sim_items: SimCache,
+    ) -> Self {
+        SimEnvInner::new(db, constants, cfg, block, finish_by, concurrency_limit, sim_items).into()
+    }
+
     /// Run a simulation round, returning the best item.
     pub async fn sim_round(
         &mut self,

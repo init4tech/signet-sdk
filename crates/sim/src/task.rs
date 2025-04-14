@@ -9,6 +9,7 @@ use trevm::{
 pub struct BlockBuild<Db, Insp = NoOpInspector> {
     env: SimEnv<Db, Insp>,
     block: BuiltBlock,
+
     finish_by: std::time::Instant,
     max_gas: u64,
 }
