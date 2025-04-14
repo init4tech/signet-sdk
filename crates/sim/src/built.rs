@@ -9,7 +9,7 @@ use signet_zenith::{encode_txns, Alloy2718Coder, SignedOrder};
 use std::sync::OnceLock;
 use tracing::{error, trace};
 
-use crate::SimItem;
+use crate::{outcome::SimulatedItem, SimItem};
 
 /// A block that has been built by the simulator.
 #[derive(Debug, Clone, Default)]
@@ -18,6 +18,9 @@ pub struct BuiltBlock {
     pub(crate) host_fills: Vec<SignedOrder>,
     /// Transactions in the block.
     pub(crate) transactions: Vec<TxEnvelope>,
+
+    /// The amount of gas used by the block so far
+    pub(crate) gas_used: u64,
 
     /// Memoized raw encoding of the block.
     pub(crate) raw_encoding: OnceLock<Bytes>,
@@ -31,13 +34,19 @@ impl BuiltBlock {
         Self {
             host_fills: Vec::new(),
             transactions: Vec::new(),
+            gas_used: 0,
             raw_encoding: OnceLock::new(),
             hash: OnceLock::new(),
         }
     }
 
+    /// Get the amount of gas used by the block.
+    pub fn gas_used(&self) -> u64 {
+        self.gas_used
+    }
+
     /// Get the number of transactions in the block.
-    pub fn len(&self) -> usize {
+    pub fn tx_count(&self) -> usize {
         self.transactions.len()
     }
 
@@ -96,8 +105,10 @@ impl BuiltBlock {
         }
     }
 
-    pub fn ingest(&mut self, item: SimItem) {
-        match item {
+    pub fn ingest(&mut self, item: SimulatedItem) {
+        self.gas_used += item.gas_used;
+
+        match item.item {
             SimItem::Bundle(bundle) => self.ingest_bundle(bundle),
             SimItem::Tx(tx) => self.ingest_tx(tx),
         }

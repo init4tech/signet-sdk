@@ -1,4 +1,4 @@
-use crate::{outcome::SimOutcomeWithCache, SimCache, SimItem};
+use crate::{outcome::SimulatedItem, SimCache, SimItem, SimOutcomeWithCache};
 use alloy::{consensus::TxEnvelope, primitives::U256};
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetLayered;
@@ -45,7 +45,11 @@ where
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
 {
     /// Run a simulation round, returning the best item.
-    pub async fn sim_round(&mut self, finish_by: std::time::Instant) -> Option<(U256, SimItem)> {
+    pub async fn sim_round(
+        &mut self,
+        finish_by: std::time::Instant,
+        max_gas: u64,
+    ) -> Option<SimulatedItem> {
         let (best_tx, mut best_watcher) = watch::channel(None);
 
         let (done_tx, done_rx) = oneshot::channel();
@@ -73,11 +77,14 @@ where
                         // If simulation is succesful, send the outcome via the
                         // channel.
                         if let Ok(candidate) = this_ref.simulate(*identifier, item) {
-                            let _ = c.blocking_send(candidate);
-                        } else {
-                            // if the sim fails, remove the item from the cache
-                            this_ref.sim_items.remove(*identifier);
+                            if candidate.gas_used <= max_gas {
+                                let _ = c.blocking_send(candidate);
+                                return;
+                            }
                         };
+                        // fall through applies to all errors, occurs if
+                        // the simulation fails or the gas limit is exceeded.
+                        this_ref.sim_items.remove(*identifier);
                     });
                 }
                 // Drop the TX so that the channel is closed when all threads
@@ -112,7 +119,7 @@ where
             .accept_cache_ref(&outcome.cache)
             .ok()?;
 
-        Some((outcome.score, item))
+        Some(SimulatedItem { gas_used: outcome.gas_used, score: outcome.score, item })
     }
 }
 
@@ -259,10 +266,12 @@ where
                     trevm.try_read_balance_ref(beneificiary).map_err(EVMError::Database)?;
                 let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
 
+                // Get the simulation results
+                let gas_used = trevm.result().gas_used();
                 let cache = trevm.accept_state().into_db().into_cache();
 
                 // Create the outcome
-                Ok(SimOutcomeWithCache { identifier, score, cache })
+                Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
             }
             Err(e) => Err(SignetEthBundleError::from(e.into_error())),
         }
@@ -280,19 +289,18 @@ where
         let mut driver = SignetEthBundleDriver::new(bundle, self.finish_by);
         let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
 
-        // run the bundle
+        // Run the bundle
         let trevm = match driver.run_bundle(trevm) {
             Ok(result) => result,
             Err(e) => return Err(e.into_error()),
         };
 
-        // evaluate the result
+        // Build the SimOutcome
         let score = driver.beneficiary_balance_increase();
+        let gas_used = driver.total_gas_used();
+        let cache = trevm.into_db().into_cache();
 
-        let db = trevm.into_db();
-        let cache = db.into_cache();
-
-        Ok(SimOutcomeWithCache { identifier, score, cache })
+        Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
     }
 
     /// Simulates a transaction or bundle in the context of a block.
