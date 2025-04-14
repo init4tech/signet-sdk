@@ -6,7 +6,8 @@ use axum::http::HeaderValue;
 use interprocess::local_socket as ls;
 use reqwest::Method;
 use reth::{
-    primitives::EthPrimitives, providers::providers::ProviderNodeTypes, tasks::TaskExecutor,
+    primitives::EthPrimitives, providers::providers::ProviderNodeTypes,
+    rpc::builder::CorsDomainError, tasks::TaskExecutor,
 };
 use reth_chainspec::ChainSpec;
 use std::{future::IntoFuture, iter::StepBy, net::SocketAddr, ops::RangeInclusive};
@@ -107,36 +108,28 @@ impl Iterator for BlockRangeInclusiveIter {
     }
 }
 
-fn make_cors(cors: Option<&str>) -> CorsLayer {
-    let cors = match cors.unwrap_or("*") {
-        "*" => CorsLayer::new()
-            .allow_methods([Method::GET, Method::POST])
-            .allow_origin(Any)
-            .allow_headers(Any),
-        _ => {
-            let iter = cors.unwrap().split(',');
-            if iter.clone().any(|o| o == "*") {
-                return Err(CorsDomainError::WildCardNotAllowed {
-                    input: http_cors_domains.to_string(),
-                });
-            }
-
-            let origins = iter
-                .map(|domain| {
-                    domain
-                        .parse::<HeaderValue>()
-                        .map_err(|_| CorsDomainError::InvalidHeader { domain: domain.to_string() })
-                })
-                .collect::<Result<Vec<HeaderValue>, _>>()?;
-
-            let origin = AllowOrigin::list(origins);
-            CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST])
-                .allow_origin(origin)
-                .allow_headers(Any)
+fn make_cors(cors: Option<&str>) -> Result<CorsLayer, CorsDomainError> {
+    let origins = if let Some(cors) = cors {
+        if cors.split(',').any(|o| o == "*") {
+            return Err(CorsDomainError::WildCardNotAllowed { input: cors.to_string() });
         }
+
+        cors.split(',')
+            .map(|domain| {
+                domain
+                    .parse::<HeaderValue>()
+                    .map_err(|_| CorsDomainError::InvalidHeader { domain: domain.to_string() })
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into()
+    } else {
+        AllowOrigin::any()
     };
-    cors
+
+    Ok(CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(origins)
+        .allow_headers(Any))
 }
 
 /// Serve the axum router on the specified addresses.
@@ -165,7 +158,7 @@ pub async fn serve_axum(
     cors: Option<&str>,
 ) -> eyre::Result<JoinHandle<()>> {
     let handle = tasks.handle().clone();
-    let cors = make_cors(cors);
+    let cors = make_cors(cors)?;
 
     let service = router.into_axum_with_handle("/", handle).layer(cors);
 
@@ -180,7 +173,7 @@ pub async fn serve_ws(
     cors: Option<&str>,
 ) -> eyre::Result<JoinHandle<()>> {
     let handle = tasks.handle().clone();
-    let cors = make_cors(cors);
+    let cors = make_cors(cors)?;
 
     let service = router.into_axum_with_ws_and_handle("/rpc", "/", handle).layer(cors);
 
