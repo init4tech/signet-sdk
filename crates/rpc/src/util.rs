@@ -6,12 +6,13 @@ use axum::http::HeaderValue;
 use interprocess::local_socket as ls;
 use reqwest::Method;
 use reth::{
-    primitives::EthPrimitives, providers::providers::ProviderNodeTypes, tasks::TaskExecutor,
+    primitives::EthPrimitives, providers::providers::ProviderNodeTypes,
+    rpc::builder::CorsDomainError, tasks::TaskExecutor,
 };
 use reth_chainspec::ChainSpec;
 use std::{future::IntoFuture, iter::StepBy, net::SocketAddr, ops::RangeInclusive};
 use tokio::task::JoinHandle;
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::error;
 
 macro_rules! await_jh_option {
@@ -107,14 +108,28 @@ impl Iterator for BlockRangeInclusiveIter {
     }
 }
 
-fn make_cors(cors: Option<&str>) -> CorsLayer {
-    let cors = cors
-        .unwrap_or("*")
-        .parse::<HeaderValue>()
-        .map(Into::<AllowOrigin>::into)
-        .unwrap_or_else(|_| AllowOrigin::any());
+fn make_cors(cors: Option<&str>) -> Result<CorsLayer, CorsDomainError> {
+    let origins = match cors {
+        None | Some("*") => AllowOrigin::any(),
+        Some(cors) => {
+            if cors.split(',').any(|o| o == "*") {
+                return Err(CorsDomainError::WildCardNotAllowed { input: cors.to_string() });
+            }
+            cors.split(',')
+                .map(|domain| {
+                    domain
+                        .parse::<HeaderValue>()
+                        .map_err(|_| CorsDomainError::InvalidHeader { domain: domain.to_string() })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into()
+        }
+    };
 
-    CorsLayer::new().allow_methods([Method::GET, Method::POST]).allow_origin(cors)
+    Ok(CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(origins)
+        .allow_headers(Any))
 }
 
 /// Serve the axum router on the specified addresses.
@@ -143,7 +158,7 @@ pub async fn serve_axum(
     cors: Option<&str>,
 ) -> eyre::Result<JoinHandle<()>> {
     let handle = tasks.handle().clone();
-    let cors = make_cors(cors);
+    let cors = make_cors(cors)?;
 
     let service = router.into_axum_with_handle("/", handle).layer(cors);
 
@@ -158,7 +173,7 @@ pub async fn serve_ws(
     cors: Option<&str>,
 ) -> eyre::Result<JoinHandle<()>> {
     let handle = tasks.handle().clone();
-    let cors = make_cors(cors);
+    let cors = make_cors(cors)?;
 
     let service = router.into_axum_with_ws_and_handle("/rpc", "/", handle).layer(cors);
 
