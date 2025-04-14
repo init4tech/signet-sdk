@@ -109,21 +109,21 @@ impl Iterator for BlockRangeInclusiveIter {
 }
 
 fn make_cors(cors: Option<&str>) -> Result<CorsLayer, CorsDomainError> {
-    let origins = if let Some(cors) = cors {
-        if cors.split(',').any(|o| o == "*") {
-            return Err(CorsDomainError::WildCardNotAllowed { input: cors.to_string() });
+    let origins = match cors {
+        None => AllowOrigin::any(),
+        Some(cors) => {
+            if cors.split(',').any(|o| o == "*") {
+                return Err(CorsDomainError::WildCardNotAllowed { input: cors.to_string() });
+            }
+            cors.split(',')
+                .map(|domain| {
+                    domain
+                        .parse::<HeaderValue>()
+                        .map_err(|_| CorsDomainError::InvalidHeader { domain: domain.to_string() })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into()
         }
-
-        cors.split(',')
-            .map(|domain| {
-                domain
-                    .parse::<HeaderValue>()
-                    .map_err(|_| CorsDomainError::InvalidHeader { domain: domain.to_string() })
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .into()
-    } else {
-        AllowOrigin::any()
     };
 
     Ok(CorsLayer::new()
