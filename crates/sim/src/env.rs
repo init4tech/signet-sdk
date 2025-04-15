@@ -1,5 +1,5 @@
 use crate::{outcome::SimulatedItem, InnerDb, SimCache, SimDb, SimItem, SimOutcomeWithCache};
-use alloy::{consensus::TxEnvelope, primitives::U256};
+use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetLayered;
@@ -7,14 +7,15 @@ use signet_types::config::SignetSystemConstants;
 use std::{convert::Infallible, marker::PhantomData, ops::Deref, sync::Arc, time::Instant};
 use tokio::{
     select,
-    sync::{mpsc, oneshot, watch},
+    sync::{mpsc, watch},
 };
+use tracing::{instrument, trace, trace_span};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
     revm::{
-        context::result::EVMError,
+        context::result::{EVMError, ExecutionResult},
         database::{Cache, CacheDB},
         inspector::NoOpInspector,
         DatabaseRef, Inspector,
@@ -75,69 +76,28 @@ where
     }
 
     /// Run a simulation round, returning the best item.
+    #[instrument(skip(self))]
     pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
         let (best_tx, mut best_watcher) = watch::channel(None);
-
-        let (done_tx, done_rx) = oneshot::channel();
 
         let this = self.inner.clone();
 
         // Spawn a blocking task to run the simulations.
-        tokio::task::spawn_blocking(move || async move {
-            // Pull the `n` best items from the cache.
-            let active_sim = this.sim_items.read_best(this.concurrency_limit);
-
-            // If there are no items to simulate, return None.
-            let best_score = U256::ZERO;
-
-            std::thread::scope(|scope| {
-                // Create a channel to send the results back.
-                let (candidates, mut candidates_rx) = mpsc::channel(this.concurrency_limit);
-
-                // Spawn a thread per bundle to simulate.
-                for (identifier, item) in active_sim.iter() {
-                    let this_ref = &this;
-                    let c = candidates.clone();
-
-                    scope.spawn(move || {
-                        // If simulation is succesful, send the outcome via the
-                        // channel.
-                        if let Ok(candidate) = this_ref.simulate(*identifier, item) {
-                            if candidate.gas_used <= max_gas {
-                                let _ = c.blocking_send(candidate);
-                                return;
-                            }
-                        };
-                        // fall through applies to all errors, occurs if
-                        // the simulation fails or the gas limit is exceeded.
-                        this_ref.sim_items.remove(*identifier);
-                    });
-                }
-                // Drop the TX so that the channel is closed when all threads
-                // are done.
-                drop(candidates);
-
-                // Wait for each thread to finish. Find the best outcome.
-                while let Some(candidate) = candidates_rx.blocking_recv() {
-                    if candidate.score > best_score {
-                        let _ = best_tx.send(Some(candidate));
-                    }
-                }
-            });
-            // we drop the Arc BEFORE notifying the listener that the
-            // simulation is done
-            drop(this);
-            let _ = done_tx.send(());
-        });
+        let sim_task = tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx));
 
         // Either simulation is done, or we time out
         select! {
-            _ = tokio::time::sleep_until(self.finish_by.into()) => {},
-            _ = done_rx => {},
+            _ = tokio::time::sleep_until(self.finish_by.into()) => {
+                trace!("Sim round timed out");
+            },
+            _ = sim_task => {
+                trace!("Sim round done");
+            },
         }
 
         // Check what the current best outcome is.
         let best = best_watcher.borrow_and_update();
+        trace!(score = %best.as_ref().map(|candidate| candidate.score).unwrap_or_default(), "Read outcome from channel");
         let outcome = best.as_ref()?;
 
         // Remove the item from the cache.
@@ -222,6 +182,11 @@ impl<Db, Insp> SimEnv<Db, Insp> {
         &self.constants
     }
 
+    /// Get a reference to the cache of items to simulate.
+    pub const fn sim_items(&self) -> &SimCache {
+        &self.sim_items
+    }
+
     /// Get a reference to the chain cfg.
     pub fn cfg(&self) -> &dyn Cfg {
         &self.cfg
@@ -283,6 +248,7 @@ where
     ///
     /// This function runs the simulation in a separate thread and waits for
     /// the result or the deadline to expire.
+    #[instrument(skip_all, fields(identifier, tx_hash = %transaction.hash()))]
     fn simulate_tx(
         &self,
         identifier: u128,
@@ -291,22 +257,43 @@ where
         let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
 
         // Get the initial beneficiary balance
-        let beneificiary = trevm.beneficiary();
+        let beneficiary = trevm.beneficiary();
         let initial_beneficiary_balance =
-            trevm.try_read_balance_ref(beneificiary).map_err(EVMError::Database)?;
+            trevm.try_read_balance_ref(beneficiary).map_err(EVMError::Database)?;
 
         // If succesful, take the cache. If failed, return the error.
         match trevm.run_tx(transaction) {
             Ok(trevm) => {
-                // Get the beneficiary balance after the transaction and calculate the
-                // increase
-                let beneficiary_balance =
-                    trevm.try_read_balance_ref(beneificiary).map_err(EVMError::Database)?;
-                let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
-
                 // Get the simulation results
                 let gas_used = trevm.result().gas_used();
+                let success = trevm.result().is_success();
+                let reason = trevm.result().output().cloned().map(hex::encode);
+                let halted = trevm.result().is_halt();
+                let halt_reason = if let ExecutionResult::Halt { reason, .. } = trevm.result() {
+                    Some(reason)
+                } else {
+                    None
+                }
+                .cloned();
+
                 let cache = trevm.accept_state().into_db().into_cache();
+
+                let beneficiary_balance = cache
+                    .accounts
+                    .get(&beneficiary)
+                    .map(|acct| acct.info.balance)
+                    .unwrap_or_default();
+                let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
+
+                trace!(
+                    gas_used = gas_used,
+                    score = %score,
+                    reverted = !success,
+                    halted,
+                    halt_reason = ?if halted { halt_reason } else { None },
+                    revert_reason = if !success { reason } else { None },
+                    "Simulation complete"
+                );
 
                 // Create the outcome
                 Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
@@ -316,6 +303,7 @@ where
     }
 
     /// Simulates a bundle on the current environment.
+    #[instrument(skip_all, fields(identifier, uuid = bundle.replacement_uuid()))]
     fn simulate_bundle(
         &self,
         identifier: u128,
@@ -338,6 +326,12 @@ where
         let gas_used = driver.total_gas_used();
         let cache = trevm.into_db().into_cache();
 
+        trace!(
+            gas_used = gas_used,
+            score = %score,
+            "Bundle simulation successful"
+        );
+
         Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
     }
 
@@ -351,6 +345,83 @@ where
             SimItem::Bundle(bundle) => self.simulate_bundle(identifier, bundle),
             SimItem::Tx(tx) => self.simulate_tx(identifier, tx),
         }
+    }
+
+    #[instrument(skip_all)]
+    fn sim_round(
+        self: Arc<Self>,
+        max_gas: u64,
+        best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
+    ) {
+        // Pull the `n` best items from the cache.
+        let active_sim = self.sim_items.read_best(self.concurrency_limit);
+
+        // Create a channel to send the results back.
+        let (candidates, mut candidates_rx) = mpsc::channel(self.concurrency_limit);
+
+        let outer = trace_span!("sim_thread", candidates = active_sim.len());
+        let outer_ref = &outer;
+        let _og = outer.enter();
+
+        // to be used in the scope
+        let this_ref = &self;
+
+        std::thread::scope(move |scope| {
+            // Spawn a thread per bundle to simulate.
+            for (identifier, item) in active_sim.into_iter() {
+                let c = candidates.clone();
+
+                scope.spawn(move || {
+                    let _ig = trace_span!(parent: outer_ref, "sim_task", identifier = %identifier)
+                        .entered();
+
+                    // If simulation is succesful, send the outcome via the
+                    // channel.
+                    match this_ref.simulate(identifier, &item) {
+                        Ok(candidate) => {
+                            if candidate.gas_used <= max_gas {
+                                // shortcut return on success
+                                let _ = c.blocking_send(candidate);
+                                return;
+                            }
+                            trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
+                        }
+                        Err(e) => {
+                            trace!(?identifier, ?e, "Simulation failed");
+                        }
+                    };
+                    // fall through applies to all errors, occurs if
+                    // the simulation fails or the gas limit is exceeded.
+                    this_ref.sim_items.remove(identifier);
+                });
+            }
+            // Drop the TX so that the channel is closed when all threads
+            // are done.
+            drop(candidates);
+
+            // Wait for each thread to finish. Find the best outcome.
+            while let Some(candidate) = candidates_rx.blocking_recv() {
+                // Update the best score and send it to the channel.
+                let _ = best_tx.send_if_modified(|current| {
+                    let best_score = current.as_ref().map(|c| c.score).unwrap_or_default();
+                    let current_id = current.as_ref().map(|c| c.identifier);
+
+                    if candidate.score > best_score {
+                        trace!(
+                            old_best = ?best_score,
+                            old_identifier = current_id,
+                            new_best = %candidate.score,
+                            identifier = candidate.identifier,
+                            "Found better candidate"
+                        );
+                        *current = Some(candidate);
+                        true
+                    } else {
+                        false
+                    }
+                });
+            }
+        });
     }
 }
 

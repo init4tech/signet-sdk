@@ -42,6 +42,16 @@ impl SimCache {
         self.inner.read().unwrap().iter().rev().take(n).map(|(k, v)| (*k, v.clone())).collect()
     }
 
+    /// Get the number of items in the cache.
+    pub fn len(&self) -> usize {
+        self.inner.read().unwrap().len()
+    }
+
+    /// True if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.read().unwrap().is_empty()
+    }
+
     /// Get an item by key.
     pub fn get(&self, key: u128) -> Option<SimItem> {
         self.inner.read().unwrap().get(&key).cloned()
