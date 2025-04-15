@@ -21,7 +21,7 @@ mod cache;
 pub use cache::SimCache;
 
 mod env;
-pub use env::SimEnv;
+pub use env::{SharedSimEnv, SimEnv};
 
 mod item;
 pub use item::SimItem;

@@ -25,11 +25,11 @@ use trevm::{
 /// A simulation environment.
 ///
 /// Contains enough information to run a simulation.
-pub struct SimEnv<Db, Insp = NoOpInspector> {
-    inner: Arc<SimEnvInner<Db, Insp>>,
+pub struct SharedSimEnv<Db, Insp = NoOpInspector> {
+    inner: Arc<SimEnv<Db, Insp>>,
 }
 
-impl<Db, Insp> fmt::Debug for SimEnv<Db, Insp> {
+impl<Db, Insp> fmt::Debug for SharedSimEnv<Db, Insp> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimEnv")
             .field("finish_by", &self.inner.finish_by)
@@ -38,25 +38,25 @@ impl<Db, Insp> fmt::Debug for SimEnv<Db, Insp> {
     }
 }
 
-impl<Db, Insp> Deref for SimEnv<Db, Insp> {
-    type Target = SimEnvInner<Db, Insp>;
+impl<Db, Insp> Deref for SharedSimEnv<Db, Insp> {
+    type Target = SimEnv<Db, Insp>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<Db, Insp> From<SimEnvInner<Db, Insp>> for SimEnv<Db, Insp>
+impl<Db, Insp> From<SimEnv<Db, Insp>> for SharedSimEnv<Db, Insp>
 where
     Db: DatabaseRef + Send + Sync + 'static,
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
 {
-    fn from(inner: SimEnvInner<Db, Insp>) -> Self {
+    fn from(inner: SimEnv<Db, Insp>) -> Self {
         Self { inner: Arc::new(inner) }
     }
 }
 
-impl<Db, Insp> SimEnv<Db, Insp>
+impl<Db, Insp> SharedSimEnv<Db, Insp>
 where
     Db: DatabaseRef + Send + Sync + 'static,
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
@@ -71,15 +71,11 @@ where
         concurrency_limit: usize,
         sim_items: SimCache,
     ) -> Self {
-        SimEnvInner::new(db, constants, cfg, block, finish_by, concurrency_limit, sim_items).into()
+        SimEnv::new(db, constants, cfg, block, finish_by, concurrency_limit, sim_items).into()
     }
 
     /// Run a simulation round, returning the best item.
-    pub async fn sim_round(
-        &mut self,
-        finish_by: std::time::Instant,
-        max_gas: u64,
-    ) -> Option<SimulatedItem> {
+    pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
         let (best_tx, mut best_watcher) = watch::channel(None);
 
         let (done_tx, done_rx) = oneshot::channel();
@@ -127,13 +123,16 @@ where
                         let _ = best_tx.send(Some(candidate));
                     }
                 }
-                let _ = done_tx.send(());
             });
+            // we drop the Arc BEFORE notifying the listener that the
+            // simulation is done
+            drop(this);
+            let _ = done_tx.send(());
         });
 
         // Either simulation is done, or we time out
         select! {
-            _ = tokio::time::sleep_until(finish_by.into()) => {},
+            _ = tokio::time::sleep_until(self.finish_by.into()) => {},
             _ = done_rx => {},
         }
 
@@ -154,7 +153,7 @@ where
 }
 
 /// A simulation environment.
-pub struct SimEnvInner<Db, Insp = NoOpInspector> {
+pub struct SimEnv<Db, Insp = NoOpInspector> {
     /// The database to use for the simulation. This database will be wrapped
     /// in [`CacheOnWrite`] databases for each simulation.
     db: InnerDb<Db>,
@@ -181,7 +180,7 @@ pub struct SimEnvInner<Db, Insp = NoOpInspector> {
     _pd: PhantomData<fn() -> Insp>,
 }
 
-impl<Db, Insp> fmt::Debug for SimEnvInner<Db, Insp> {
+impl<Db, Insp> fmt::Debug for SimEnv<Db, Insp> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimEnvInner")
             .field("finish_by", &self.finish_by)
@@ -190,7 +189,7 @@ impl<Db, Insp> fmt::Debug for SimEnvInner<Db, Insp> {
     }
 }
 
-impl<Db, Insp> SimEnvInner<Db, Insp> {
+impl<Db, Insp> SimEnv<Db, Insp> {
     /// Creates a new `SimFactory` instance.
     pub fn new(
         db: Db,
@@ -244,7 +243,7 @@ impl<Db, Insp> SimEnvInner<Db, Insp> {
     }
 }
 
-impl<Db, Insp> DbConnect for SimEnvInner<Db, Insp>
+impl<Db, Insp> DbConnect for SimEnv<Db, Insp>
 where
     Db: DatabaseRef + Send + Sync,
     Insp: Sync,
@@ -258,7 +257,7 @@ where
     }
 }
 
-impl<Db, Insp> EvmFactory for SimEnvInner<Db, Insp>
+impl<Db, Insp> EvmFactory for SimEnv<Db, Insp>
 where
     Db: DatabaseRef + Send + Sync,
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
@@ -275,7 +274,7 @@ where
     }
 }
 
-impl<Db, Insp> SimEnvInner<Db, Insp>
+impl<Db, Insp> SimEnv<Db, Insp>
 where
     Db: DatabaseRef + Send + Sync,
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
@@ -355,7 +354,7 @@ where
     }
 }
 
-impl<Db, Insp> SimEnvInner<Db, Insp>
+impl<Db, Insp> SimEnv<Db, Insp>
 where
     Db: DatabaseRef,
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
