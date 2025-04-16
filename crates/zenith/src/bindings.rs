@@ -13,6 +13,9 @@ mod mint {
 }
 pub use mint::mintCall;
 
+const PERMIT2_CONTRACT_NAME: &str = "Permit2";
+const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
+
 mod zenith {
     use super::*;
 
@@ -341,12 +344,10 @@ mod orders {
             };
 
             // construct EIP-712 domain for Permit2 contract
-            let permit2_contract_name = "Permit2";
-            let permit2_address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
             let domain = Eip712Domain {
                 chain_id: Some(chain_id),
-                name: Some(permit2_contract_name.into()),
-                verifying_contract: Some(permit2_address),
+                name: Some(PERMIT2_CONTRACT_NAME.into()),
+                verifying_contract: Some(PERMIT2_ADDRESS),
                 version: None,
                 salt: None,
             };
@@ -357,22 +358,19 @@ mod orders {
 
         /// Get Permit2 TokenPermissions for the Inputs of an Order; used to Initiate the Order
         fn input_token_permissions(&self) -> Vec<TokenPermissions> {
-            let mut permitted: Vec<TokenPermissions> = Vec::with_capacity(self.inputs.len());
-            for input in self.inputs.iter() {
-                permitted.push(TokenPermissions { token: input.token, amount: input.amount });
-            }
-            permitted
+            self.inputs()
+                .iter()
+                .map(|input| TokenPermissions { token: input.token, amount: input.amount })
+                .collect()
         }
 
         // Get Permit2 TokenPermissions for the Outputs of an Order; used to Fill the Order
         fn output_token_permissions(&self, destination_chain_id: U256) -> Vec<TokenPermissions> {
-            let mut permitted: Vec<TokenPermissions> = Vec::with_capacity(self.outputs.len());
-            for output in self.outputs.iter() {
-                if destination_chain_id == U256::from(output.chain_id()) {
-                    permitted.push(TokenPermissions { token: output.token, amount: output.amount });
-                }
-            }
-            permitted
+            self.outputs()
+                .iter()
+                .filter(|output| U256::from(output.chain_id()) == destination_chain_id)
+                .map(|output| TokenPermissions { token: output.token, amount: output.amount })
+                .collect()
         }
     }
 
