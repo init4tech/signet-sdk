@@ -1,7 +1,7 @@
 use crate::send::SignetEthBundle;
 use alloy::primitives::U256;
 use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
-use signet_zenith::SignedOrderError;
+use signet_zenith::SignedPermitError;
 use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
@@ -24,9 +24,9 @@ pub enum SignetEthBundleError<Db: Database> {
     #[error(transparent)]
     BundleError(#[from] BundleError<Db>),
 
-    /// SignedOrderError.
+    /// SignedPermitError.
     #[error(transparent)]
-    SignedOrderError(#[from] SignedOrderError),
+    SignedPermitError(#[from] SignedPermitError),
 
     /// Contract error.
     #[error(transparent)]
@@ -39,8 +39,8 @@ impl<Db: Database> core::fmt::Debug for SignetEthBundleError<Db> {
             SignetEthBundleError::BundleError(bundle_error) => {
                 f.debug_tuple("BundleError").field(bundle_error).finish()
             }
-            SignetEthBundleError::SignedOrderError(signed_order_error) => {
-                f.debug_tuple("SignedOrderError").field(signed_order_error).finish()
+            SignetEthBundleError::SignedPermitError(signed_order_error) => {
+                f.debug_tuple("SignedPermitError").field(signed_order_error).finish()
             }
             SignetEthBundleError::ContractError(contract_error) => {
                 f.debug_tuple("ContractError").field(contract_error).finish()
@@ -136,7 +136,7 @@ where
             BundleError::TimestampOutOfRange.into()
         );
 
-        // Check that the `SignedOrder` is valid at the timestamp.
+        // Check that the `SignedFill` is valid at the timestamp.
         if self.bundle().validate_fills_offchain(timestamp).is_err() {
             return Err(trevm.errored(BundleError::BundleReverted.into()));
         }

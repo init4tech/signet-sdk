@@ -1,13 +1,16 @@
+use crate::orders::signing::SignedOrder;
 use crate::RollupOrders;
 use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 
 /// Aggregated orders for a transaction or set of transactions.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct AggregateOrders {
     /// Outputs to be transferred to the user. These may be on the rollup or
     /// the host or potentially elsewhere in the future.
+    /// (chain_id, token) -> recipient -> amount
     pub outputs: HashMap<(u64, Address), HashMap<Address, U256>>,
     /// Inputs to be transferred to the filler. These are always on the
     /// rollup.
@@ -28,19 +31,36 @@ impl AggregateOrders {
 
     /// Ingest an output into the aggregate orders.
     pub(crate) fn ingest_output(&mut self, output: &RollupOrders::Output) {
-        let entry = self
-            .outputs
-            .entry((output.chain_id() as u64, output.token))
-            .or_default()
-            .entry(output.recipient)
-            .or_default();
-        *entry = entry.saturating_add(output.amount);
+        self.ingest_raw_output(
+            output.chainId as u64,
+            output.token,
+            output.recipient,
+            output.amount,
+        );
+    }
+
+    /// Ingest raw output values into the aggregate orders.
+    fn ingest_raw_output(
+        &mut self,
+        chain_id: u64,
+        token: Address,
+        recipient: Address,
+        amount: U256,
+    ) {
+        let entry =
+            self.outputs.entry((chain_id, token)).or_default().entry(recipient).or_default();
+        *entry = entry.saturating_add(amount);
     }
 
     /// Ingest an input into the aggregate orders.
     pub(crate) fn ingest_input(&mut self, input: &RollupOrders::Input) {
-        let entry = self.inputs.entry(input.token).or_default();
-        *entry = entry.saturating_add(input.amount);
+        self.ingest_raw_input(input.token, input.amount);
+    }
+
+    /// Ingest raw input values into the aggregate orders.
+    fn ingest_raw_input(&mut self, token: Address, amount: U256) {
+        let entry = self.inputs.entry(token).or_default();
+        *entry = entry.saturating_add(amount);
     }
 
     /// Ingest a new order into the aggregate orders.
@@ -49,11 +69,57 @@ impl AggregateOrders {
         order.inputs.iter().for_each(|i| self.ingest_input(i));
     }
 
+    /// Ingest a signed order into the aggregate orders.
+    pub fn ingest_signed(&mut self, order: &SignedOrder) {
+        order
+            .outputs
+            .iter()
+            .for_each(|o| self.ingest_raw_output(o.chainId as u64, o.token, o.recipient, o.amount));
+        order
+            .permit
+            .permit
+            .permitted
+            .iter()
+            .for_each(|tp| self.ingest_raw_input(tp.token, tp.amount));
+    }
+
     /// Extend the orders with a new set of orders.
     pub fn extend<'a>(&mut self, orders: impl IntoIterator<Item = &'a RollupOrders::Order>) {
         for order in orders {
             self.ingest(order);
         }
+    }
+
+    /// Extend the orders with a new set of signed orders.
+    pub fn extend_signed<'a>(&mut self, orders: impl IntoIterator<Item = &'a SignedOrder>) {
+        for order in orders {
+            self.ingest_signed(order);
+        }
+    }
+
+    /// Get the unique destination chain ids for the aggregated outputs.
+    pub fn destination_chain_ids(&self) -> Vec<u64> {
+        HashSet::<u64>::from_iter(self.outputs.keys().map(|(chain_id, _)| *chain_id))
+            .into_iter()
+            .collect()
+    }
+
+    /// Get the aggregated Outputs for a given chain id.
+    pub fn outputs_for(&self, target_chain_id: u64) -> Vec<RollupOrders::Output> {
+        let mut o = Vec::new();
+        for ((chain_id, token), recipient_map) in &self.outputs {
+            if *chain_id == target_chain_id {
+                for (recipient, amount) in recipient_map {
+                    o.push(RollupOrders::Output {
+                        token: *token,
+                        amount: U256::from(*amount),
+                        recipient: *recipient,
+                        chainId: *chain_id as u32,
+                    });
+                }
+            }
+        }
+        o
     }
 }
 
@@ -62,6 +128,36 @@ impl<'a> FromIterator<&'a RollupOrders::Order> for AggregateOrders {
         let mut orders = AggregateOrders::new();
         orders.extend(iter);
         orders
+    }
+}
+
+impl<'a> FromIterator<&'a SignedOrder> for AggregateOrders {
+    fn from_iter<T: IntoIterator<Item = &'a SignedOrder>>(iter: T) -> Self {
+        let mut orders = AggregateOrders::new();
+        orders.extend_signed(iter);
+        orders
+    }
+}
+
+impl<'a> From<&'a RollupOrders::Order> for AggregateOrders {
+    fn from(order: &'a RollupOrders::Order) -> Self {
+        let mut orders = AggregateOrders::new();
+        orders.ingest(order);
+        orders
+    }
+}
+
+impl<'a> From<&'a SignedOrder> for AggregateOrders {
+    fn from(order: &'a SignedOrder) -> Self {
+        let mut orders = AggregateOrders::new();
+        orders.ingest_signed(order);
+        orders
+    }
+}
+
+impl<'a> From<&'a AggregateOrders> for Cow<'a, AggregateOrders> {
+    fn from(orders: &'a AggregateOrders) -> Self {
+        Cow::Borrowed(orders)
     }
 }
 

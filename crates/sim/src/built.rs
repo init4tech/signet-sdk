@@ -6,7 +6,7 @@ use alloy::{
 };
 use core::fmt;
 use signet_bundle::SignetEthBundle;
-use signet_zenith::{encode_txns, Alloy2718Coder, SignedOrder};
+use signet_zenith::{encode_txns, Alloy2718Coder, SignedFill};
 use std::sync::OnceLock;
 use tracing::{error, trace};
 
@@ -16,7 +16,7 @@ use crate::{outcome::SimulatedItem, SimItem};
 #[derive(Clone, Default)]
 pub struct BuiltBlock {
     /// The host fill actions.
-    pub(crate) host_fills: Vec<SignedOrder>,
+    pub(crate) host_fills: Vec<SignedFill>,
     /// Transactions in the block.
     pub(crate) transactions: Vec<TxEnvelope>,
 

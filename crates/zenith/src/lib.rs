@@ -20,7 +20,10 @@ mod block;
 pub use block::{decode_txns, encode_txns, Alloy2718Coder, Coder, ZenithBlock, ZenithTransaction};
 
 mod orders;
-pub use orders::{AggregateOrders, SignedOrder, SignedOrderError};
+pub use orders::{
+    AggregateOrders, SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill,
+    UnsignedOrder,
+};
 
 mod trevm;
 

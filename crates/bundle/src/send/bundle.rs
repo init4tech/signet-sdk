@@ -1,4 +1,5 @@
 //! Signet bundle types.
+use crate::send::SignetEthBundleError;
 use alloy::{
     consensus::TxEnvelope,
     eips::Decodable2718,
@@ -9,17 +10,15 @@ use alloy::{
     rpc::types::mev::EthSendBundle,
 };
 use serde::{Deserialize, Serialize};
-use signet_zenith::{HostOrders::HostOrdersInstance, SignedOrder, SignedOrderError};
+use signet_zenith::{HostOrders::HostOrdersInstance, SignedFill, SignedPermitError};
 use trevm::{revm::Database, BundleError};
-
-use super::SignetEthBundleError;
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///
 /// The Signet bundle contains the following:
 ///
 /// - A standard [`EthSendBundle`] with the transactions to simulate.
-/// - A signed permit2 order to be applied on Ethereum with the bundle.
+/// - A signed permit2 fill to be applied on the Host chain with the bundle.
 ///
 /// This is based on the flashbots `eth_sendBundle` bundle. See [their docs].
 ///
@@ -31,9 +30,9 @@ pub struct SignetEthBundle {
     #[serde(flatten)]
     pub bundle: EthSendBundle,
     /// Host fills to be applied with the bundle, represented as a signed
-    /// permit2 order.
+    /// permit2 fill.
     #[serde(default)]
-    pub host_fills: Option<SignedOrder>,
+    pub host_fills: Option<SignedFill>,
 }
 
 impl SignetEthBundle {
@@ -88,9 +87,9 @@ impl SignetEthBundle {
     }
 
     /// Check that this can be syntactically used as a fill.
-    pub fn validate_fills_offchain(&self, timestamp: u64) -> Result<(), SignedOrderError> {
+    pub fn validate_fills_offchain(&self, timestamp: u64) -> Result<(), SignedPermitError> {
         if let Some(host_fills) = &self.host_fills {
-            host_fills.validate_as_fill(timestamp)
+            host_fills.validate(timestamp)
         } else {
             Ok(())
         }
@@ -108,7 +107,7 @@ impl SignetEthBundle {
         N: Network,
     {
         if let Some(host_fills) = self.host_fills.clone() {
-            orders.try_signed_order(host_fills).await.map_err(Into::into)
+            orders.try_fill(host_fills).await.map_err(Into::into)
         } else {
             Ok(())
         }
@@ -149,7 +148,7 @@ mod test {
                 reverting_tx_hashes: vec![B256::repeat_byte(4), B256::repeat_byte(5)],
                 replacement_uuid: Some("uuid".to_owned()),
             },
-            host_fills: Some(SignedOrder {
+            host_fills: Some(SignedFill {
                 permit: Permit2Batch {
                     permit: PermitBatchTransferFrom {
                         permitted: vec![TokenPermissions {
