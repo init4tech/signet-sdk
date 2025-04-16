@@ -4,6 +4,7 @@ use alloy::{
     primitives::{address, Address, Bytes, FixedBytes, B256, U256},
     sol_types::{Eip712Domain, SolStruct},
 };
+use std::borrow::Cow;
 
 const PERMIT2_CONTRACT_NAME: &str = "Permit2";
 const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
@@ -280,6 +281,36 @@ mod orders {
         }
     }
 
+    impl From<&IOrders::Input> for TokenPermissions {
+        fn from(input: &IOrders::Input) -> TokenPermissions {
+            TokenPermissions { token: input.token, amount: input.amount }
+        }
+    }
+
+    impl From<IOrders::Input> for TokenPermissions {
+        fn from(input: IOrders::Input) -> TokenPermissions {
+            TokenPermissions { token: input.token, amount: input.amount }
+        }
+    }
+
+    impl From<&IOrders::Output> for TokenPermissions {
+        fn from(output: &IOrders::Output) -> TokenPermissions {
+            TokenPermissions { token: output.token, amount: output.amount }
+        }
+    }
+
+    impl From<IOrders::Output> for TokenPermissions {
+        fn from(output: IOrders::Output) -> TokenPermissions {
+            TokenPermissions { token: output.token, amount: output.amount }
+        }
+    }
+
+    impl<'a> From<&'a Orders::Order> for Cow<'a, Orders::Order> {
+        fn from(order: &'a Orders::Order) -> Self {
+            Cow::Borrowed(order)
+        }
+    }
+
     impl Orders::Order {
         /// Get the inputs of the order.
         #[allow(clippy::missing_const_for_fn)] // false positive
@@ -313,6 +344,18 @@ mod orders {
             )
         }
 
+        /// Generate the Permit2 batch transfer object to Initiate an Order
+        pub fn initiate_permit(
+            &self,
+            permit2_nonce: U256,
+        ) -> ISignatureTransfer::PermitBatchTransferFrom {
+            ISignatureTransfer::PermitBatchTransferFrom {
+                permitted: self.input_token_permissions(),
+                nonce: permit2_nonce,
+                deadline: U256::from(self.deadline()),
+            }
+        }
+
         /// Generate the Permit2 signing hash to Fill the Outputs of an Order on a given chain.
         pub fn fill_signing_hash(
             &self,
@@ -326,6 +369,33 @@ mod orders {
                 destination_chain_id,
                 destination_order_contract,
             )
+        }
+
+        /// Generate the Permit2 batch transfer object to Fill an Order on a given chain.
+        pub fn fill_permit(
+            &self,
+            permit2_nonce: U256,
+            chain_id: U256,
+        ) -> ISignatureTransfer::PermitBatchTransferFrom {
+            ISignatureTransfer::PermitBatchTransferFrom {
+                permitted: self.output_token_permissions(chain_id),
+                nonce: permit2_nonce,
+                deadline: U256::from(self.deadline()),
+            }
+        }
+
+        /// Get Permit2 TokenPermissions for the Inputs of an Order; used to Initiate the Order
+        fn input_token_permissions(&self) -> Vec<TokenPermissions> {
+            self.inputs().iter().map(Into::into).collect()
+        }
+
+        // Get Permit2 TokenPermissions for the Outputs of an Order; used to Fill the Order
+        fn output_token_permissions(&self, destination_chain_id: U256) -> Vec<TokenPermissions> {
+            self.outputs()
+                .iter()
+                .filter(|output| U256::from(output.chain_id()) == destination_chain_id)
+                .map(Into::into)
+                .collect()
         }
 
         /// Generate a correct Permit2 signing hash to either Initiate or Fill an Order
@@ -355,23 +425,6 @@ mod orders {
 
             // generate EIP-712 signing hash
             permit2_signing_data.eip712_signing_hash(&domain)
-        }
-
-        /// Get Permit2 TokenPermissions for the Inputs of an Order; used to Initiate the Order
-        fn input_token_permissions(&self) -> Vec<TokenPermissions> {
-            self.inputs()
-                .iter()
-                .map(|input| TokenPermissions { token: input.token, amount: input.amount })
-                .collect()
-        }
-
-        // Get Permit2 TokenPermissions for the Outputs of an Order; used to Fill the Order
-        fn output_token_permissions(&self, destination_chain_id: U256) -> Vec<TokenPermissions> {
-            self.outputs()
-                .iter()
-                .filter(|output| U256::from(output.chain_id()) == destination_chain_id)
-                .map(|output| TokenPermissions { token: output.token, amount: output.amount })
-                .collect()
         }
     }
 
