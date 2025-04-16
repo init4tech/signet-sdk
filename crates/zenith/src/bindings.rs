@@ -5,6 +5,9 @@ use alloy::{
     sol_types::{Eip712Domain, SolStruct},
 };
 
+const PERMIT2_CONTRACT_NAME: &str = "Permit2";
+const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
+
 mod mint {
     alloy::sol!(
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -12,9 +15,6 @@ mod mint {
     );
 }
 pub use mint::mintCall;
-
-const PERMIT2_CONTRACT_NAME: &str = "Permit2";
-const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
 
 mod zenith {
     use super::*;
@@ -297,6 +297,7 @@ mod orders {
         pub const fn deadline(&self) -> u64 {
             self.deadline.as_limbs()[0]
         }
+
         /// Generate the Permit2 signing hash to Initiate an Order.
         pub fn initiate_signing_hash(
             &self,
