@@ -65,6 +65,11 @@ impl AggregateOrders {
         }
     }
 
+    /// Get all destination chain ids for the aggregated outputs.
+    pub fn output_chain_ids(&self) -> Vec<u64> {
+        self.outputs.keys().map(|(chain_id, _)| *chain_id).collect()
+    }
+
     /// Get the aggregated Outputs for a given chain id.
     pub fn outputs_for(&self, target_chain_id: u64) -> Vec<RollupOrders::Output> {
         let mut o = Vec::new();

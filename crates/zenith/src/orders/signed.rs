@@ -3,6 +3,7 @@ use crate::bindings::RollupOrders::{Order, Output, Permit2Batch};
 use alloy::primitives::Address;
 use alloy::signers::Signer;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// An error that can occur when validating a signed order or fill.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -101,9 +102,12 @@ impl SignedFill {
 /// An error that can occur when signing an Order or a Fill.
 #[derive(Debug, thiserror::Error)]
 pub enum SignerError {
-    /// Missing chain id.
-    #[error("Target chain id and Order contract address must be populated by calling with_chain before attempting to sign.")]
+    /// Missing chain config.
+    #[error("Target chain id and Order contract address are missing. Populate them by calling with_chain before attempting to sign.")]
     MissingChainConfig,
+    /// Missing chain config for a specific chain.
+    #[error("Target chain id and Order contract address are missing for chain id {0}. Populate them by calling with_chain before attempting to sign.")]
+    MissingChainConfigFor(u64),
     /// Error signing the order hash.
     #[error("Signer error: {0}")]
     Signer(#[from] alloy::signers::Error),
@@ -174,8 +178,7 @@ pub struct UnsignedFill<'a> {
     orders: std::borrow::Cow<'a, AggregateOrders>,
     deadline: Option<u64>,
     nonce: Option<u64>,
-    destination_chain_id: Option<u64>,
-    destination_order_address: Option<Address>,
+    destination_chains: HashMap<u64, Address>,
 }
 
 impl<'a> From<&'a AggregateOrders> for UnsignedFill<'a> {
@@ -191,8 +194,7 @@ impl<'a> UnsignedFill<'a> {
             orders: orders.into(),
             deadline: None,
             nonce: None,
-            destination_chain_id: None,
-            destination_order_address: None,
+            destination_chains: HashMap::new(),
         }
     }
 
@@ -207,40 +209,58 @@ impl<'a> UnsignedFill<'a> {
     }
 
     /// Add the chain id  and Order contract address to the UnsignedOrder.
-    pub fn with_chain(self, chain_id: u64, order_contract_address: Address) -> Self {
-        Self {
-            destination_chain_id: Some(chain_id),
-            destination_order_address: Some(order_contract_address),
-            ..self
-        }
+    pub fn with_chain(mut self, chain_id: u64, order_contract_address: Address) -> Self {
+        self.destination_chains.insert(chain_id, order_contract_address);
+        self
     }
 
-    /// Sign the UnsignedFill, generating a SignedFill.
-    pub async fn sign<S: Signer>(&self, signer: &S) -> Result<SignedFill, SignerError> {
+    /// Sign the UnsignedFill, generating a SignedFill for each destination chain.
+    /// Utilizes the same signing key for every chain.
+    pub async fn sign<S: Signer>(
+        &self,
+        signer: &S,
+    ) -> Result<HashMap<u64, SignedFill>, SignerError> {
+        let mut fills = HashMap::new();
+
+        // loop through each destination chain and sign the fills
+        for destination_chain_id in self.orders.output_chain_ids() {
+            let signed_fill = self.sign_for(destination_chain_id, signer).await?;
+            fills.insert(destination_chain_id, signed_fill);
+        }
+
+        // return the fills
+        Ok(fills)
+    }
+
+    /// Sign the UnsignedFill for a specific destination chain.
+    /// NOTE that *all* Outputs MUST be filled on all chains, else Inputs will not be transferred.
+    pub async fn sign_for<S: Signer>(
+        &self,
+        chain_id: u64,
+        signer: &S,
+    ) -> Result<SignedFill, SignerError> {
         let now = chrono::Utc::now();
         // if nonce is are None, populate it as the current timestamp in milliseconds
         let nonce = self.nonce.unwrap_or(now.timestamp_millis() as u64);
         // if deadline is None, populate it as now + 12 seconds (can only mine within the current block)
         let deadline = self.deadline.unwrap_or(now.timestamp() as u64 + 12);
 
-        let destination_chain_id =
-            self.destination_chain_id.ok_or(SignerError::MissingChainConfig)?;
+        let destination_order_address = self
+            .destination_chains
+            .get(&chain_id)
+            .ok_or(SignerError::MissingChainConfigFor(chain_id))?;
 
-        let signing_hash = self.orders.fill_signing_hash(
-            deadline,
-            nonce,
-            destination_chain_id,
-            self.destination_order_address.ok_or(SignerError::MissingChainConfig)?,
-        );
+        let signing_hash =
+            self.orders.fill_signing_hash(deadline, nonce, chain_id, *destination_order_address);
         let signature = signer.sign_hash(&signing_hash).await?;
 
         Ok(SignedFill {
             permit: Permit2Batch {
-                permit: self.orders.fill_permit(deadline, nonce, destination_chain_id),
+                permit: self.orders.fill_permit(deadline, nonce, chain_id),
                 owner: signer.address(),
                 signature: signature.as_bytes().into(),
             },
-            outputs: self.orders.outputs_for(destination_chain_id).to_vec(),
+            outputs: self.orders.outputs_for(chain_id).to_vec(),
         })
     }
 }
