@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 trevm.workspace = true
+chrono.workspace = true
 
 alloy = { workspace = true, features = ["full", "json-rpc", "signer-aws", "rpc-types-mev", "rlp"] }
 
