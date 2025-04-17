@@ -1,6 +1,15 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(missing_docs)]
-use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use alloy::{
+    primitives::{address, Address, Bytes, FixedBytes, B256, U256},
+    sol_types::{Eip712Domain, SolStruct},
+};
+
+/// Name of the Permit2 contract, used in EIP-712 domain.
+const PERMIT2_CONTRACT_NAME: &str = "Permit2";
+/// Address of the Permit2 contract, used in EIP-712 domain. Permit2 is CREATE2 deployed at the same address on every chain.
+const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
+
 mod mint {
     alloy::sol!(
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -205,6 +214,8 @@ mod passage {
 
 mod orders {
     use super::*;
+    use IOrders::Output;
+    use ISignatureTransfer::TokenPermissions;
 
     alloy::sol!(
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -212,6 +223,16 @@ mod orders {
         Orders,
         "abi/RollupOrders.json"
     );
+
+    alloy::sol! {
+       struct PermitBatchWitnessTransferFrom {
+           TokenPermissions[] permitted;
+           address spender;
+           uint256 nonce;
+           uint256 deadline;
+           Output[] outputs;
+       }
+    }
 
     impl Copy for IOrders::Input {}
     impl Copy for IOrders::Output {}
@@ -277,6 +298,82 @@ mod orders {
         /// Get the deadline of the order.
         pub const fn deadline(&self) -> u64 {
             self.deadline.as_limbs()[0]
+        }
+
+        /// Generate the Permit2 signing hash to Initiate an Order.
+        pub fn initiate_signing_hash(
+            &self,
+            permit2_nonce: U256,
+            rollup_chain_id: U256,
+            rollup_order_contract: Address,
+        ) -> B256 {
+            self.permit2_signing_hash(
+                self.input_token_permissions(),
+                permit2_nonce,
+                rollup_chain_id,
+                rollup_order_contract,
+            )
+        }
+
+        /// Generate the Permit2 signing hash to Fill the Outputs of an Order on a given chain.
+        pub fn fill_signing_hash(
+            &self,
+            permit2_nonce: U256,
+            destination_chain_id: U256,
+            destination_order_contract: Address,
+        ) -> B256 {
+            self.permit2_signing_hash(
+                self.output_token_permissions(destination_chain_id),
+                permit2_nonce,
+                destination_chain_id,
+                destination_order_contract,
+            )
+        }
+
+        /// Generate a correct Permit2 signing hash to either Initiate or Fill an Order
+        fn permit2_signing_hash(
+            &self,
+            permitted: Vec<TokenPermissions>,
+            nonce: U256,
+            chain_id: U256,
+            order_contract: Address,
+        ) -> B256 {
+            let permit2_signing_data = PermitBatchWitnessTransferFrom {
+                permitted,
+                spender: order_contract,
+                nonce,
+                deadline: U256::from(self.deadline()),
+                outputs: self.outputs().to_vec(),
+            };
+
+            // construct EIP-712 domain for Permit2 contract
+            let domain = Eip712Domain {
+                chain_id: Some(chain_id),
+                name: Some(PERMIT2_CONTRACT_NAME.into()),
+                verifying_contract: Some(PERMIT2_ADDRESS),
+                version: None,
+                salt: None,
+            };
+
+            // generate EIP-712 signing hash
+            permit2_signing_data.eip712_signing_hash(&domain)
+        }
+
+        /// Get Permit2 TokenPermissions for the Inputs of an Order; used to Initiate the Order
+        fn input_token_permissions(&self) -> Vec<TokenPermissions> {
+            self.inputs()
+                .iter()
+                .map(|input| TokenPermissions { token: input.token, amount: input.amount })
+                .collect()
+        }
+
+        // Get Permit2 TokenPermissions for the Outputs of an Order; used to Fill the Order
+        fn output_token_permissions(&self, destination_chain_id: U256) -> Vec<TokenPermissions> {
+            self.outputs()
+                .iter()
+                .filter(|output| U256::from(output.chain_id()) == destination_chain_id)
+                .map(|output| TokenPermissions { token: output.token, amount: output.amount })
+                .collect()
         }
     }
 
