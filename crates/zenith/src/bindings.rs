@@ -212,6 +212,8 @@ mod passage {
 }
 
 mod orders {
+    use crate::SignedOrder;
+
     use super::*;
     use IOrders::Output;
     use ISignatureTransfer::TokenPermissions;
@@ -293,6 +295,12 @@ mod orders {
         }
     }
 
+    impl From<TokenPermissions> for IOrders::Input {
+        fn from(perm: TokenPermissions) -> IOrders::Input {
+            IOrders::Input { token: perm.token, amount: perm.amount }
+        }
+    }
+
     impl From<&IOrders::Output> for TokenPermissions {
         fn from(output: &IOrders::Output) -> TokenPermissions {
             TokenPermissions { token: output.token, amount: output.amount }
@@ -302,12 +310,6 @@ mod orders {
     impl From<IOrders::Output> for TokenPermissions {
         fn from(output: IOrders::Output) -> TokenPermissions {
             TokenPermissions { token: output.token, amount: output.amount }
-        }
-    }
-
-    impl<'a> From<&'a Orders::Order> for Cow<'a, Orders::Order> {
-        fn from(order: &'a Orders::Order) -> Self {
-            Cow::Borrowed(order)
         }
     }
 
@@ -332,12 +334,14 @@ mod orders {
         /// Generate the Permit2 signing hash to Initiate an Order.
         pub fn initiate_signing_hash(
             &self,
-            permit2_nonce: U256,
-            rollup_chain_id: U256,
+            permit2_nonce: u64,
+            rollup_chain_id: u64,
             rollup_order_contract: Address,
         ) -> B256 {
-            self.permit2_signing_hash(
-                self.input_token_permissions(),
+            Self::orders_permit2_signing_hash(
+                self.outputs().to_vec(),
+                self.inputs().iter().map(Into::into).collect(),
+                self.deadline(),
                 permit2_nonce,
                 rollup_chain_id,
                 rollup_order_contract,
@@ -347,76 +351,35 @@ mod orders {
         /// Generate the Permit2 batch transfer object to Initiate an Order
         pub fn initiate_permit(
             &self,
-            permit2_nonce: U256,
+            permit2_nonce: u64,
         ) -> ISignatureTransfer::PermitBatchTransferFrom {
             ISignatureTransfer::PermitBatchTransferFrom {
-                permitted: self.input_token_permissions(),
-                nonce: permit2_nonce,
+                permitted: self.inputs().iter().map(Into::into).collect(),
+                nonce: U256::from(permit2_nonce),
                 deadline: U256::from(self.deadline()),
             }
-        }
-
-        /// Generate the Permit2 signing hash to Fill the Outputs of an Order on a given chain.
-        pub fn fill_signing_hash(
-            &self,
-            permit2_nonce: U256,
-            destination_chain_id: U256,
-            destination_order_contract: Address,
-        ) -> B256 {
-            self.permit2_signing_hash(
-                self.output_token_permissions(destination_chain_id),
-                permit2_nonce,
-                destination_chain_id,
-                destination_order_contract,
-            )
-        }
-
-        /// Generate the Permit2 batch transfer object to Fill an Order on a given chain.
-        pub fn fill_permit(
-            &self,
-            permit2_nonce: U256,
-            chain_id: U256,
-        ) -> ISignatureTransfer::PermitBatchTransferFrom {
-            ISignatureTransfer::PermitBatchTransferFrom {
-                permitted: self.output_token_permissions(chain_id),
-                nonce: permit2_nonce,
-                deadline: U256::from(self.deadline()),
-            }
-        }
-
-        /// Get Permit2 TokenPermissions for the Inputs of an Order; used to Initiate the Order
-        fn input_token_permissions(&self) -> Vec<TokenPermissions> {
-            self.inputs().iter().map(Into::into).collect()
-        }
-
-        // Get Permit2 TokenPermissions for the Outputs of an Order; used to Fill the Order
-        fn output_token_permissions(&self, destination_chain_id: U256) -> Vec<TokenPermissions> {
-            self.outputs()
-                .iter()
-                .filter(|output| U256::from(output.chain_id()) == destination_chain_id)
-                .map(Into::into)
-                .collect()
         }
 
         /// Generate a correct Permit2 signing hash to either Initiate or Fill an Order
-        fn permit2_signing_hash(
-            &self,
+        pub fn orders_permit2_signing_hash(
+            outputs: Vec<IOrders::Output>,
             permitted: Vec<TokenPermissions>,
-            nonce: U256,
-            chain_id: U256,
+            deadline: u64,
+            nonce: u64,
+            chain_id: u64,
             order_contract: Address,
         ) -> B256 {
             let permit2_signing_data = PermitBatchWitnessTransferFrom {
                 permitted,
                 spender: order_contract,
-                nonce,
-                deadline: U256::from(self.deadline()),
-                outputs: self.outputs().to_vec(),
+                nonce: U256::from(nonce),
+                deadline: U256::from(deadline),
+                outputs,
             };
 
             // construct EIP-712 domain for Permit2 contract
             let domain = Eip712Domain {
-                chain_id: Some(chain_id),
+                chain_id: Some(U256::from(chain_id)),
                 name: Some(PERMIT2_CONTRACT_NAME.into()),
                 verifying_contract: Some(PERMIT2_ADDRESS),
                 version: None,
@@ -425,6 +388,28 @@ mod orders {
 
             // generate EIP-712 signing hash
             permit2_signing_data.eip712_signing_hash(&domain)
+        }
+    }
+
+    impl From<SignedOrder> for Orders::Order {
+        fn from(signed: SignedOrder) -> Orders::Order {
+            Orders::Order {
+                deadline: signed.permit.permit.deadline,
+                inputs: signed
+                    .permit
+                    .permit
+                    .permitted
+                    .into_iter()
+                    .map(|perm| perm.into())
+                    .collect(),
+                outputs: signed.outputs,
+            }
+        }
+    }
+
+    impl<'a> From<&'a Orders::Order> for Cow<'a, Orders::Order> {
+        fn from(order: &'a Orders::Order) -> Self {
+            Cow::Borrowed(order)
         }
     }
 

@@ -1,6 +1,8 @@
+use super::signed::SignedOrder;
 use crate::RollupOrders;
-use alloy::primitives::{Address, U256};
+use alloy::primitives::{Address, B256, U256};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// Aggregated orders for a transaction or set of transactions.
@@ -8,6 +10,7 @@ use std::collections::HashMap;
 pub struct AggregateOrders {
     /// Outputs to be transferred to the user. These may be on the rollup or
     /// the host or potentially elsewhere in the future.
+    /// (chain_id, token) -> recipient -> amount
     pub outputs: HashMap<(u64, Address), HashMap<Address, U256>>,
     /// Inputs to be transferred to the filler. These are always on the
     /// rollup.
@@ -49,10 +52,66 @@ impl AggregateOrders {
         order.inputs.iter().for_each(|i| self.ingest_input(i));
     }
 
+    /// Ingest a signed order into the aggregate orders.
+    pub fn ingest_signed(&mut self, order: &SignedOrder) {
+        let order: RollupOrders::Order = order.clone().into();
+        self.ingest(&order);
+    }
+
     /// Extend the orders with a new set of orders.
     pub fn extend<'a>(&mut self, orders: impl IntoIterator<Item = &'a RollupOrders::Order>) {
         for order in orders {
             self.ingest(order);
+        }
+    }
+
+    /// Get the aggregated Outputs for a given chain id.
+    pub fn outputs_for(&self, target_chain_id: u64) -> Vec<RollupOrders::Output> {
+        let mut o = Vec::new();
+        for ((chain_id, token), recipient_map) in &self.outputs {
+            if *chain_id == target_chain_id {
+                for (recipient, amount) in recipient_map {
+                    o.push(RollupOrders::Output {
+                        token: *token,
+                        amount: U256::from(*amount),
+                        recipient: *recipient,
+                        chainId: *chain_id as u32,
+                    });
+                }
+            }
+        }
+        o
+    }
+
+    /// Generate the Permit2 signing hash to Fill the aggregated Outputs on a given chain.
+    pub fn fill_signing_hash(
+        &self,
+        deadline: u64,
+        permit2_nonce: u64,
+        destination_chain_id: u64,
+        destination_order_contract: Address,
+    ) -> B256 {
+        RollupOrders::Order::orders_permit2_signing_hash(
+            self.outputs_for(destination_chain_id),
+            self.outputs_for(destination_chain_id).iter().map(Into::into).collect(),
+            deadline,
+            permit2_nonce,
+            destination_chain_id,
+            destination_order_contract,
+        )
+    }
+
+    /// Generate the Permit2 batch transfer object to Fill the aggregated Outputs on a given chain.
+    pub fn fill_permit(
+        &self,
+        deadline: u64,
+        permit2_nonce: u64,
+        chain_id: u64,
+    ) -> RollupOrders::PermitBatchTransferFrom {
+        RollupOrders::PermitBatchTransferFrom {
+            permitted: self.outputs_for(chain_id).iter().map(Into::into).collect(),
+            nonce: U256::from(permit2_nonce),
+            deadline: U256::from(deadline),
         }
     }
 }
@@ -62,6 +121,12 @@ impl<'a> FromIterator<&'a RollupOrders::Order> for AggregateOrders {
         let mut orders = AggregateOrders::new();
         orders.extend(iter);
         orders
+    }
+}
+
+impl<'a> From<&'a AggregateOrders> for Cow<'a, AggregateOrders> {
+    fn from(orders: &'a AggregateOrders) -> Self {
+        Cow::Borrowed(orders)
     }
 }
 
