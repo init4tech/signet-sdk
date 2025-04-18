@@ -22,3 +22,6 @@ trevm.workspace = true
 signet-types = { workspace = true, features = ["test-utils"] }
 signet-evm = { workspace = true, features = ["test-utils"] }
 tracing-subscriber.workspace = true
+
+[features]
+test-utils = ["signet-types/test-utils", "signet-evm/test-utils"]

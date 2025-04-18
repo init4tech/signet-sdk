@@ -1,6 +1,7 @@
 use alloy::{
-    consensus::{Transaction, TxEnvelope},
+    consensus::{Signed, Transaction, TxEip1559, TxEnvelope},
     eips::Decodable2718,
+    signers::Signature,
 };
 use signet_bundle::SignetEthBundle;
 
@@ -59,5 +60,19 @@ impl SimItem {
             }
             Self::Tx(tx) => tx.effective_gas_price(None) * tx.gas_limit() as u128,
         }
+    }
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+impl SimItem {
+    /// Create an invalid test item. This will be a [`TxEnvelope`] containing
+    /// an EIP-1559 transaction with an invalid signature and hash.
+    pub fn invalid_test_item() -> Self {
+        TxEnvelope::Eip1559(Signed::new_unchecked(
+            TxEip1559::default(),
+            Signature::test_signature(),
+            Default::default(),
+        ))
+        .into()
     }
 }

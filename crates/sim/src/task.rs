@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
 use signet_types::config::SignetSystemConstants;
 use tokio::select;
@@ -74,35 +72,50 @@ where
     }
 
     /// Run several rounds, building
-    pub fn build(mut self) -> impl Future<Output = BuiltBlock> + Send {
-        async move {
-            let mut i = 1;
-            // Run until the deadline is reached.
-            loop {
-                let span = info_span!("build", round = i);
-                let finish_by = self.finish_by.into();
-                let fut = self.round().instrument(span);
+    pub async fn build(mut self) -> BuiltBlock {
+        let mut i = 1;
+        // Run until the deadline is reached.
+        loop {
+            let span = info_span!("build", round = i);
+            let finish_by = self.finish_by.into();
+            let fut = self.round().instrument(span);
 
-                select! {
-                    _ = tokio::time::sleep_until(finish_by) => {
-                        debug!("Deadline reached, stopping sim loop");
+            select! {
+                _ = tokio::time::sleep_until(finish_by) => {
+                    debug!("Deadline reached, stopping sim loop");
+                    break;
+                },
+                _ = fut => {
+                    i+= 1;
+                    let remaining = self.env.sim_items().len();
+                    trace!(%remaining, round = i, "Round completed");
+                    if remaining == 0 {
+                        debug!("No more items to simulate, stopping sim loop");
                         break;
-                    },
-                    _ = fut => {
-                        i+= 1;
-                        let remaining = self.env.sim_items().len();
-                        trace!(%remaining, round = i, "Round completed");
-                        if remaining == 0 {
-                            debug!("No more items to simulate, stopping sim loop");
-                            break;
-                        }
                     }
                 }
             }
-
-            debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
-
-            self.block
         }
+
+        debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
+
+        self.block
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::future::Future;
+
+    use super::*;
+
+    /// Compile-time check to ensure that the block building process is
+    /// `Send`.
+    fn _build_fut_is_send<Db, Insp>(b: BlockBuild<Db, Insp>)
+    where
+        Db: DatabaseRef + Send + Sync + 'static,
+        Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
+    {
+        let _: Box<dyn Future<Output = BuiltBlock> + Send> = Box::new(b.build());
     }
 }
