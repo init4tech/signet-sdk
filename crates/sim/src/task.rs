@@ -1,7 +1,9 @@
+use std::future::Future;
+
 use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
 use signet_types::config::SignetSystemConstants;
 use tokio::select;
-use tracing::{debug, info_span, trace};
+use tracing::{debug, info_span, trace, Instrument};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
@@ -72,30 +74,35 @@ where
     }
 
     /// Run several rounds, building
-    pub async fn build(mut self) -> BuiltBlock {
-        let mut i = 1;
-        // Run until the deadline is reached.
-        loop {
-            let _guard = info_span!("build", round = i).entered();
-            select! {
-                _ = tokio::time::sleep_until(self.finish_by.into()) => {
-                    debug!("Deadline reached, stopping sim loop");
-                    break;
-                },
-                _ = self.round() => {
-                    i+= 1;
-                    let remaining = self.env.sim_items().len();
-                    trace!(%remaining, round = i, "Round completed");
-                    if remaining == 0 {
-                        debug!("No more items to simulate, stopping sim loop");
+    pub fn build(mut self) -> impl Future<Output = BuiltBlock> + Send {
+        async move {
+            let mut i = 1;
+            // Run until the deadline is reached.
+            loop {
+                let span = info_span!("build", round = i);
+                let finish_by = self.finish_by.into();
+                let fut = self.round().instrument(span);
+
+                select! {
+                    _ = tokio::time::sleep_until(finish_by) => {
+                        debug!("Deadline reached, stopping sim loop");
                         break;
+                    },
+                    _ = fut => {
+                        i+= 1;
+                        let remaining = self.env.sim_items().len();
+                        trace!(%remaining, round = i, "Round completed");
+                        if remaining == 0 {
+                            debug!("No more items to simulate, stopping sim loop");
+                            break;
+                        }
                     }
                 }
             }
+
+            debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
+
+            self.block
         }
-
-        debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
-
-        self.block
     }
 }

@@ -1,3 +1,5 @@
+use trevm::MIN_TRANSACTION_GAS;
+
 use crate::SimItem;
 use core::fmt;
 use std::{
@@ -69,13 +71,22 @@ impl SimCache {
         // Calculate the total fee for the item.
         let mut score = item.calculate_total_fee();
 
+        // Sanity check. This should never be true
+        if score < MIN_TRANSACTION_GAS as u128 {
+            return;
+        }
+
         let mut inner = self.inner.write().unwrap();
 
         // If it has the same score, we decrement (prioritizing earlier items)
         while inner.contains_key(&score) {
-            score -= 1;
+            score.saturating_sub(1);
         }
+
         inner.insert(score, item);
+        if inner.len() > self.capacity {
+            inner.pop_first();
+        }
     }
 
     /// Clean the cache by removing bundles that are not valid in the current
