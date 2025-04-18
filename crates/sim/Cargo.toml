@@ -1,0 +1,27 @@
+[package]
+name = "signet-sim"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+alloy.workspace = true
+signet-bundle.workspace = true
+signet-evm.workspace = true
+signet-types.workspace = true
+signet-zenith.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+trevm.workspace = true
+
+[dev-dependencies]
+signet-types = { workspace = true, features = ["test-utils"] }
+signet-evm = { workspace = true, features = ["test-utils"] }
+tracing-subscriber.workspace = true
+
+[features]
+test-utils = ["signet-types/test-utils", "signet-evm/test-utils"]

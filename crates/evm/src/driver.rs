@@ -927,7 +927,7 @@ mod test {
         config::{HostConfig, PredeployTokens, RollupConfig},
         test_utils::*,
     };
-    use trevm::{revm::database::in_memory_db::InMemoryDB, NoopCfg};
+    use trevm::revm::database::in_memory_db::InMemoryDB;
 
     /// Make a fake block with a specific number.
     pub(super) fn fake_block(number: u64) -> RecoveredBlock<Block> {
@@ -1038,7 +1038,7 @@ mod test {
         }
 
         fn trevm(&self) -> crate::EvmNeedsBlock<InMemoryDB> {
-            let mut trevm = test_signet_evm().fill_cfg(&NoopCfg);
+            let mut trevm = test_signet_evm();
             for wallet in &self.wallets {
                 let address = wallet.address();
                 trevm.test_set_balance(address, U256::from(ETH_TO_WEI * 100));

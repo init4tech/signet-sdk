@@ -39,6 +39,7 @@ signet-evm = { path = "crates/evm" }
 signet-extract = { path = "crates/extract" }
 signet-node = { path = "crates/node" }
 signet-rpc = { path = "crates/rpc" }
+signet-sim = { path = "crates/sim" }
 signet-types = { path = "crates/types" }
 signet-zenith = { path = "crates/zenith" }
 
