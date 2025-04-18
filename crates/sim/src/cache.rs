@@ -79,8 +79,8 @@ impl SimCache {
         let mut inner = self.inner.write().unwrap();
 
         // If it has the same score, we decrement (prioritizing earlier items)
-        while inner.contains_key(&score) {
-            score.saturating_sub(1);
+        while inner.contains_key(&score) && score != 0 {
+            score = score.saturating_sub(1);
         }
 
         inner.insert(score, item);
