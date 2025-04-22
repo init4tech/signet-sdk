@@ -33,6 +33,11 @@ impl SlotCalculator {
         Self { start_timestamp: 1663224179, slot_offset: 4700013, slot_duration: 12 }
     }
 
+    /// Creates a new slot calculator for Pecorino test network.
+    pub const fn pecorino() -> Self {
+        Self { start_timestamp: 1740681556, slot_offset: 0, slot_duration: 12 }
+    }
+
     /// Calculates the slot for a given timestamp.
     /// This only works for timestamps that are GEQ to the chain's start_timestamp.
     pub const fn calculate_slot(&self, timestamp: u64) -> u64 {
