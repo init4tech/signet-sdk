@@ -1,10 +1,8 @@
-use trevm::MIN_TRANSACTION_GAS;
-
 use crate::SimItem;
 use core::fmt;
 use std::{
     collections::BTreeMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockWriteGuard},
 };
 
 /// A cache for the simulator.
@@ -64,28 +62,55 @@ impl SimCache {
         self.inner.write().unwrap().remove(&key)
     }
 
-    /// Create a new `SimCache` instance.
-    pub fn add_item(&self, item: impl Into<SimItem>) {
-        let item = item.into();
-
-        // Calculate the total fee for the item.
-        let mut score = item.calculate_total_fee();
-
-        // Sanity check. This should never be true
-        if score < MIN_TRANSACTION_GAS as u128 {
-            return;
-        }
-
-        let mut inner = self.inner.write().unwrap();
-
+    fn add_inner(
+        guard: &mut RwLockWriteGuard<'_, BTreeMap<u128, SimItem>>,
+        mut score: u128,
+        item: SimItem,
+        capacity: usize,
+    ) {
         // If it has the same score, we decrement (prioritizing earlier items)
-        while inner.contains_key(&score) && score != 0 {
+        while guard.contains_key(&score) && score != 0 {
             score = score.saturating_sub(1);
         }
 
-        inner.insert(score, item);
-        if inner.len() > self.capacity {
-            inner.pop_first();
+        if guard.len() >= capacity {
+            // If we are at capacity, we need to remove the lowest score
+            guard.pop_first();
+        }
+
+        guard.entry(score).or_insert(item);
+    }
+
+    /// Add an item to the cache.
+    ///
+    /// The basefee is used to calculate an estimated fee for the item.
+    pub fn add_item(&self, item: impl Into<SimItem>, basefee: u64) {
+        let item = item.into();
+
+        // Calculate the total fee for the item.
+        let score = item.calculate_total_fee(basefee);
+
+        let mut inner = self.inner.write().unwrap();
+
+        Self::add_inner(&mut inner, score, item, self.capacity);
+    }
+
+    /// Add an iterator of items to the cache. This locks the cache only once
+    pub fn add_items<I, Item>(&self, item: I, basefee: u64)
+    where
+        I: IntoIterator<Item = Item>,
+        Item: Into<SimItem>,
+    {
+        let iter = item.into_iter().map(|item| {
+            let item = item.into();
+            let score = item.calculate_total_fee(basefee);
+            (score, item)
+        });
+
+        let mut inner = self.inner.write().unwrap();
+
+        for (score, item) in iter {
+            Self::add_inner(&mut inner, score, item, self.capacity);
         }
     }
 
@@ -124,5 +149,47 @@ impl SimCache {
     pub fn clear(&self) {
         let mut inner = self.inner.write().unwrap();
         inner.clear();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::SimItem;
+
+    #[test]
+    fn test_cache() {
+        let items = vec![
+            SimItem::invalid_item_with_score(100, 1),
+            SimItem::invalid_item_with_score(100, 2),
+            SimItem::invalid_item_with_score(100, 3),
+        ];
+
+        let cache = SimCache::with_capacity(2);
+        cache.add_items(items, 0);
+
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(300), Some(SimItem::invalid_item_with_score(100, 3)));
+        assert_eq!(cache.get(200), Some(SimItem::invalid_item_with_score(100, 2)));
+        assert_eq!(cache.get(100), None);
+    }
+
+    #[test]
+    fn overlap_at_zero() {
+        let items = vec![
+            SimItem::invalid_item_with_score(1, 1),
+            SimItem::invalid_item_with_score(1, 1),
+            SimItem::invalid_item_with_score(1, 1),
+        ];
+
+        let cache = SimCache::with_capacity(2);
+        cache.add_items(items, 0);
+
+        dbg!(&*cache.inner.read().unwrap());
+
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(0), Some(SimItem::invalid_item_with_score(1, 1)));
+        assert_eq!(cache.get(1), Some(SimItem::invalid_item_with_score(1, 1)));
+        assert_eq!(cache.get(2), None);
     }
 }

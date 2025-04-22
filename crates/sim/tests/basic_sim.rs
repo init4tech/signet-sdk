@@ -49,6 +49,7 @@ pub async fn test_simulator() {
                 (10 - i) as u128 * GWEI_TO_WEI as u128,
             )
             .await,
+            0,
         );
     }
 
