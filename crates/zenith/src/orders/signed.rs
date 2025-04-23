@@ -2,7 +2,9 @@ use super::AggregateOrders;
 use crate::bindings::RollupOrders::{Order, Output, Permit2Batch};
 use alloy::primitives::Address;
 use alloy::signers::Signer;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// An error that can occur when validating a signed order or fill.
@@ -21,7 +23,13 @@ pub enum SignedPermitError {
     },
 }
 
-/// A signed order.
+/// A SignedOrder contains the information for a single Order, after it has been correctly permit2-encoded and signed by a User.
+/// The type corresponds to the parameters for `initiatePermit2` on the OrderOrigin contract on the rollup.
+/// The Permit2Batch is signed by the User, allowing the Order Inputs to be transferred from the user to the Filler.
+/// The Outputs the user expects to receive in return are listed explicitly, as well as committed to in the Permit2Batch signature.
+/// Users can sign an Order for any swap they are willing to make safely,
+/// as the Inputs cannot be transferred until the Outputs have already been delivered to the specified recipients.
+/// A SignedOrder can be shared directly with Fillers, or forwarded to a Signet Node to become publicly available to be filled.
 /// TODO: Link to docs.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SignedOrder {
@@ -52,7 +60,11 @@ impl SignedOrder {
     }
 }
 
-/// A signed fill for one or more Orders on a given destination chain.
+/// A single SignedFill contains the aggregated Outputs to fill any number of Orders on a single destination chain.
+/// The type corresponds to the parameters for `fillPermit2` on the OrderDestination contract on a given chain.
+/// The Permit2Batch is signed by the Filler, allowing the Order Outputs to be transferred from the Filler to their recipients.
+/// A SignedFill *must* remain private until it is mined, as there is no guarantee in the OrderDestination contract that desired Order Inputs will be received in return for the Fill.
+/// It is important to use private transaction relays to send the SignedFill to Builders, both on the rollup and host chains.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SignedFill {
     /// The permit batch.
@@ -101,22 +113,24 @@ impl SignedFill {
 
 /// An error that can occur when signing an Order or a Fill.
 #[derive(Debug, thiserror::Error)]
-pub enum SignerError {
+pub enum SigningError {
     /// Missing chain config.
-    #[error("Target chain id and Order contract address are missing. Populate them by calling with_chain before attempting to sign.")]
-    MissingChainConfig,
+    #[error(
+        "Target chain id is missing. Populate it by calling with_chain before attempting to sign"
+    )]
+    MissingChainId,
     /// Missing chain config for a specific chain.
-    #[error("Target chain id and Order contract address are missing for chain id {0}. Populate them by calling with_chain before attempting to sign.")]
-    MissingChainConfigFor(u64),
+    #[error("Target Order contract address is missing for chain id {0}. Populate it by calling with_chain before attempting to sign")]
+    MissingOrderContract(u64),
     /// Error signing the order hash.
     #[error("Signer error: {0}")]
     Signer(#[from] alloy::signers::Error),
 }
 
-/// An unsigned order. Used to turn an Order into a SignedOrder.
+/// An UnsignedOrder is a helper type used to easily transform an Order into a SignedOrder with correct permit2 semantics.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UnsignedOrder<'a> {
-    order: std::borrow::Cow<'a, Order>,
+    order: Cow<'a, Order>,
     nonce: Option<u64>,
     rollup_chain_id: Option<u64>,
     rollup_order_address: Option<Address>,
@@ -149,16 +163,17 @@ impl<'a> UnsignedOrder<'a> {
     }
 
     /// Sign the UnsignedOrder, generating a SignedOrder.
-    pub async fn sign<S: Signer>(&self, signer: &S) -> Result<SignedOrder, SignerError> {
+    pub async fn sign<S: Signer>(&self, signer: &S) -> Result<SignedOrder, SigningError> {
         // if nonce is None, populate it with the current time
-        let nonce = self.nonce.unwrap_or(chrono::Utc::now().timestamp_millis() as u64);
+        let nonce = self.nonce.unwrap_or(Utc::now().timestamp_millis() as u64);
+
+        let rollup_chain_id = self.rollup_chain_id.ok_or(SigningError::MissingChainId)?;
+        let rollup_order_contract =
+            self.rollup_order_address.ok_or(SigningError::MissingOrderContract(rollup_chain_id))?;
 
         // construct the Permit2 signing hash & sign it
-        let signing_hash = self.order.initiate_signing_hash(
-            nonce,
-            self.rollup_chain_id.ok_or(SignerError::MissingChainConfig)?,
-            self.rollup_order_address.ok_or(SignerError::MissingChainConfig)?,
-        );
+        let signing_hash =
+            self.order.initiate_signing_hash(nonce, rollup_chain_id, rollup_order_contract);
         let signature = signer.sign_hash(&signing_hash).await?;
 
         Ok(SignedOrder {
@@ -172,10 +187,10 @@ impl<'a> UnsignedOrder<'a> {
     }
 }
 
-/// An unsigned fill. Used to turn AggregateOrders into a SignedFill.
+/// An UnsignedFill is a helper type used to easily transform an AggregateOrder into a single SignedFill per target chain with correct permit2 semantics.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UnsignedFill<'a> {
-    orders: std::borrow::Cow<'a, AggregateOrders>,
+    orders: Cow<'a, AggregateOrders>,
     deadline: Option<u64>,
     nonce: Option<u64>,
     destination_chains: HashMap<u64, Address>,
@@ -219,7 +234,7 @@ impl<'a> UnsignedFill<'a> {
     pub async fn sign<S: Signer>(
         &self,
         signer: &S,
-    ) -> Result<HashMap<u64, SignedFill>, SignerError> {
+    ) -> Result<HashMap<u64, SignedFill>, SigningError> {
         let mut fills = HashMap::new();
 
         // loop through each destination chain and sign the fills
@@ -238,8 +253,8 @@ impl<'a> UnsignedFill<'a> {
         &self,
         chain_id: u64,
         signer: &S,
-    ) -> Result<SignedFill, SignerError> {
-        let now = chrono::Utc::now();
+    ) -> Result<SignedFill, SigningError> {
+        let now = Utc::now();
         // if nonce is are None, populate it as the current timestamp in milliseconds
         let nonce = self.nonce.unwrap_or(now.timestamp_millis() as u64);
         // if deadline is None, populate it as now + 12 seconds (can only mine within the current block)
@@ -248,7 +263,7 @@ impl<'a> UnsignedFill<'a> {
         let destination_order_address = self
             .destination_chains
             .get(&chain_id)
-            .ok_or(SignerError::MissingChainConfigFor(chain_id))?;
+            .ok_or(SigningError::MissingOrderContract(chain_id))?;
 
         let signing_hash =
             self.orders.fill_signing_hash(deadline, nonce, chain_id, *destination_order_address);
