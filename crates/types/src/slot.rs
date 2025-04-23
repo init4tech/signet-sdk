@@ -34,7 +34,7 @@ impl SlotCalculator {
     }
 
     /// Creates a new slot calculator for Pecorino test network.
-    pub const fn pecorino() -> Self {
+    pub const fn pecorino_host() -> Self {
         Self { start_timestamp: 1740681556, slot_offset: 0, slot_duration: 12 }
     }
 
