@@ -21,11 +21,11 @@ use reth::{
         Inspector,
     },
 };
-use signet_extract::Extracts;
+use signet_extract::{ExtractedEvent, Extracts};
 use signet_types::{config::SignetSystemConstants, AggregateFills, MarketError};
-use signet_zenith::MINTER_ADDRESS;
+use signet_zenith::{Passage, Transactor, MINTER_ADDRESS};
 use std::collections::{HashSet, VecDeque};
-use tracing::{debug, debug_span, trace_span, warn};
+use tracing::{debug, debug_span, warn};
 use trevm::{
     fillers::{DisableGasChecks, DisableNonceCheck},
     helpers::Ctx,
@@ -44,16 +44,16 @@ macro_rules! run_tx {
     ($self:ident, $trevm:ident, $tx:expr, $sender:expr) => {{
         let trevm = $trevm.fill_tx($tx);
 
-        let _guard = trace_span!("run_tx", block_env = ?trevm.block(), tx = ?$tx, tx_env = ?trevm.tx(), spec_id = ?trevm.spec_id()).entered();
+        let _guard = tracing::trace_span!("run_tx", block_env = ?trevm.block(), tx = ?$tx, tx_env = ?trevm.tx(), spec_id = ?trevm.spec_id()).entered();
 
         match trevm.run() {
             Ok(t) => {
-                debug!("evm executed successfully");
+                tracing::debug!("evm executed successfully");
                 ControlFlow::Keep(t)
             },
             Err(e) => {
                 if e.is_transaction_error() {
-                    debug!(
+                    tracing::debug!(
                         err = %e.as_transaction_error().unwrap(),
                         "Discarding outcome due to execution error"
                     );
@@ -384,9 +384,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Make a receipt for an enter.
-    fn make_enter_receipt(&self) -> alloy::consensus::Receipt {
+    fn make_enter_receipt(
+        &self,
+        enter: &ExtractedEvent<'_, Passage::Enter>,
+    ) -> alloy::consensus::Receipt {
         let cumulative_gas_used = self.cumulative_gas_used().saturating_add(BASE_GAS as u64);
-        alloy::consensus::Receipt { status: true.into(), cumulative_gas_used, logs: vec![] }
+
+        let sys_log = crate::sys_log::Enter::from(enter).to_sys_log();
+
+        alloy::consensus::Receipt { status: true.into(), cumulative_gas_used, logs: vec![sys_log] }
     }
 
     /// Construct a block header for DB and evm execution.
@@ -429,6 +435,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         &mut self,
         mut trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
+        extract: Option<&ExtractedEvent<'_, Transactor::Transact>>,
     ) -> RunTxResult<Self, Db, Insp>
     where
         Db: Database + DatabaseCommit,
@@ -444,6 +451,14 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         {
             debug!(%err, "Discarding transaction outcome due to market error");
             return Ok(trevm.reject());
+        }
+
+        if let ExecutionResult::Success { logs, .. } = trevm.result_mut_unchecked() {
+            if let Some(extract) = extract {
+                // Push the sys_log to the outcome
+                let sys_log = crate::sys_log::Transact::from(extract).to_sys_log();
+                logs.push(sys_log);
+            }
         }
 
         // We track this separately from the cumulative gas used. Enters and
@@ -518,7 +533,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             s.record("sender", sender.to_string());
             // Run the tx, returning from this function if there is a tx error
             let t = run_tx_early_return!(self, trevm, &FillShim(&tx, sender), sender);
-            trevm = self.check_fills_and_accept(t, tx)?;
+            trevm = self.check_fills_and_accept(t, tx, None)?;
         } else {
             warn!("Failed to recover signer for transaction");
         }
@@ -580,7 +595,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             // push receipt and transaction to the block
             self.processed.push(Enter { enter, nonce }.to_reth());
             self.output.push_result(
-                ReceiptEnvelope::Eip1559(self.make_enter_receipt().into()),
+                ReceiptEnvelope::Eip1559(self.make_enter_receipt(enter).into()),
                 MINTER_ADDRESS,
             );
 
@@ -632,7 +647,15 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             token: ru_token_addr,
         };
 
-        let t = run_tx_early_return!(self, trevm, &to_execute, MINTER_ADDRESS);
+        let mut t = run_tx_early_return!(self, trevm, &to_execute, MINTER_ADDRESS);
+
+        // push a sys_log to the outcome
+        if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
+            let sys_log =
+                crate::sys_log::EnterToken::from(&self.extracts.enter_tokens[idx]).to_sys_log();
+            logs.push(sys_log)
+        }
+
         // No need to check AggregateFills. This call cannot result in orders.
         Ok(self.accept_tx(t, to_execute.to_reth()))
     }
@@ -739,7 +762,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             }
         }
 
-        self.check_fills_and_accept(t, to_execute.to_reth())
+        self.check_fills_and_accept(t, to_execute.to_reth(), Some(&self.extracts.transacts[idx]))
     }
 
     /// Execute all transact events.
