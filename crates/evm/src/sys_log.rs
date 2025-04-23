@@ -39,10 +39,9 @@ impl From<&ExtractedEvent<'_, Passage::Enter>> for Enter {
     }
 }
 
-impl Enter {
-    /// Convert this event to a system log.
-    pub fn to_sys_log(self) -> Log {
-        Log { address: MINTER_ADDRESS, data: self.encode_log_data() }
+impl From<Enter> for Log {
+    fn from(value: Enter) -> Self {
+        Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }
 
@@ -57,10 +56,10 @@ impl From<&ExtractedEvent<'_, Passage::EnterToken>> for EnterToken {
         }
     }
 }
-impl EnterToken {
-    /// Convert this event to a system log.
-    pub fn to_sys_log(self) -> Log {
-        Log { address: MINTER_ADDRESS, data: self.encode_log_data() }
+
+impl From<EnterToken> for Log {
+    fn from(value: EnterToken) -> Self {
+        Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }
 
@@ -77,9 +76,8 @@ impl From<&ExtractedEvent<'_, Transactor::Transact>> for Transact {
     }
 }
 
-impl Transact {
-    /// Convert this event to a system log.
-    pub fn to_sys_log(self) -> Log {
-        Log { address: MINTER_ADDRESS, data: self.encode_log_data() }
+impl From<Transact> for Log {
+    fn from(value: Transact) -> Self {
+        Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }

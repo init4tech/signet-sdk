@@ -390,7 +390,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     ) -> alloy::consensus::Receipt {
         let cumulative_gas_used = self.cumulative_gas_used().saturating_add(BASE_GAS as u64);
 
-        let sys_log = crate::sys_log::Enter::from(enter).to_sys_log();
+        let sys_log = crate::sys_log::Enter::from(enter).into();
 
         alloy::consensus::Receipt { status: true.into(), cumulative_gas_used, logs: vec![sys_log] }
     }
@@ -456,7 +456,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         if let ExecutionResult::Success { logs, .. } = trevm.result_mut_unchecked() {
             if let Some(extract) = extract {
                 // Push the sys_log to the outcome
-                let sys_log = crate::sys_log::Transact::from(extract).to_sys_log();
+                let sys_log = crate::sys_log::Transact::from(extract).into();
                 logs.push(sys_log);
             }
         }
@@ -651,8 +651,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
         // push a sys_log to the outcome
         if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
-            let sys_log =
-                crate::sys_log::EnterToken::from(&self.extracts.enter_tokens[idx]).to_sys_log();
+            let sys_log = crate::sys_log::EnterToken::from(&self.extracts.enter_tokens[idx]).into();
             logs.push(sys_log)
         }
 
