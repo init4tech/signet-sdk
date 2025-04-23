@@ -13,7 +13,8 @@ where
     N: Network,
 {
     /// Preflight a signed order to see if the transaction would succeed.
-    /// NOTE: Take care with the rpc endpoint used for this. SignedFills should remain private.
+    /// # Warning ⚠️
+    /// Take care with the rpc endpoint used for this. SignedFills *must* remain private until they mine.
     pub async fn try_fill(&self, fill: SignedFill) -> Result<(), alloy::contract::Error> {
         self.fillPermit2(fill.outputs, fill.permit).call().await.map(drop)
     }

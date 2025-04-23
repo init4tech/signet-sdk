@@ -63,6 +63,7 @@ impl SignedOrder {
 /// A single SignedFill contains the aggregated Outputs to fill any number of Orders on a single destination chain.
 /// The type corresponds to the parameters for `fillPermit2` on the OrderDestination contract on a given chain.
 /// The Permit2Batch is signed by the Filler, allowing the Order Outputs to be transferred from the Filler to their recipients.
+/// # Warning ⚠️ 
 /// A SignedFill *must* remain private until it is mined, as there is no guarantee in the OrderDestination contract that desired Order Inputs will be received in return for the Fill.
 /// It is important to use private transaction relays to send the SignedFill to Builders, both on the rollup and host chains.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
