@@ -84,7 +84,7 @@ impl BuiltBlock {
         self.hash.get_or_init(|| keccak256(self.raw_encoding.get().unwrap().as_ref()));
     }
 
-    /// Ingest a transaction into the in-progress block. Fails
+    /// Ingest a transaction into the in-progress block.
     pub fn ingest_tx(&mut self, tx: TxEnvelope) {
         trace!(hash = %tx.tx_hash(), "ingesting tx");
         self.unseal();

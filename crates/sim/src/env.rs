@@ -406,7 +406,8 @@ where
                     let best_score = current.as_ref().map(|c| c.score).unwrap_or_default();
                     let current_id = current.as_ref().map(|c| c.identifier);
 
-                    if candidate.score > best_score {
+                    let changed = candidate.score > best_score;
+                    if changed {
                         trace!(
                             old_best = ?best_score,
                             old_identifier = current_id,
@@ -415,10 +416,8 @@ where
                             "Found better candidate"
                         );
                         *current = Some(candidate);
-                        true
-                    } else {
-                        false
                     }
+                    changed
                 });
             }
         });
