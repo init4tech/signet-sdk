@@ -66,9 +66,9 @@ impl BuiltBlock {
         self.transactions.is_empty()
     }
 
-    /// Returns the current list of transactions included in this block
-    pub fn transactions(&self) -> Vec<TxEnvelope> {
-        self.transactions.clone()
+    /// Get the current list of transactions included in this block.
+    pub fn transactions(&self) -> &[TxEnvelope] {
+        &self.transactions
     }
 
     /// Unseal the block
@@ -77,7 +77,8 @@ impl BuiltBlock {
         self.hash.take();
     }
 
-    /// Seal the block by encoding the transactions and calculating the contentshash.
+    /// Seal the block by encoding the transactions and calculating the hash of
+    /// the block contents.
     pub(crate) fn seal(&self) {
         self.raw_encoding.get_or_init(|| encode_txns::<Alloy2718Coder>(&self.transactions).into());
         self.hash.get_or_init(|| keccak256(self.raw_encoding.get().unwrap().as_ref()));
@@ -126,16 +127,16 @@ impl BuiltBlock {
         }
     }
 
-    /// Encode the in-progress block
+    /// Encode the in-progress block.
     pub(crate) fn encode_raw(&self) -> &Bytes {
         self.seal();
         self.raw_encoding.get().unwrap()
     }
 
     /// Calculate the hash of the in-progress block, finishing the block.
-    pub fn contents_hash(&self) -> B256 {
+    pub fn contents_hash(&self) -> &B256 {
         self.seal();
-        *self.hash.get().unwrap()
+        self.hash.get().unwrap()
     }
 
     /// Convert the in-progress block to sign request contents.
