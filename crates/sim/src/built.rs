@@ -67,6 +67,7 @@ impl BuiltBlock {
     }
 
     /// Get the current list of transactions included in this block.
+    #[allow(clippy::missing_const_for_fn)] // false positive, const deref
     pub fn transactions(&self) -> &[TxEnvelope] {
         &self.transactions
     }
