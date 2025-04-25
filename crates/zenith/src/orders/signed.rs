@@ -63,7 +63,7 @@ impl SignedOrder {
 /// A single SignedFill contains the aggregated Outputs to fill any number of Orders on a single destination chain.
 /// The type corresponds to the parameters for `fillPermit2` on the OrderDestination contract on a given chain.
 /// The Permit2Batch is signed by the Filler, allowing the Order Outputs to be transferred from the Filler to their recipients.
-/// # Warning ⚠️ 
+/// # Warning ⚠️
 /// A SignedFill *must* remain private until it is mined, as there is no guarantee in the OrderDestination contract that desired Order Inputs will be received in return for the Fill.
 /// It is important to use private transaction relays to send the SignedFill to Builders, both on the rollup and host chains.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -231,7 +231,7 @@ impl<'a> UnsignedFill<'a> {
     }
 
     /// Sign the UnsignedFill, generating a SignedFill for each destination chain.
-    /// Utilizes the same signing key for every chain.
+    /// Use if Filling Orders with the same signing key on every chain.
     pub async fn sign<S: Signer>(
         &self,
         signer: &S,
@@ -249,7 +249,10 @@ impl<'a> UnsignedFill<'a> {
     }
 
     /// Sign the UnsignedFill for a specific destination chain.
-    /// NOTE that *all* Outputs MUST be filled on all chains, else Inputs will not be transferred.
+    /// Use if Filling Orders with different signing keys on respective destination chains.
+    /// # Warning ⚠️
+    /// *All* Outputs MUST be filled on all destination chains, else the Order Inputs will not be transferred.
+    /// Take care when using this function to produce SignedFills for every destination chain.
     pub async fn sign_for<S: Signer>(
         &self,
         chain_id: u64,
