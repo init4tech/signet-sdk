@@ -124,7 +124,7 @@ pub enum SigningError {
     #[error("Target Order contract address is missing for chain id {0}. Populate it by calling with_chain before attempting to sign")]
     MissingOrderContract(u64),
     /// Error signing the order hash.
-    #[error("Signer error: {0}")]
+    #[error(transparent)]
     Signer(#[from] alloy::signers::Error),
 }
 
