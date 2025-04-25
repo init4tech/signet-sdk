@@ -50,7 +50,7 @@ impl SignedOrder {
 }
 
 /// An UnsignedOrder is a helper type used to easily transform an Order into a SignedOrder with correct permit2 semantics.
-/// Users can do: 
+/// Users can do:
 /// let signed_order = UnsignedOrder::from(order).with_chain(rollup_chain_id, rollup_order_address).sign(signer)?;
 /// TxCacheForwarder::new(tx_cache_endpoint).send_order(signed_order);
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
