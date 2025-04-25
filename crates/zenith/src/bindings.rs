@@ -379,7 +379,7 @@ mod orders {
         }
 
         /// Generate the Permit2 batch transfer object to Initiate an Order
-        pub fn initiate_permit(
+        pub fn to_initiate_permit(
             &self,
             permit2_nonce: u64,
         ) -> ISignatureTransfer::PermitBatchTransferFrom {

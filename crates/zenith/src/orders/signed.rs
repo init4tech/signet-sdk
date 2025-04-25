@@ -179,7 +179,7 @@ impl<'a> UnsignedOrder<'a> {
 
         Ok(SignedOrder {
             permit: Permit2Batch {
-                permit: self.order.initiate_permit(nonce),
+                permit: self.order.to_initiate_permit(nonce),
                 owner: signer.address(),
                 signature: signature.as_bytes().into(),
             },
@@ -275,7 +275,7 @@ impl<'a> UnsignedFill<'a> {
 
         Ok(SignedFill {
             permit: Permit2Batch {
-                permit: self.orders.fill_permit(deadline, nonce, chain_id),
+                permit: self.orders.to_fill_permit(deadline, nonce, chain_id),
                 owner: signer.address(),
                 signature: signature.as_bytes().into(),
             },

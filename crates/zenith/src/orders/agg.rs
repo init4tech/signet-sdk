@@ -139,7 +139,7 @@ impl AggregateOrders {
     }
 
     /// Generate the Permit2 batch transfer object to Fill the aggregated Outputs on a given chain.
-    pub fn fill_permit(
+    pub fn to_fill_permit(
         &self,
         deadline: u64,
         permit2_nonce: u64,
