@@ -21,7 +21,8 @@ pub use block::{decode_txns, encode_txns, Alloy2718Coder, Coder, ZenithBlock, Ze
 
 mod orders;
 pub use orders::{
-    AggregateOrders, SignedFill, SignedOrder, SignedPermitError, UnsignedFill, UnsignedOrder,
+    AggregateOrders, SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill,
+    UnsignedOrder,
 };
 
 mod trevm;

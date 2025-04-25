@@ -1,8 +1,10 @@
 mod agg;
 pub use agg::AggregateOrders;
 
-mod signed;
-pub use signed::{SignedFill, SignedOrder, SignedPermitError, UnsignedFill, UnsignedOrder};
+mod signing;
+pub use signing::{
+    SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
+};
 
 use crate::HostOrders::HostOrdersInstance;
 use alloy::{network::Network, providers::Provider};
