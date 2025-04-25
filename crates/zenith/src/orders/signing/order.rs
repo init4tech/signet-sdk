@@ -7,13 +7,18 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-/// A SignedOrder contains the information for a single Order, after it has been correctly permit2-encoded and signed by a User.
-/// The type corresponds to the parameters for `initiatePermit2` on the OrderOrigin contract on the rollup.
-/// The Permit2Batch is signed by the User, allowing the Order Inputs to be transferred from the user to the Filler.
-/// The Outputs the user expects to receive in return are listed explicitly, as well as committed to in the Permit2Batch signature.
-/// Users can sign an Order for any swap they are willing to make safely,
-/// as the Inputs cannot be transferred until the Outputs have already been delivered to the specified recipients.
-/// A SignedOrder can be shared directly with Fillers, or forwarded to a Signet Node to become publicly available to be filled.
+/// A SignedOrder represents a single Order after it has been permit2-encoded and signed.
+/// It is the final format signed by Users and shared with Fillers to request that an Order be filled.
+///
+/// It corresponds to the parameters for `initiatePermit2` on the OrderOrigin contract,
+/// and thus contains all necessary information to initiate the Order.
+///
+/// It can be shared with all Fillers via the Signet Node `signet_sendOrder` RPC call,
+/// or shared directly with specific Filler(s) via private channels.
+/// The type can be signed and published safely, because although the Permit2Batch allows
+/// the Order Inputs to be transferred from the user, the Signet Node ensures that
+/// Inputs cannot be transferred until the Order Outputs have already been filled.
+///
 /// TODO: Link to docs.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SignedOrder {

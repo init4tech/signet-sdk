@@ -10,12 +10,28 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::HashMap};
 
-/// A single SignedFill contains the aggregated Outputs to fill any number of Orders on a single destination chain.
-/// The type corresponds to the parameters for `fillPermit2` on the OrderDestination contract on a given chain.
-/// The Permit2Batch is signed by the Filler, allowing the Order Outputs to be transferred from the Filler to their recipients.
+/// SignedFill type is constructed by Fillers to fill a batch of Orders.
+/// It represents the Orders' Outputs after they have been permit2-encoded and signed.
+///
+/// A SignedFill corresponds to the parameters for `fillPermit2` on the OrderDestination contract,
+/// and thus contains all necessary information to fill the Order.
+///
+/// SignedFill is an optional part of the SignetEthBundle type.
+/// Fillers sign & send bundles which contain Order initiations & fills.
+/// Filler bundles contain:
+/// - optionally, a host SignedFill (if any Orders contain host Outputs)
+/// - optionally, a rollup transaction that submits a SignedFill (if any Orders contain rollup Outputs)
+/// - rollup transactions that submit the SignedOrders
+///
 /// # Warning ⚠️
-/// A SignedFill *must* remain private until it is mined, as there is no guarantee in the OrderDestination contract that desired Order Inputs will be received in return for the Fill.
-/// It is important to use private transaction relays to send the SignedFill to Builders, both on the rollup and host chains.
+/// A SignedFill *must* remain private until it is mined, as there is no guarantee
+/// that desired Order Inputs will be received in return for the Outputs offered by the signed Permit2Batch.
+/// SignetEthBundles are used to submit SignedFills because they *must* be submitted atomically
+/// with the corresponding SignedOrder(s) in order to claim the Inputs.
+/// It is important to use private transaction relays to send bundles containing SignedFill(s) to Builders.
+/// Bundles can be sent to a *trusted* Signet Node's `signet_sendBundle` endpoint.
+///
+/// TODO: Link to docs.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SignedFill {
     /// The permit batch.
@@ -62,7 +78,7 @@ impl SignedFill {
     }
 }
 
-/// An UnsignedFill is a helper type used to easily transform an AggregateOrder into a single SignedFill per target chain with correct permit2 semantics.
+/// An UnsignedFill is a helper type used to easily transform an AggregateOrder into a single SignedFill with correct permit2 semantics.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UnsignedFill<'a> {
     orders: Cow<'a, AggregateOrders>,
