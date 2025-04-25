@@ -3,7 +3,7 @@ use crate::{
     interest::{ActiveFilter, FilterManager, FilterOutput, SubscriptionManager},
     receipts::build_signet_receipt,
     util::BlockRangeInclusiveIter,
-    Pnt, TxCacheForwarder,
+    Pnt, TxCache,
 };
 use alloy::{
     consensus::{BlockHeader, Header, Signed, Transaction, TxEnvelope},
@@ -74,13 +74,13 @@ where
         constants: SignetSystemConstants,
         provider: BlockchainProvider<Signet>,
         eth_config: EthConfig,
-        forwarder: Option<TxCacheForwarder>,
+        tx_cache: Option<TxCache>,
         spawner: Tasks,
     ) -> Self
     where
         Tasks: TaskSpawner + Clone + 'static,
     {
-        let inner = RpcCtxInner::new(host, constants, provider, eth_config, forwarder, spawner);
+        let inner = RpcCtxInner::new(host, constants, provider, eth_config, tx_cache, spawner);
 
         Self { inner: Arc::new(inner) }
     }
@@ -130,13 +130,13 @@ where
         constants: SignetSystemConstants,
         provider: BlockchainProvider<Signet>,
         eth_config: EthConfig,
-        forwarder: Option<TxCacheForwarder>,
+        tx_cache: Option<TxCache>,
         spawner: Tasks,
     ) -> Self
     where
         Tasks: TaskSpawner + Clone + 'static,
     {
-        let signet = SignetCtx::new(constants, provider, eth_config, forwarder, spawner);
+        let signet = SignetCtx::new(constants, provider, eth_config, tx_cache, spawner);
         Self { host, signet }
     }
 
@@ -197,7 +197,7 @@ where
     fee_history: FeeHistoryCache,
 
     // Tx stuff
-    forwarder: Option<TxCacheForwarder>,
+    tx_cache: Option<TxCache>,
 
     // Filter and subscription stuff
     filters: FilterManager,
@@ -217,7 +217,7 @@ where
         constants: SignetSystemConstants,
         provider: BlockchainProvider<Inner>,
         eth_config: EthConfig,
-        forwarder: Option<TxCacheForwarder>,
+        tx_cache: Option<TxCache>,
         spawner: Tasks,
     ) -> Self
     where
@@ -248,7 +248,7 @@ where
             cache,
             gas_oracle,
             fee_history,
-            forwarder,
+            tx_cache,
             filters,
             subs,
             _pd: PhantomData,
@@ -270,9 +270,9 @@ where
         &self.eth_config
     }
 
-    /// Access the forwarder
-    pub fn forwarder(&self) -> Option<TxCacheForwarder> {
-        self.forwarder.clone()
+    /// Access the tx_cache
+    pub fn tx_cache(&self) -> Option<TxCache> {
+        self.tx_cache.clone()
     }
 
     /// Access the [`ChainSpec`].

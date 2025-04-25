@@ -9,7 +9,7 @@ pub enum SignetError {
     #[error("transaction cache URL not provided")]
     TxCacheUrlNotProvided,
     /// An error coming from interacting with components
-    /// that could emit `EthApiError`s, such as the forwarder.
+    /// that could emit `EthApiError`s, such as the tx-cache.
     #[error(transparent)]
     EthApiError(#[from] EthApiError),
 }
