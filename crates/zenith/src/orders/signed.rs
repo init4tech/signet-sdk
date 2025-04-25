@@ -166,7 +166,7 @@ impl<'a> UnsignedOrder<'a> {
     /// Sign the UnsignedOrder, generating a SignedOrder.
     pub async fn sign<S: Signer>(&self, signer: &S) -> Result<SignedOrder, SigningError> {
         // if nonce is None, populate it with the current time
-        let nonce = self.nonce.unwrap_or(Utc::now().timestamp_millis() as u64);
+        let nonce = self.nonce.unwrap_or(Utc::now().timestamp_micros() as u64);
 
         let rollup_chain_id = self.rollup_chain_id.ok_or(SigningError::MissingChainId)?;
         let rollup_order_contract =
@@ -260,7 +260,7 @@ impl<'a> UnsignedFill<'a> {
     ) -> Result<SignedFill, SigningError> {
         let now = Utc::now();
         // if nonce is are None, populate it as the current timestamp in milliseconds
-        let nonce = self.nonce.unwrap_or(now.timestamp_millis() as u64);
+        let nonce = self.nonce.unwrap_or(now.timestamp_micros() as u64);
         // if deadline is None, populate it as now + 12 seconds (can only mine within the current block)
         let deadline = self.deadline.unwrap_or(now.timestamp() as u64 + 12);
 
