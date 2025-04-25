@@ -128,7 +128,7 @@ impl AggregateOrders {
         destination_chain_id: u64,
         destination_order_contract: Address,
     ) -> B256 {
-        RollupOrders::Order::orders_permit2_signing_hash(
+        RollupOrders::orders_permit2_signing_hash(
             self.outputs_for(destination_chain_id),
             self.outputs_for(destination_chain_id).iter().map(Into::into).collect(),
             deadline,

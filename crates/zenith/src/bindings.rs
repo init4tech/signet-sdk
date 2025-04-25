@@ -235,6 +235,36 @@ mod orders {
        }
     }
 
+    /// Generate a correct Permit2 signing hash to either Initiate or Fill an Order
+    pub fn orders_permit2_signing_hash(
+        outputs: Vec<IOrders::Output>,
+        permitted: Vec<TokenPermissions>,
+        deadline: u64,
+        nonce: u64,
+        chain_id: u64,
+        order_contract: Address,
+    ) -> B256 {
+        let permit2_signing_data = PermitBatchWitnessTransferFrom {
+            permitted,
+            spender: order_contract,
+            nonce: U256::from(nonce),
+            deadline: U256::from(deadline),
+            outputs,
+        };
+
+        // construct EIP-712 domain for Permit2 contract
+        let domain = Eip712Domain {
+            chain_id: Some(U256::from(chain_id)),
+            name: Some(PERMIT2_CONTRACT_NAME.into()),
+            verifying_contract: Some(PERMIT2_ADDRESS),
+            version: None,
+            salt: None,
+        };
+
+        // generate EIP-712 signing hash
+        permit2_signing_data.eip712_signing_hash(&domain)
+    }
+
     impl Copy for IOrders::Input {}
     impl Copy for IOrders::Output {}
     impl Copy for Orders::Sweep {}
@@ -338,7 +368,7 @@ mod orders {
             rollup_chain_id: u64,
             rollup_order_contract: Address,
         ) -> B256 {
-            Self::orders_permit2_signing_hash(
+            orders_permit2_signing_hash(
                 self.outputs().to_vec(),
                 self.inputs().iter().map(Into::into).collect(),
                 self.deadline(),
@@ -358,36 +388,6 @@ mod orders {
                 nonce: U256::from(permit2_nonce),
                 deadline: U256::from(self.deadline()),
             }
-        }
-
-        /// Generate a correct Permit2 signing hash to either Initiate or Fill an Order
-        pub fn orders_permit2_signing_hash(
-            outputs: Vec<IOrders::Output>,
-            permitted: Vec<TokenPermissions>,
-            deadline: u64,
-            nonce: u64,
-            chain_id: u64,
-            order_contract: Address,
-        ) -> B256 {
-            let permit2_signing_data = PermitBatchWitnessTransferFrom {
-                permitted,
-                spender: order_contract,
-                nonce: U256::from(nonce),
-                deadline: U256::from(deadline),
-                outputs,
-            };
-
-            // construct EIP-712 domain for Permit2 contract
-            let domain = Eip712Domain {
-                chain_id: Some(U256::from(chain_id)),
-                name: Some(PERMIT2_CONTRACT_NAME.into()),
-                verifying_contract: Some(PERMIT2_ADDRESS),
-                version: None,
-                salt: None,
-            };
-
-            // generate EIP-712 signing hash
-            permit2_signing_data.eip712_signing_hash(&domain)
         }
     }
 
@@ -528,10 +528,10 @@ pub use zenith::Zenith;
 /// Contract Bindings for the RollupOrders contract.
 #[allow(non_snake_case)]
 pub mod RollupOrders {
-    pub use super::orders::Orders::*;
-
+    pub use super::orders::orders_permit2_signing_hash;
     pub use super::orders::IOrders::*;
     pub use super::orders::ISignatureTransfer::*;
+    pub use super::orders::Orders::*;
     pub use super::orders::UsesPermit2::*;
 
     pub use super::orders::Orders::OrdersCalls as RollupOrdersCalls;
