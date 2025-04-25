@@ -1,5 +1,5 @@
-use super::AggregateOrders;
 use crate::bindings::RollupOrders::{Order, Output, Permit2Batch};
+use crate::orders::AggregateOrders;
 use alloy::primitives::Address;
 use alloy::signers::Signer;
 use chrono::Utc;

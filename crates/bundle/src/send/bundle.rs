@@ -1,4 +1,5 @@
 //! Signet bundle types.
+use crate::send::SignetEthBundleError;
 use alloy::{
     consensus::TxEnvelope,
     eips::Decodable2718,
@@ -11,8 +12,6 @@ use alloy::{
 use serde::{Deserialize, Serialize};
 use signet_zenith::{HostOrders::HostOrdersInstance, SignedFill, SignedPermitError};
 use trevm::{revm::Database, BundleError};
-
-use super::SignetEthBundleError;
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///
