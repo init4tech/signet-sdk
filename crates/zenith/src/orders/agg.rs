@@ -31,19 +31,36 @@ impl AggregateOrders {
 
     /// Ingest an output into the aggregate orders.
     pub(crate) fn ingest_output(&mut self, output: &RollupOrders::Output) {
-        let entry = self
-            .outputs
-            .entry((output.chain_id() as u64, output.token))
-            .or_default()
-            .entry(output.recipient)
-            .or_default();
-        *entry = entry.saturating_add(output.amount);
+        self.ingest_raw_output(
+            output.chainId as u64,
+            output.token,
+            output.recipient,
+            output.amount,
+        );
+    }
+
+    /// Ingest raw output values into the aggregate orders.
+    fn ingest_raw_output(
+        &mut self,
+        chain_id: u64,
+        token: Address,
+        recipient: Address,
+        amount: U256,
+    ) {
+        let entry =
+            self.outputs.entry((chain_id, token)).or_default().entry(recipient).or_default();
+        *entry = entry.saturating_add(amount);
     }
 
     /// Ingest an input into the aggregate orders.
     pub(crate) fn ingest_input(&mut self, input: &RollupOrders::Input) {
-        let entry = self.inputs.entry(input.token).or_default();
-        *entry = entry.saturating_add(input.amount);
+        self.ingest_raw_input(input.token, input.amount);
+    }
+
+    /// Ingest raw input values into the aggregate orders.
+    fn ingest_raw_input(&mut self, token: Address, amount: U256) {
+        let entry = self.inputs.entry(token).or_default();
+        *entry = entry.saturating_add(amount);
     }
 
     /// Ingest a new order into the aggregate orders.
@@ -54,8 +71,16 @@ impl AggregateOrders {
 
     /// Ingest a signed order into the aggregate orders.
     pub fn ingest_signed(&mut self, order: &SignedOrder) {
-        let order: RollupOrders::Order = order.clone().into();
-        self.ingest(&order);
+        order
+            .outputs
+            .iter()
+            .for_each(|o| self.ingest_raw_output(o.chainId as u64, o.token, o.recipient, o.amount));
+        order
+            .permit
+            .permit
+            .permitted
+            .iter()
+            .for_each(|tp| self.ingest_raw_input(tp.token, tp.amount));
     }
 
     /// Extend the orders with a new set of orders.
