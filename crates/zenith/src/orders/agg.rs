@@ -65,6 +65,13 @@ impl AggregateOrders {
         }
     }
 
+    /// Extend the orders with a new set of signed orders.
+    pub fn extend_signed<'a>(&mut self, orders: impl IntoIterator<Item = &'a SignedOrder>) {
+        for order in orders {
+            self.ingest_signed(order);
+        }
+    }
+
     /// Get all destination chain ids for the aggregated outputs.
     pub fn output_chain_ids(&self) -> Vec<u64> {
         self.outputs.keys().map(|(chain_id, _)| *chain_id).collect()
@@ -125,6 +132,30 @@ impl<'a> FromIterator<&'a RollupOrders::Order> for AggregateOrders {
     fn from_iter<T: IntoIterator<Item = &'a RollupOrders::Order>>(iter: T) -> Self {
         let mut orders = AggregateOrders::new();
         orders.extend(iter);
+        orders
+    }
+}
+
+impl<'a> FromIterator<&'a SignedOrder> for AggregateOrders {
+    fn from_iter<T: IntoIterator<Item = &'a SignedOrder>>(iter: T) -> Self {
+        let mut orders = AggregateOrders::new();
+        orders.extend_signed(iter);
+        orders
+    }
+}
+
+impl<'a> From<&'a RollupOrders::Order> for AggregateOrders {
+    fn from(order: &'a RollupOrders::Order) -> Self {
+        let mut orders = AggregateOrders::new();
+        orders.ingest(order);
+        orders
+    }
+}
+
+impl<'a> From<&'a SignedOrder> for AggregateOrders {
+    fn from(order: &'a SignedOrder) -> Self {
+        let mut orders = AggregateOrders::new();
+        orders.ingest_signed(order);
         orders
     }
 }
