@@ -2,7 +2,7 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
-use signet_zenith::SignedOrder;
+use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
 /// The endpoints for the transaction cache.
