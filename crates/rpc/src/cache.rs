@@ -6,6 +6,11 @@ use signet_bundle::SignetEthBundle;
 use signet_zenith::SignedOrder;
 use tracing::{instrument, warn};
 
+/// The endpoints for the transaction cache.
+const TRANSACTIONS: &str = "transactions";
+const BUNDLES: &str = "bundles";
+const ORDERS: &str = "orders";
+
 /// Signet's Transaction Cache helper.
 /// Forwards GET and POST requests to a tx cache URL.
 #[derive(Debug, Clone)]
@@ -91,42 +96,39 @@ impl TxCache {
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
 
         // Get the result.
-        let result = self
-            .client
+        self.client
             .get(url)
             .send()
             .await
             .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache"))?
             .json::<T>()
-            .await?;
-
-        // Deserialize the result.
-        Ok(result)
+            .await
+            .map_err(Into::into)
     }
 
     /// Forwards a raw transaction to the URL.
     #[instrument(skip_all)]
     pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> EthResult<()> {
-        self.forward_inner("transactions", tx).await
+        self.forward_inner(TRANSACTIONS, tx).await
     }
 
     /// Forward a bundle to the URL.
     #[instrument(skip_all)]
     pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> EthResult<()> {
-        self.forward_inner("bundles", bundle).await
+        self.forward_inner(BUNDLES, bundle).await
     }
 
     /// Forward an order to the URL.
     #[instrument(skip_all)]
     pub async fn forward_order(&self, order: SignedOrder) -> EthResult<()> {
-        self.forward_inner("orders", order).await
+        self.forward_inner(ORDERS, order).await
     }
 
     /// Get transactions from the URL.
     #[instrument(skip_all)]
     pub async fn get_transactions(&self) -> Result<Vec<TxEnvelope>, Error> {
         let response: TxCacheTransactionsResponse =
-            self.get_inner::<TxCacheTransactionsResponse>("transactions").await?;
+            self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await?;
         Ok(response.transactions)
     }
 
@@ -134,7 +136,7 @@ impl TxCache {
     #[instrument(skip_all)]
     pub async fn get_bundles(&self) -> Result<Vec<SignetEthBundleResponse>, Error> {
         let response: TxCacheBundleResponse =
-            self.get_inner::<TxCacheBundleResponse>("bundles").await?;
+            self.get_inner::<TxCacheBundleResponse>(BUNDLES).await?;
         Ok(response.bundles)
     }
 
@@ -142,7 +144,7 @@ impl TxCache {
     #[instrument(skip_all)]
     pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
         let response: TxCacheOrderResponse =
-            self.get_inner::<TxCacheOrderResponse>("orders").await?;
+            self.get_inner::<TxCacheOrderResponse>(ORDERS).await?;
         Ok(response.orders)
     }
 }
