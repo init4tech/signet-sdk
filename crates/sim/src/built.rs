@@ -6,7 +6,8 @@ use alloy::{
 };
 use core::fmt;
 use signet_bundle::SignetEthBundle;
-use signet_zenith::{encode_txns, Alloy2718Coder, SignedFill};
+use signet_types::SignedFill;
+use signet_zenith::{encode_txns, Alloy2718Coder};
 use std::sync::OnceLock;
 use tracing::{error, trace};
 

@@ -206,8 +206,6 @@ mod passage {
 }
 
 mod orders {
-    use crate::SignedOrder;
-
     use super::*;
     use IOrders::Output;
     use ISignatureTransfer::TokenPermissions;
@@ -323,22 +321,6 @@ mod orders {
         /// Get the deadline of the order.
         pub const fn deadline(&self) -> u64 {
             self.deadline.as_limbs()[0]
-        }
-    }
-
-    impl From<SignedOrder> for Orders::Order {
-        fn from(signed: SignedOrder) -> Orders::Order {
-            Orders::Order {
-                deadline: signed.permit.permit.deadline,
-                inputs: signed
-                    .permit
-                    .permit
-                    .permitted
-                    .into_iter()
-                    .map(|perm| perm.into())
-                    .collect(),
-                outputs: signed.outputs,
-            }
         }
     }
 

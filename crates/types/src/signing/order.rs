@@ -1,10 +1,8 @@
-use crate::{
-    bindings::RollupOrders::{Order, Output, Permit2Batch, TokenPermissions},
-    orders::signing::{permit_signing_info, SignedPermitError, SigningError},
-};
+use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{primitives::Address, signers::Signer};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use signet_zenith::RollupOrders::{Order, Output, Permit2Batch, TokenPermissions};
 use std::borrow::Cow;
 
 /// A SignedOrder represents a single Order after it has been permit2-encoded and signed.

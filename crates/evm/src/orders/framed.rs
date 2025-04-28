@@ -1,5 +1,5 @@
-use signet_types::AggregateFills;
-use signet_zenith::{AggregateOrders, RollupOrders};
+use signet_types::{AggregateFills, AggregateOrders};
+use signet_zenith::RollupOrders;
 
 /// A [`Framed`] containing [`RollupOrders::Order`] instances.
 pub type FramedOrders = Framed<RollupOrders::Order>;

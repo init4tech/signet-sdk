@@ -1,13 +1,9 @@
-use crate::{
-    bindings::RollupOrders::{Output, Permit2Batch, TokenPermissions},
-    orders::{
-        signing::{permit_signing_info, SignedPermitError, SigningError},
-        AggregateOrders,
-    },
-};
+use crate::agg::AggregateOrders;
+use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{primitives::Address, signers::Signer};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use signet_zenith::RollupOrders::{Output, Permit2Batch, TokenPermissions};
 use std::{borrow::Cow, collections::HashMap};
 
 /// SignedFill type is constructed by Fillers to fill a batch of Orders.
