@@ -39,6 +39,8 @@ use trevm::{
     TrevmBuilder,
 };
 
+mod sys_log;
+
 pub(crate) const BASE_GAS: usize = 21_000;
 
 /// Type alias for EVMs using a [`StateProviderBox`] as the `DB` type for
