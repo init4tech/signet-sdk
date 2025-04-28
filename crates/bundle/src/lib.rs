@@ -25,7 +25,7 @@
 //! The [`SignetEthBundle`] type contains actions that must be performed on
 //! both chains. As such, its simulation must be performed on both chains. The
 //! primary transaction simulation via [`SignetEthBundleDriver`] is performed
-//! locally using [`trevm`]. However, the [`SignedOrder`] must be checked
+//! locally using [`trevm`]. However, the [`SignedFill`] must be checked
 //! against the host chain. This is done by calling the
 //! [`SignetEthBundle::alloy_validate_fills_onchain`] method. This MUST be
 //! called BEFORE simulating.

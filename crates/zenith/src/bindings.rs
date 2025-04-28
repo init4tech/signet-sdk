@@ -1,14 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(missing_docs)]
-use alloy::{
-    primitives::{address, Address, Bytes, FixedBytes, B256, U256},
-    sol_types::{Eip712Domain, SolStruct},
-};
-
-/// Name of the Permit2 contract, used in EIP-712 domain.
-const PERMIT2_CONTRACT_NAME: &str = "Permit2";
-/// Address of the Permit2 contract, used in EIP-712 domain. Permit2 is CREATE2 deployed at the same address on every chain.
-const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
+use alloy::primitives::{Address, Bytes, FixedBytes, U256};
+use std::borrow::Cow;
 
 mod mint {
     alloy::sol!(
@@ -213,6 +206,8 @@ mod passage {
 }
 
 mod orders {
+    use crate::SignedOrder;
+
     use super::*;
     use IOrders::Output;
     use ISignatureTransfer::TokenPermissions;
@@ -282,6 +277,36 @@ mod orders {
         }
     }
 
+    impl From<&IOrders::Input> for TokenPermissions {
+        fn from(input: &IOrders::Input) -> TokenPermissions {
+            TokenPermissions { token: input.token, amount: input.amount }
+        }
+    }
+
+    impl From<IOrders::Input> for TokenPermissions {
+        fn from(input: IOrders::Input) -> TokenPermissions {
+            TokenPermissions { token: input.token, amount: input.amount }
+        }
+    }
+
+    impl From<TokenPermissions> for IOrders::Input {
+        fn from(perm: TokenPermissions) -> IOrders::Input {
+            IOrders::Input { token: perm.token, amount: perm.amount }
+        }
+    }
+
+    impl From<&IOrders::Output> for TokenPermissions {
+        fn from(output: &IOrders::Output) -> TokenPermissions {
+            TokenPermissions { token: output.token, amount: output.amount }
+        }
+    }
+
+    impl From<IOrders::Output> for TokenPermissions {
+        fn from(output: IOrders::Output) -> TokenPermissions {
+            TokenPermissions { token: output.token, amount: output.amount }
+        }
+    }
+
     impl Orders::Order {
         /// Get the inputs of the order.
         #[allow(clippy::missing_const_for_fn)] // false positive
@@ -299,81 +324,27 @@ mod orders {
         pub const fn deadline(&self) -> u64 {
             self.deadline.as_limbs()[0]
         }
+    }
 
-        /// Generate the Permit2 signing hash to Initiate an Order.
-        pub fn initiate_signing_hash(
-            &self,
-            permit2_nonce: U256,
-            rollup_chain_id: U256,
-            rollup_order_contract: Address,
-        ) -> B256 {
-            self.permit2_signing_hash(
-                self.input_token_permissions(),
-                permit2_nonce,
-                rollup_chain_id,
-                rollup_order_contract,
-            )
+    impl From<SignedOrder> for Orders::Order {
+        fn from(signed: SignedOrder) -> Orders::Order {
+            Orders::Order {
+                deadline: signed.permit.permit.deadline,
+                inputs: signed
+                    .permit
+                    .permit
+                    .permitted
+                    .into_iter()
+                    .map(|perm| perm.into())
+                    .collect(),
+                outputs: signed.outputs,
+            }
         }
+    }
 
-        /// Generate the Permit2 signing hash to Fill the Outputs of an Order on a given chain.
-        pub fn fill_signing_hash(
-            &self,
-            permit2_nonce: U256,
-            destination_chain_id: U256,
-            destination_order_contract: Address,
-        ) -> B256 {
-            self.permit2_signing_hash(
-                self.output_token_permissions(destination_chain_id),
-                permit2_nonce,
-                destination_chain_id,
-                destination_order_contract,
-            )
-        }
-
-        /// Generate a correct Permit2 signing hash to either Initiate or Fill an Order
-        fn permit2_signing_hash(
-            &self,
-            permitted: Vec<TokenPermissions>,
-            nonce: U256,
-            chain_id: U256,
-            order_contract: Address,
-        ) -> B256 {
-            let permit2_signing_data = PermitBatchWitnessTransferFrom {
-                permitted,
-                spender: order_contract,
-                nonce,
-                deadline: U256::from(self.deadline()),
-                outputs: self.outputs().to_vec(),
-            };
-
-            // construct EIP-712 domain for Permit2 contract
-            let domain = Eip712Domain {
-                chain_id: Some(chain_id),
-                name: Some(PERMIT2_CONTRACT_NAME.into()),
-                verifying_contract: Some(PERMIT2_ADDRESS),
-                version: None,
-                salt: None,
-            };
-
-            // generate EIP-712 signing hash
-            permit2_signing_data.eip712_signing_hash(&domain)
-        }
-
-        /// Get Permit2 TokenPermissions for the Inputs of an Order; used to Initiate the Order
-        fn input_token_permissions(&self) -> Vec<TokenPermissions> {
-            self.inputs()
-                .iter()
-                .map(|input| TokenPermissions { token: input.token, amount: input.amount })
-                .collect()
-        }
-
-        // Get Permit2 TokenPermissions for the Outputs of an Order; used to Fill the Order
-        fn output_token_permissions(&self, destination_chain_id: U256) -> Vec<TokenPermissions> {
-            self.outputs()
-                .iter()
-                .filter(|output| U256::from(output.chain_id()) == destination_chain_id)
-                .map(|output| TokenPermissions { token: output.token, amount: output.amount })
-                .collect()
+    impl<'a> From<&'a Orders::Order> for Cow<'a, Orders::Order> {
+        fn from(order: &'a Orders::Order) -> Self {
+            Cow::Borrowed(order)
         }
     }
 
@@ -492,10 +463,10 @@ pub use zenith::Zenith;
 /// Contract Bindings for the RollupOrders contract.
 #[allow(non_snake_case)]
 pub mod RollupOrders {
-    pub use super::orders::Orders::*;
-
     pub use super::orders::IOrders::*;
     pub use super::orders::ISignatureTransfer::*;
+    pub use super::orders::Orders::*;
+    pub use super::orders::PermitBatchWitnessTransferFrom;
     pub use super::orders::UsesPermit2::*;
 
     pub use super::orders::Orders::OrdersCalls as RollupOrdersCalls;
