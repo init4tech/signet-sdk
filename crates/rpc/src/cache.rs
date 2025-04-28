@@ -1,6 +1,5 @@
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
-use reth::rpc::server_types::eth::EthResult;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_zenith::SignedOrder;
@@ -63,15 +62,12 @@ impl TxCache {
         &self,
         join: &'static str,
         obj: T,
-    ) -> EthResult<()> {
+    ) -> Result<(), Error> {
         // Append the path to the URL.
-        let url = match self.url.join(join) {
-            Ok(url) => url,
-            Err(e) => {
-                warn!(%e, "Failed to join URL. Not forwarding transaction.");
-                return Ok(());
-            }
-        };
+        let url = self
+            .url
+            .join(join)
+            .inspect_err(|e| warn!(%e, "Failed to join URL. Not forwarding transaction."))?;
 
         // Send the object.
         let _ = self
@@ -80,7 +76,7 @@ impl TxCache {
             .json(&obj)
             .send()
             .await
-            .inspect_err(|e| warn!(%e, "Failed to forward object"));
+            .inspect_err(|e| warn!(%e, "Failed to forward object"))?;
 
         Ok(())
     }
@@ -108,19 +104,19 @@ impl TxCache {
 
     /// Forwards a raw transaction to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> EthResult<()> {
+    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<(), Error> {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
     /// Forward a bundle to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> EthResult<()> {
+    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<(), Error> {
         self.forward_inner(BUNDLES, bundle).await
     }
 
     /// Forward an order to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_order(&self, order: SignedOrder) -> EthResult<()> {
+    pub async fn forward_order(&self, order: SignedOrder) -> Result<(), Error> {
         self.forward_inner(ORDERS, order).await
     }
 

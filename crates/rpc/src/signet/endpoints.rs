@@ -27,12 +27,7 @@ where
             return Err(SignetError::TxCacheUrlNotProvided.into_string());
         };
 
-        hctx.spawn(async move {
-            tx_cache
-                .forward_bundle(bundle)
-                .await
-                .map_err(|e| SignetError::EthApiError(e).into_string())
-        });
+        hctx.spawn(async move { tx_cache.forward_bundle(bundle).await.map_err(|e| e.to_string()) });
 
         Ok(())
     };
@@ -54,12 +49,7 @@ where
             return Err(SignetError::TxCacheUrlNotProvided.into_string());
         };
 
-        hctx.spawn(async move {
-            tx_cache
-                .forward_order(order)
-                .await
-                .map_err(|e| SignetError::EthApiError(e).into_string())
-        });
+        hctx.spawn(async move { tx_cache.forward_order(order).await.map_err(|e| e.to_string()) });
 
         Ok(())
     };
