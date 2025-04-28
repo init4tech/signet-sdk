@@ -23,16 +23,11 @@ where
     Signet: Pnt,
 {
     let task = |hctx: HandlerCtx| async move {
-        let Some(forwarder) = ctx.signet().forwarder() else {
+        let Some(tx_cache) = ctx.signet().tx_cache() else {
             return Err(SignetError::TxCacheUrlNotProvided.into_string());
         };
 
-        hctx.spawn(async move {
-            forwarder
-                .forward_bundle(bundle)
-                .await
-                .map_err(|e| SignetError::EthApiError(e).into_string())
-        });
+        hctx.spawn(async move { tx_cache.forward_bundle(bundle).await.map_err(|e| e.to_string()) });
 
         Ok(())
     };
@@ -50,16 +45,11 @@ where
     Signet: Pnt,
 {
     let task = |hctx: HandlerCtx| async move {
-        let Some(forwarder) = ctx.signet().forwarder() else {
+        let Some(tx_cache) = ctx.signet().tx_cache() else {
             return Err(SignetError::TxCacheUrlNotProvided.into_string());
         };
 
-        hctx.spawn(async move {
-            forwarder
-                .forward_order(order)
-                .await
-                .map_err(|e| SignetError::EthApiError(e).into_string())
-        });
+        hctx.spawn(async move { tx_cache.forward_order(order).await.map_err(|e| e.to_string()) });
 
         Ok(())
     };

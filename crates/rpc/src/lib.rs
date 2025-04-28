@@ -62,8 +62,8 @@ pub use signet::{error::SignetError, signet};
 
 mod interest;
 
-mod forwarder;
-pub use forwarder::TxCacheForwarder;
+mod cache;
+pub use cache::{SignetEthBundleResponse, TxCache};
 
 pub mod receipts;
 
