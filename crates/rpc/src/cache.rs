@@ -143,8 +143,7 @@ impl TxCache {
     /// Get signed orders from the URL.
     #[instrument(skip_all)]
     pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
-        let response: TxCacheOrderResponse =
-            self.get_inner::<TxCacheOrderResponse>(ORDERS).await?;
+        let response: TxCacheOrderResponse = self.get_inner::<TxCacheOrderResponse>(ORDERS).await?;
         Ok(response.orders)
     }
 }
