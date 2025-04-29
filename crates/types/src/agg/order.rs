@@ -1,7 +1,7 @@
-use crate::orders::signing::SignedOrder;
-use crate::RollupOrders;
+use crate::SignedOrder;
 use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
+use signet_zenith::RollupOrders;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 

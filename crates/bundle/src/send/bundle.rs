@@ -10,7 +10,8 @@ use alloy::{
     rpc::types::mev::EthSendBundle,
 };
 use serde::{Deserialize, Serialize};
-use signet_zenith::{HostOrders::HostOrdersInstance, SignedFill, SignedPermitError};
+use signet_types::{SignedFill, SignedPermitError};
+use signet_zenith::HostOrders::HostOrdersInstance;
 use trevm::{revm::Database, BundleError};
 
 /// Bundle of transactions for `signet_sendBundle`.
@@ -107,7 +108,7 @@ impl SignetEthBundle {
         N: Network,
     {
         if let Some(host_fills) = self.host_fills.clone() {
-            orders.try_fill(host_fills).await.map_err(Into::into)
+            orders.try_fill(host_fills.outputs, host_fills.permit).await.map_err(Into::into)
         } else {
             Ok(())
         }

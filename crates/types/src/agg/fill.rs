@@ -1,7 +1,8 @@
+use crate::AggregateOrders;
 use crate::MarketError;
 use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
-use signet_zenith::{AggregateOrders, RollupOrders};
+use signet_zenith::RollupOrders;
 use std::collections::HashMap;
 
 /// The aggregate fills, to be populated via block extracts. Generally used to

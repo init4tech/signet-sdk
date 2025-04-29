@@ -18,8 +18,13 @@
 /// Structs that hold Signet system configuration.
 pub mod config;
 
-mod fills;
-pub use fills::{AggregateFills, MarketError};
+mod agg;
+pub use agg::{AggregateFills, AggregateOrders, MarketError};
+
+mod signing;
+pub use signing::{
+    SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
+};
 
 mod magic_sig;
 pub use magic_sig::{MagicSig, MagicSigInfo};

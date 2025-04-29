@@ -7,11 +7,11 @@ pub use fill::{SignedFill, UnsignedFill};
 mod error;
 pub use error::{SignedPermitError, SigningError};
 
-use crate::bindings::RollupOrders::{
-    Output, PermitBatchTransferFrom, PermitBatchWitnessTransferFrom, TokenPermissions,
-};
 use alloy::primitives::{address, Address, B256, U256};
 use alloy::sol_types::{Eip712Domain, SolStruct};
+use signet_zenith::RollupOrders::{
+    Output, PermitBatchTransferFrom, PermitBatchWitnessTransferFrom, TokenPermissions,
+};
 
 const PERMIT2_CONTRACT_NAME: &str = "Permit2";
 const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");

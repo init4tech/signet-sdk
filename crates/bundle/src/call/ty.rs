@@ -7,8 +7,7 @@ use alloy::{
     rpc::types::mev::{EthCallBundle, EthCallBundleResponse, EthCallBundleTransactionResult},
 };
 use serde::{Deserialize, Serialize};
-use signet_types::AggregateFills;
-use signet_zenith::AggregateOrders;
+use signet_types::{AggregateFills, AggregateOrders};
 use trevm::{
     revm::{context::result::ExecutionResult, Database},
     BundleError,

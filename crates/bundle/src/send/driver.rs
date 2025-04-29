@@ -1,7 +1,7 @@
 use crate::send::SignetEthBundle;
 use alloy::primitives::U256;
 use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
-use signet_zenith::SignedPermitError;
+use signet_types::SignedPermitError;
 use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},

@@ -19,16 +19,31 @@ pub use bindings::{
 mod block;
 pub use block::{decode_txns, encode_txns, Alloy2718Coder, Coder, ZenithBlock, ZenithTransaction};
 
-mod orders;
-pub use orders::{
-    AggregateOrders, SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill,
-    UnsignedOrder,
-};
-
 mod trevm;
 
-use alloy::primitives::{address, Address};
+use alloy::{
+    network::Network,
+    primitives::{address, Address},
+    providers::Provider,
+};
 
 /// System address with permission to mint tokens on pre-deploys.
 /// "tokenadmin"
 pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e61646d696e");
+
+impl<P, N> HostOrders::HostOrdersInstance<(), P, N>
+where
+    P: Provider<N>,
+    N: Network,
+{
+    /// Preflight a signed order to see if the transaction would succeed.
+    /// # Warning ⚠️
+    /// Take care with the rpc endpoint used for this. SignedFills *must* remain private until they mine.
+    pub async fn try_fill(
+        &self,
+        outputs: Vec<RollupOrders::Output>,
+        permit: RollupOrders::Permit2Batch,
+    ) -> Result<(), alloy::contract::Error> {
+        self.fillPermit2(outputs, permit).call().await.map(drop)
+    }
+}

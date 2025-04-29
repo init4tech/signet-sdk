@@ -4,7 +4,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use reth::revm::interpreter::InterpreterTypes;
-use signet_types::{config::SignetSystemConstants, AggregateFills};
+use signet_types::{config::SignetSystemConstants, AggregateFills, AggregateOrders};
 use signet_zenith::RollupOrders;
 use trevm::{
     helpers::Ctx,
@@ -68,7 +68,7 @@ impl OrderDetector {
 
     /// Take the orders from the inspector, clearing it, and convert them to
     /// aggregate orders.
-    pub fn take_aggregates(&mut self) -> (signet_zenith::AggregateOrders, AggregateFills) {
+    pub fn take_aggregates(&mut self) -> (AggregateOrders, AggregateFills) {
         let (orders, filleds) = self.take();
         (orders.aggregate(), filleds.aggregate(self.chain_id()))
     }

@@ -12,12 +12,10 @@ repository.workspace = true
 
 [dependencies]
 trevm.workspace = true
-chrono.workspace = true
 
 alloy = { workspace = true, features = ["full", "json-rpc", "signer-aws", "rpc-types-mev", "rlp"] }
 
 serde = { workspace = true, features = ["derive"] }
-thiserror.workspace = true
 
 [dev-dependencies]
 serde_json = "1.0.94"

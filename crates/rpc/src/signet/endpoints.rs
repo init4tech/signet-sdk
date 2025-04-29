@@ -9,7 +9,7 @@ use reth_node_api::FullNodeComponents;
 use signet_bundle::{
     SignetBundleDriver, SignetCallBundle, SignetCallBundleResponse, SignetEthBundle,
 };
-use signet_zenith::SignedOrder;
+use signet_types::SignedOrder;
 use std::time::Duration;
 use tokio::select;
 
