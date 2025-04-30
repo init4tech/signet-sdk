@@ -131,6 +131,26 @@ impl<'a> FromIterator<&'a RollupOrders::Order> for AggregateOrders {
     }
 }
 
+impl From<Vec<RollupOrders::Order>> for AggregateOrders {
+    fn from(orders: Vec<RollupOrders::Order>) -> Self {
+        let mut agg = AggregateOrders::new();
+        for order in orders {
+            agg.ingest(&order);
+        }
+        agg
+    }
+}
+
+impl From<Vec<SignedOrder>> for AggregateOrders {
+    fn from(orders: Vec<SignedOrder>) -> Self {
+        let mut agg = AggregateOrders::new();
+        for order in orders {
+            agg.ingest_signed(&order);
+        }
+        agg
+    }
+}
+
 impl<'a> FromIterator<&'a SignedOrder> for AggregateOrders {
     fn from_iter<T: IntoIterator<Item = &'a SignedOrder>>(iter: T) -> Self {
         let mut orders = AggregateOrders::new();
