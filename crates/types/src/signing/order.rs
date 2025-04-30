@@ -1,9 +1,9 @@
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{
-    network::TransactionBuilder, primitives::Address, signers::Signer, sol_types::SolCall,
+    network::TransactionBuilder, primitives::Address, rpc::types::TransactionRequest,
+    signers::Signer, sol_types::SolCall,
 };
 use chrono::Utc;
-use reth::rpc::types::TransactionRequest;
 use serde::{Deserialize, Serialize};
 use signet_zenith::RollupOrders::{
     initiatePermit2Call, Order, Output, Permit2Batch, TokenPermissions,
