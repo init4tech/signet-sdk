@@ -34,6 +34,9 @@ type Provider = FillProvider<
     Ethereum,
 >;
 
+/// Empty main to silence clippy.
+fn main() {}
+
 /// Example code demonstrating API usage and patterns for Signet Fillers.
 #[derive(Debug)]
 pub struct Filler<S: Signer> {
