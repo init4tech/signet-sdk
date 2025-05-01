@@ -1,8 +1,13 @@
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
-use alloy::{primitives::Address, signers::Signer};
+use alloy::{
+    network::TransactionBuilder, primitives::Address, rpc::types::TransactionRequest,
+    signers::Signer, sol_types::SolCall,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use signet_zenith::RollupOrders::{Order, Output, Permit2Batch, TokenPermissions};
+use signet_zenith::RollupOrders::{
+    initiatePermit2Call, Order, Output, Permit2Batch, TokenPermissions,
+};
 use std::borrow::Cow;
 
 /// A SignedOrder represents a single Order after it has been permit2-encoded and signed.
@@ -44,6 +49,24 @@ impl SignedOrder {
         }
 
         Ok(())
+    }
+
+    /// Generate a TransactionRequest to `initiate` the SignedOrder.
+    pub fn to_initiate_tx(
+        &self,
+        filler_token_recipient: Address,
+        order_contract: Address,
+    ) -> TransactionRequest {
+        // encode initiate data
+        let initiate_data = initiatePermit2Call {
+            tokenRecipient: filler_token_recipient,
+            outputs: self.outputs.clone(),
+            permit2: self.permit.clone(),
+        }
+        .abi_encode();
+
+        // construct an initiate tx request
+        TransactionRequest::default().with_input(initiate_data).with_to(order_contract)
     }
 }
 

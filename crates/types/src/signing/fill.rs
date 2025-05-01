@@ -1,9 +1,12 @@
 use crate::agg::AggregateOrders;
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
-use alloy::{primitives::Address, signers::Signer};
+use alloy::{
+    network::TransactionBuilder, primitives::Address, rpc::types::TransactionRequest,
+    signers::Signer, sol_types::SolCall,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use signet_zenith::RollupOrders::{Output, Permit2Batch, TokenPermissions};
+use signet_zenith::RollupOrders::{fillPermit2Call, Output, Permit2Batch, TokenPermissions};
 use std::{borrow::Cow, collections::HashMap};
 
 /// SignedFill type is constructed by Fillers to fill a batch of Orders.
@@ -71,6 +74,17 @@ impl SignedFill {
         }
 
         Ok(())
+    }
+
+    /// Generate a TransactionRequest to `fill` the SignedFill.
+    pub fn to_fill_tx(&self, order_contract: Address) -> TransactionRequest {
+        // encode fill data
+        let fill_data =
+            fillPermit2Call { outputs: self.outputs.clone(), permit2: self.permit.clone() }
+                .abi_encode();
+
+        // construct fill tx request
+        TransactionRequest::default().with_input(fill_data).with_to(order_contract)
     }
 }
 

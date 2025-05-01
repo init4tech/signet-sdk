@@ -11,7 +11,7 @@ repository.workspace = true
 [dependencies]
 signet-zenith.workspace = true
 
-alloy = { workspace = true, features = ["eips"] }
+alloy.workspace = true
 
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
