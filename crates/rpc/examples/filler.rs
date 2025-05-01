@@ -71,36 +71,27 @@ where
         Self { signer, ru_provider, tx_cache, order_contracts, ru_chain_id, host_chain_id }
     }
 
-    /// Fills Orders by aggregating them into a single, atomic Bundle.
-    ///
-    /// Filling orders in aggregate means that Fills are batched and more gas efficient;
+    /// Gets a set of fillable Orders from the TransactionCache and fills them in aggregate
+    /// by submitting them all in a single, atomic Bundle.
+    /// 
+    /// Filling Orders in aggregate means that Fills are batched and more gas efficient;
     /// however, if a single Order cannot be filled, then the entire Bundle will not mine.
-    ///
-    /// For example, using this strategy, if one Order is filled by another Filler first, then all other Orders will also not be filled.
-    ///
-    /// It may be a preferred strategy to fill each Order in a separate Bundle, as in `fill_individual`.
-    pub async fn fill_aggregate(&self) -> Result<(), Error> {
+    pub async fn run(&self) -> Result<(), Error> {
         let fillable_orders = self.get_fillable_orders().await?;
 
         // submit one bundle that fills the entire set of orders
         self.fill(fillable_orders).await
     }
 
-    /// Fills Orders individually, by submitting a separate Bundle for each Order.
-    ///
+    /// Gets a set of fillable Orders from the TransactionCache and fills them individually.
+    /// 
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
-    ///
-    /// It may be a preferred strategy to fill Orders within a single Bundle, as in `fill_aggregate`.
-    pub async fn fill_individual(&self) -> Result<(), Error> {
+    pub async fn run_individual(&self) -> Result<(), Error> {
         let fillable_orders = self.get_fillable_orders().await?;
 
-        // submit one bundle per individual order
-        for order in fillable_orders {
-            self.fill(vec![order]).await?;
-        }
-
-        Ok(())
+        // submit a separate bundle per order
+        self.fill_individual(fillable_orders).await
     }
 
     /// Query the transaction cache to get all possible orders.
@@ -125,7 +116,33 @@ where
         todo!()
     }
 
-    /// Construct a Bundle to fill the selected set of orders.
+    /// Fills Orders individually, by submitting a separate Bundle for each Order.
+    ///
+    /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
+    /// however, it is less gas efficient.
+    pub async fn fill_individual(&self, orders:Vec<SignedOrder>) -> Result<(), Error> {
+        // submit one bundle per individual order
+        for order in orders {
+            self.fill(vec![order]).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Fills one or more Orders in a single, atomic Bundle.
+    /// 
+    /// Signs Fill(s) for the Order(s); 
+    /// constructs a Bundle of transactions to fill the Order(s);
+    /// sends the Bundle to the transaction cache.
+    /// 
+    /// If more than one Order is passed to this fn, 
+    /// Filling them in aggregate means that Fills are batched and more gas efficient;
+    /// however, if a single Order cannot be filled, then the entire Bundle will not mine.
+    /// For example, using this strategy, if one Order is filled by another Filler first, then all other Orders will also not be filled.
+    ///
+    /// If a single Order is passed to this fn, 
+    /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
+    /// however, it is less gas efficient.
     pub async fn fill(&self, orders: Vec<SignedOrder>) -> Result<(), Error> {
         // if orders is empty, exit the function without doing anything
         if orders.is_empty() {
