@@ -80,14 +80,14 @@ where
     ///
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
-    /// 
-    /// A nice feature of filling Orders individually is that Fillers could be less concerned 
+    ///
+    /// A nice feature of filling Orders individually is that Fillers could be less concerned
     /// about carefully simulating Orders onchain before attempting to fill them.
-    /// As long as an Order is economically a "good deal" for the Filler, they can attempt to fill it 
+    /// As long as an Order is economically a "good deal" for the Filler, they can attempt to fill it
     /// without simulating to check whether it has already been filled, because they can rely on Builder simulation.
     /// Order `initiate` transactions will revert if the Order has already been filled,
     /// in which case the entire Bundle would simply be discarded by the Builder.
-    pub async fn fill_individually(&self, orders:Vec<SignedOrder>) -> Result<(), Error> {
+    pub async fn fill_individually(&self, orders: Vec<SignedOrder>) -> Result<(), Error> {
         // submit one bundle per individual order
         for order in orders {
             self.fill(vec![order]).await?;
@@ -100,13 +100,13 @@ where
     /// - Signs Fill(s) for the Order(s)
     /// - Constructs a Bundle of transactions to fill & initiate the Order(s)
     /// - Sends the Bundle to the transaction cache to be mined by Builders
-    /// 
-    /// If more than one Order is passed to this fn, 
+    ///
+    /// If more than one Order is passed to this fn,
     /// Filling them in aggregate means that Fills are batched and more gas efficient;
     /// however, if a single Order cannot be filled, then the entire Bundle will not mine.
     /// For example, using this strategy, if one Order is filled by another Filler first, then all other Orders will also not be filled.
     ///
-    /// If a single Order is passed to this fn, 
+    /// If a single Order is passed to this fn,
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
     pub async fn fill(&self, orders: Vec<SignedOrder>) -> Result<(), Error> {
@@ -231,7 +231,7 @@ where
 
             // sign the transaction
             let SendableTx::Envelope(filled) = self.ru_provider.fill(tx).await? else {
-                return Err(eyre!("Failed to fill rollup transaction"));
+                eyre::bail!("Failed to fill transaction")
             };
 
             // encode it
