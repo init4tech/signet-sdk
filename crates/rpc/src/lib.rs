@@ -63,7 +63,10 @@ pub use signet::{error::SignetError, signet};
 mod interest;
 
 mod cache;
-pub use cache::{SignetEthBundleResponse, TxCache};
+pub use cache::{
+    SignetEthBundleResponse, TxCache, TxCacheBundleResponse, TxCacheBundlesResponse,
+    TxCacheOrdersResponse, TxCacheTransactionResponse, TxCacheTransactionsResponse,
+};
 
 pub mod receipts;
 

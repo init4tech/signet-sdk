@@ -1,4 +1,4 @@
-use alloy::consensus::TxEnvelope;
+use alloy::{consensus::TxEnvelope, primitives::B256};
 use eyre::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
@@ -14,37 +14,146 @@ const ORDERS: &str = "orders";
 /// Forwards GET and POST requests to a tx cache URL.
 #[derive(Debug, Clone)]
 pub struct TxCache {
+    /// The URL of the transaction cache.
     url: reqwest::Url,
+    /// The reqwest client used to send requests.
     client: reqwest::Client,
 }
 
 /// A bundle response from the transaction cache, containing a UUID and a
 /// [`SignetEthBundle`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SignetEthBundleResponse {
     /// The bundle id (a UUID)
-    pub id: String,
+    pub id: uuid::Uuid,
     /// The bundle itself
     pub bundle: SignetEthBundle,
 }
 
+impl SignetEthBundleResponse {
+    /// Create a new bundle response from a bundle and an id.
+    pub fn from_bundle_and_id(bundle: SignetEthBundle, id: uuid::Uuid) -> Self {
+        Self { id, bundle }
+    }
+
+    /// Convert the bundle response to a [`SignetEthBundle`].
+    pub fn into_bundle(self) -> SignetEthBundle {
+        self.bundle
+    }
+
+    /// The bundle id.
+    pub fn id(&self) -> uuid::Uuid {
+        self.id
+    }
+
+    /// The bundle itself.
+    pub fn bundle(&self) -> &SignetEthBundle {
+        &self.bundle
+    }
+}
+
+/// A response from the transaction cache, containing a single bundle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxCacheBundleResponse {
+    /// The bundle
+    pub bundle: SignetEthBundleResponse,
+}
+
+impl TxCacheBundleResponse {
+    /// Create a new bundle response from a bundle.
+    pub fn from_bundle(bundle: SignetEthBundleResponse) -> Self {
+        Self { bundle }
+    }
+
+    /// Convert the bundle response to a [`SignetEthBundle`].
+    pub fn into_bundle(self) -> SignetEthBundleResponse {
+        self.bundle
+    }
+}
+
+impl From<SignetEthBundleResponse> for TxCacheBundleResponse {
+    fn from(bundle: SignetEthBundleResponse) -> Self {
+        Self { bundle }
+    }
+}
+
 /// Response from the transaction cache `bundles` endpoint, containing a list of bundles.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TxCacheBundleResponse {
+#[serde(rename_all = "camelCase")]
+pub struct TxCacheBundlesResponse {
     /// the list of bundles
     pub bundles: Vec<SignetEthBundleResponse>,
 }
 
+impl TxCacheBundlesResponse {
+    /// Create a new bundle response from a list of bundles.
+    pub fn from_bundles(bundles: Vec<SignetEthBundleResponse>) -> Self {
+        Self { bundles }
+    }
+
+    /// Convert the bundle response to a list of [`SignetEthBundle`].
+    pub fn into_bundles(self) -> Vec<SignetEthBundleResponse> {
+        self.bundles
+    }
+}
+
 /// Response from the transaction cache `transactions` endpoint, containing a list of transactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TxCacheTransactionsResponse {
+#[serde(rename_all = "camelCase")]
+pub struct TxCacheTransactionsResponse {
     transactions: Vec<TxEnvelope>,
+}
+
+impl TxCacheTransactionsResponse {
+    /// Create a new transaction response from a list of transactions.
+    pub fn from_transactions(transactions: Vec<TxEnvelope>) -> Self {
+        Self { transactions }
+    }
+
+    /// Convert the transaction response to a list of [`TxEnvelope`].
+    pub fn into_transactions(self) -> Vec<TxEnvelope> {
+        self.transactions
+    }
+}
+
+/// A response from the transaction cache, containing a transaction hash.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct TxCacheTransactionResponse {
+    /// The transaction hash
+    tx_hash: B256,
+}
+
+impl TxCacheTransactionResponse {
+    /// Create a new transaction response from a transaction hash.
+    pub fn from_tx_hash(tx_hash: B256) -> Self {
+        Self { tx_hash }
+    }
+
+    /// Convert the transaction response to a transaction hash.
+    pub fn into_tx_hash(self) -> B256 {
+        self.tx_hash
+    }
 }
 
 /// Response from the transaction cache `orders` endpoint, containing a list of signed orders.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TxCacheOrderResponse {
+#[serde(rename_all = "camelCase")]
+pub struct TxCacheOrdersResponse {
     orders: Vec<SignedOrder>,
+}
+
+impl TxCacheOrdersResponse {
+    /// Create a new order response from a list of orders.
+    pub fn from_orders(orders: Vec<SignedOrder>) -> Self {
+        Self { orders }
+    }
+
+    /// Convert the order response to a list of [`SignedOrder`].
+    pub fn into_orders(self) -> Vec<SignedOrder> {
+        self.orders
+    }
 }
 
 impl TxCache {
@@ -131,15 +240,24 @@ impl TxCache {
     /// Get bundles from the URL.
     #[instrument(skip_all)]
     pub async fn get_bundles(&self) -> Result<Vec<SignetEthBundleResponse>, Error> {
+        let response: TxCacheBundlesResponse =
+            self.get_inner::<TxCacheBundlesResponse>(BUNDLES).await?;
+        Ok(response.bundles)
+    }
+
+    /// Get a bundle from the URL.
+    #[instrument(skip_all)]
+    pub async fn get_bundle(&self) -> Result<SignetEthBundleResponse, Error> {
         let response: TxCacheBundleResponse =
             self.get_inner::<TxCacheBundleResponse>(BUNDLES).await?;
-        Ok(response.bundles)
+        Ok(response.bundle)
     }
 
     /// Get signed orders from the URL.
     #[instrument(skip_all)]
     pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
-        let response: TxCacheOrderResponse = self.get_inner::<TxCacheOrderResponse>(ORDERS).await?;
+        let response: TxCacheOrdersResponse =
+            self.get_inner::<TxCacheOrdersResponse>(ORDERS).await?;
         Ok(response.orders)
     }
 }

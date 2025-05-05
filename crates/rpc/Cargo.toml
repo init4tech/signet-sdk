@@ -34,3 +34,4 @@ tokio = { workspace = true, features = ["macros"] }
 tokio-util = "0.7.13"
 tower-http = { version = "0.6.2", features = ["cors"] }
 tracing.workspace = true
+uuid = { workspace = true, features = ["serde"] }
