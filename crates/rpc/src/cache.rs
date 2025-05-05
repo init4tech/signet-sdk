@@ -33,7 +33,7 @@ pub struct SignetEthBundleResponse {
 
 impl SignetEthBundleResponse {
     /// Create a new bundle response from a bundle and an id.
-    pub fn from_bundle_and_id(bundle: SignetEthBundle, id: uuid::Uuid) -> Self {
+    pub const fn from_bundle_and_id(bundle: SignetEthBundle, id: uuid::Uuid) -> Self {
         Self { id, bundle }
     }
 
@@ -43,12 +43,12 @@ impl SignetEthBundleResponse {
     }
 
     /// The bundle id.
-    pub fn id(&self) -> uuid::Uuid {
+    pub const fn id(&self) -> uuid::Uuid {
         self.id
     }
 
     /// The bundle itself.
-    pub fn bundle(&self) -> &SignetEthBundle {
+    pub const fn bundle(&self) -> &SignetEthBundle {
         &self.bundle
     }
 }
@@ -63,7 +63,7 @@ pub struct TxCacheBundleResponse {
 
 impl TxCacheBundleResponse {
     /// Create a new bundle response from a bundle.
-    pub fn from_bundle(bundle: SignetEthBundleResponse) -> Self {
+    pub const fn from_bundle(bundle: SignetEthBundleResponse) -> Self {
         Self { bundle }
     }
 
@@ -89,7 +89,7 @@ pub struct TxCacheBundlesResponse {
 
 impl TxCacheBundlesResponse {
     /// Create a new bundle response from a list of bundles.
-    pub fn from_bundles(bundles: Vec<SignetEthBundleResponse>) -> Self {
+    pub const fn from_bundles(bundles: Vec<SignetEthBundleResponse>) -> Self {
         Self { bundles }
     }
 
@@ -108,7 +108,7 @@ pub struct TxCacheTransactionsResponse {
 
 impl TxCacheTransactionsResponse {
     /// Create a new transaction response from a list of transactions.
-    pub fn from_transactions(transactions: Vec<TxEnvelope>) -> Self {
+    pub const fn from_transactions(transactions: Vec<TxEnvelope>) -> Self {
         Self { transactions }
     }
 
@@ -127,12 +127,12 @@ pub struct TxCacheTransactionResponse {
 
 impl TxCacheTransactionResponse {
     /// Create a new transaction response from a transaction hash.
-    pub fn from_tx_hash(tx_hash: B256) -> Self {
+    pub const fn from_tx_hash(tx_hash: B256) -> Self {
         Self { tx_hash }
     }
 
     /// Convert the transaction response to a transaction hash.
-    pub fn into_tx_hash(self) -> B256 {
+    pub const fn into_tx_hash(self) -> B256 {
         self.tx_hash
     }
 }
@@ -146,7 +146,7 @@ pub struct TxCacheOrdersResponse {
 
 impl TxCacheOrdersResponse {
     /// Create a new order response from a list of orders.
-    pub fn from_orders(orders: Vec<SignedOrder>) -> Self {
+    pub const fn from_orders(orders: Vec<SignedOrder>) -> Self {
         Self { orders }
     }
 
