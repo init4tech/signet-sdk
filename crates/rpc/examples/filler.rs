@@ -112,18 +112,18 @@ where
     /// If a single Order is passed to this fn,
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
-    pub async fn fill(&self, orders: impl AsRef<[SignedOrder]>) -> Result<(), Error> {
+    pub async fn fill(&self, orders: &[SignedOrder]) -> Result<(), Error> {
         // if orders is empty, exit the function without doing anything
-        if orders.as_ref().is_empty() {
+        if orders.is_empty() {
             println!("No orders to fill");
             return Ok(());
         }
 
         // sign a SignedFill for the orders
-        let mut signed_fills = self.sign_fills(orders.as_ref().iter()).await?;
+        let mut signed_fills = self.sign_fills(orders.iter()).await?;
 
         // get the transaction requests for the rollup
-        let tx_requests = self.rollup_txn_requests(&signed_fills, orders.as_ref().iter()).await?;
+        let tx_requests = self.rollup_txn_requests(&signed_fills, orders.iter()).await?;
 
         // sign & encode the transactions for the Bundle
         let txs = self.sign_and_encode_txns(tx_requests).await?;
