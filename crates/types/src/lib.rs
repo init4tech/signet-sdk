@@ -32,9 +32,6 @@ pub use magic_sig::{MagicSig, MagicSigInfo};
 mod height;
 pub use height::PairedHeights;
 
-mod slot;
-pub use slot::SlotCalculator;
-
 mod seq;
 pub use seq::{RequestSigner, SignRequest, SignResponse};
 
