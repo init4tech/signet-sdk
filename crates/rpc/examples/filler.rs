@@ -117,7 +117,7 @@ where
         }
 
         // sign a SignedFill for the orders
-        let signed_fills = self.sign_fills(orders).await?;
+        let mut signed_fills = self.sign_fills(orders).await?;
 
         // get the transaction requests for the rollup
         let tx_requests = self.rollup_txn_requests(&signed_fills, orders).await?;
@@ -126,7 +126,7 @@ where
         let txs = self.sign_and_encode_txns(tx_requests).await?;
 
         // get the aggregated host fill for the Bundle, if any
-        let host_fills = signed_fills.get(&self.host_chain_id).cloned();
+        let host_fills = signed_fills.remove(&self.host_chain_id);
 
         // set the Bundle to only be valid if mined in the next rollup block
         let block_number = self.ru_provider.get_block_number().await? + 1;
