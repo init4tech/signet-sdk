@@ -16,7 +16,7 @@ use eyre::{eyre, Error};
 use signet_bundle::SignetEthBundle;
 use signet_rpc::TxCache;
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
-use std::collections::HashMap;
+use std::{collections::HashMap, slice::from_ref};
 
 /// Multiplier for converting gwei to wei.
 const GWEI_TO_WEI: u64 = 1_000_000_000;
@@ -87,13 +87,10 @@ where
     /// without simulating to check whether it has already been filled, because they can rely on Builder simulation.
     /// Order `initiate` transactions will revert if the Order has already been filled,
     /// in which case the entire Bundle would simply be discarded by the Builder.
-    pub async fn fill_individually(
-        &self,
-        orders: impl IntoIterator<Item = SignedOrder>,
-    ) -> Result<(), Error> {
+    pub async fn fill_individually(&self, orders: &[SignedOrder]) -> Result<(), Error> {
         // submit one bundle per individual order
-        for order in orders.into_iter() {
-            self.fill(&[order]).await?;
+        for order in orders {
+            self.fill(from_ref(order)).await?;
         }
 
         Ok(())
@@ -120,10 +117,10 @@ where
         }
 
         // sign a SignedFill for the orders
-        let mut signed_fills = self.sign_fills(orders.iter()).await?;
+        let mut signed_fills = self.sign_fills(orders).await?;
 
         // get the transaction requests for the rollup
-        let tx_requests = self.rollup_txn_requests(&signed_fills, orders.iter()).await?;
+        let tx_requests = self.rollup_txn_requests(&signed_fills, orders).await?;
 
         // sign & encode the transactions for the Bundle
         let txs = self.sign_and_encode_txns(tx_requests).await?;
@@ -162,12 +159,9 @@ where
     /// If filling multiple Orders, they may wish to utilize one Order's Outputs to provide another Order's rollup Inputs.
     /// In this case, the Filler would wish to split up the Fills for each Order,
     /// rather than signing a single, aggregate a Fill for each chain, as is done here.
-    async fn sign_fills(
-        &self,
-        orders: impl Iterator<Item = &SignedOrder>,
-    ) -> Result<HashMap<u64, SignedFill>, Error> {
+    async fn sign_fills(&self, orders: &[SignedOrder]) -> Result<HashMap<u64, SignedFill>, Error> {
         //  create an AggregateOrder from the SignedOrders they want to fill
-        let agg: AggregateOrders = orders.collect();
+        let agg: AggregateOrders = orders.iter().collect();
         // produce an UnsignedFill from the AggregateOrder
         let mut unsigned_fill = UnsignedFill::from(&agg);
         // populate the Order contract addresses for each chain
@@ -192,7 +186,7 @@ where
     async fn rollup_txn_requests(
         &self,
         signed_fills: &HashMap<u64, SignedFill>,
-        orders: impl Iterator<Item = &SignedOrder>,
+        orders: &[SignedOrder],
     ) -> Result<Vec<TransactionRequest>, Error> {
         // construct the transactions to be submitted to the Rollup
         let mut tx_requests = Vec::new();
