@@ -14,8 +14,6 @@ honestly.
   [conditional transactions].
 - `MagicSig` - a struct that holds magic signatures for Signet L1-driven
   actions.
-- `SlotCalculator` - a small utility for calculating the slot number from a
-  timestamp and vice versa.
 - `SignRequest` and `SignResponse` - data structures for block-builders
   communicating with the Signet sequencer.
 
