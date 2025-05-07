@@ -250,7 +250,7 @@ where
     fn order_contract_address_for(&self, chain_id: u64) -> Result<Address, Error> {
         self.order_contracts
             .get(&chain_id)
-            .cloned()
+            .copied()
             .ok_or(eyre!("No Order contract address configured for chain id {}", chain_id))
     }
 
