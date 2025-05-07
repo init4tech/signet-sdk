@@ -14,7 +14,7 @@ use alloy::{
 };
 use eyre::{eyre, Error};
 use signet_bundle::SignetEthBundle;
-use signet_rpc::TxCache;
+use signet_tx_cache::client::TxCache;
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
 use std::{collections::HashMap, slice::from_ref};
 
