@@ -1,5 +1,5 @@
 use crate::types::{
-    SignetEthBundleResponse, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse,
+    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse,
     TxCacheTransactionsResponse,
 };
 use alloy::consensus::TxEnvelope;
@@ -107,7 +107,7 @@ impl TxCache {
 
     /// Get bundles from the URL.
     #[instrument(skip_all)]
-    pub async fn get_bundles(&self) -> Result<Vec<SignetEthBundleResponse>, Error> {
+    pub async fn get_bundles(&self) -> Result<Vec<TxCacheBundle>, Error> {
         let response: TxCacheBundlesResponse =
             self.get_inner::<TxCacheBundlesResponse>(BUNDLES).await?;
         Ok(response.bundles)
@@ -115,7 +115,7 @@ impl TxCache {
 
     /// Get a bundle from the URL.
     #[instrument(skip_all)]
-    pub async fn get_bundle(&self) -> Result<SignetEthBundleResponse, Error> {
+    pub async fn get_bundle(&self) -> Result<TxCacheBundle, Error> {
         let response: TxCacheBundleResponse =
             self.get_inner::<TxCacheBundleResponse>(BUNDLES).await?;
         Ok(response.bundle)
