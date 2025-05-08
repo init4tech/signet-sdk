@@ -108,7 +108,7 @@ fn simple_send(to: Address, value: U256, mpfpg: u128) -> TxEip1559 {
         gas_limit: 21_000,
         to: TxKind::Call(to),
         value,
-        chain_id: TEST_RU_CHAIN_ID,
+        chain_id: RU_CHAIN_ID,
         max_fee_per_gas: GWEI_TO_WEI as u128 * 100,
         max_priority_fee_per_gas: mpfpg,
         ..Default::default()

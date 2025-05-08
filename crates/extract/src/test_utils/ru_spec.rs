@@ -9,7 +9,7 @@ use alloy::{
     signers::local::PrivateKeySigner,
 };
 use reth::primitives::TransactionSigned;
-use signet_types::config::SignetSystemConstants;
+use signet_types::constants::SignetSystemConstants;
 use signet_zenith::Zenith::{self};
 
 /// A block spec for the Ru chain.

@@ -946,7 +946,7 @@ mod test {
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
     use signet_types::{
-        config::{HostConfig, PredeployTokens, RollupConstants},
+        constants::{HostConstants, PredeployTokens, RollupConstants},
         test_utils::*,
     };
     use trevm::revm::database::in_memory_db::InMemoryDB;
@@ -984,7 +984,7 @@ mod test {
             gas_limit: 21_000,
             to: alloy::primitives::TxKind::Call(to),
             value: amount,
-            chain_id: TEST_RU_CHAIN_ID,
+            chain_id: RU_CHAIN_ID,
             max_fee_per_gas: GWEI_TO_WEI as u128 * 100,
             max_priority_fee_per_gas: GWEI_TO_WEI as u128,
             ..Default::default()
@@ -1031,7 +1031,7 @@ mod test {
                 txns.into(),
                 SealedHeader::new(header, hash),
                 SignetSystemConstants::new(
-                    HostConfig::new(
+                    HostConstants::new(
                         1,
                         0,
                         Address::repeat_byte(0xdd),
@@ -1045,7 +1045,7 @@ mod test {
                         ),
                     ),
                     RollupConstants::new(
-                        TEST_RU_CHAIN_ID,
+                        RU_CHAIN_ID,
                         Address::repeat_byte(0xff),
                         Address::repeat_byte(0),
                         Address::repeat_byte(1),
@@ -1195,7 +1195,7 @@ mod test {
         let fake_receipt: reth::primitives::Receipt = Default::default();
 
         let enter = signet_zenith::Passage::Enter {
-            rollupChainId: U256::from(TEST_RU_CHAIN_ID),
+            rollupChainId: U256::from(RU_CHAIN_ID),
             rollupRecipient: user,
             amount: U256::from(100),
         };
@@ -1236,13 +1236,13 @@ mod test {
         let fake_receipt: reth::primitives::Receipt = Default::default();
 
         let enter = signet_zenith::Passage::Enter {
-            rollupChainId: U256::from(TEST_RU_CHAIN_ID),
+            rollupChainId: U256::from(RU_CHAIN_ID),
             rollupRecipient: sender,
             amount: U256::from(ETH_TO_WEI),
         };
 
         let transact = signet_zenith::Transactor::Transact {
-            rollupChainId: U256::from(TEST_RU_CHAIN_ID),
+            rollupChainId: U256::from(RU_CHAIN_ID),
             sender,
             to: recipient,
             data: Default::default(),

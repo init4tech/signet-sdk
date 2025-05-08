@@ -14,7 +14,7 @@ use reth::{
     },
     providers::{Chain, ExecutionOutcome},
 };
-use signet_types::{config::SignetSystemConstants, AggregateFills};
+use signet_types::{constants::SignetSystemConstants, AggregateFills};
 use signet_zenith::{Passage, RollupOrders, Transactor};
 use std::{
     borrow::Borrow,

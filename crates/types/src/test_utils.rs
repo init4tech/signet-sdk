@@ -2,7 +2,6 @@ use alloy::{
     primitives::Address,
     signers::{k256::ecdsa::SigningKey, local::PrivateKeySigner},
 };
-use signet_constants::{HostConfig, PredeployTokens, RollupConstants, SignetSystemConstants};
 use std::sync::LazyLock;
 
 pub use signet_constants::test_utils::*;

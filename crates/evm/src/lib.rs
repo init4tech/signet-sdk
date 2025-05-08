@@ -99,7 +99,7 @@ pub mod test_utils {
         fn fill_cfg_env(&self, cfg_env: &mut reth::revm::context::CfgEnv) {
             let CfgEnv { chain_id, spec, .. } = cfg_env;
 
-            *chain_id = TEST_RU_CHAIN_ID;
+            *chain_id = RU_CHAIN_ID;
             *spec = SpecId::default();
         }
     }

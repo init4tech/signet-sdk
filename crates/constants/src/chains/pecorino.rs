@@ -4,9 +4,9 @@ use crate::{HostConstants, PredeployTokens, RollupConstants, SignetSystemConstan
 use alloy::primitives::{address, Address};
 
 /// Chain ID for the Pecorino testnet host chain.
-pub const HOST_ID: u64 = 3151908;
+pub const HOST_CHAIN_ID: u64 = 3151908;
 /// Deployment height for the Pecorino testnet host chain.
-pub const DEPLOY_HEIGHT: u64 = 149984; 
+pub const DEPLOY_HEIGHT: u64 = 149984;
 /// `Zenith` contract address for the Pecorino testnet host chain.
 pub const HOST_ZENITH: Address = address!("0xbe45611502116387211D28cE493D6Fb3d192bc4E");
 /// `Orders` contract address for the Pecorino testnet host chain.
@@ -31,7 +31,7 @@ pub const RU_USDT: Address = address!("0xF34326d3521F1b07d1aa63729cB14A372f8A737
 pub const RU_WBTC: Address = address!("0xE3d7066115f7d6b65F88Dff86288dB4756a7D733");
 
 /// Chain ID for the Pecorino testnet RU chain.
-pub const ROLLUP_ID: u64 = 14174;
+pub const RU_CHAIN_ID: u64 = 14174;
 /// `Orders` contract address for the Pecorino testnet RU chain.
 pub const RU_ORDERS: Address = address!("0x8e9806fFF56d0660683F0A8157cE70F541A49dD0");
 /// `Passage` contract address for the Pecorino testnet RU chain.
@@ -48,7 +48,7 @@ pub const RU_TOKENS: PredeployTokens = crate::PredeployTokens::new(RU_USDC, RU_U
 
 /// Host system constants for Pecorino.
 pub const HOST: HostConstants = crate::HostConstants::new(
-    HOST_ID,
+    HOST_CHAIN_ID,
     DEPLOY_HEIGHT,
     HOST_ZENITH,
     HOST_ORDERS,
@@ -59,7 +59,7 @@ pub const HOST: HostConstants = crate::HostConstants::new(
 
 /// RU system constants for Pecorino.
 pub const ROLLUP: RollupConstants =
-    crate::RollupConstants::new(ROLLUP_ID, RU_ORDERS, RU_PASSAGE, BASE_FEE_RECIPIENT, RU_TOKENS);
+    crate::RollupConstants::new(RU_CHAIN_ID, RU_ORDERS, RU_PASSAGE, BASE_FEE_RECIPIENT, RU_TOKENS);
 
 /// Signet system constants for Pecorino.
 pub const PECORINO: SignetSystemConstants = crate::SignetSystemConstants::new(HOST, ROLLUP);

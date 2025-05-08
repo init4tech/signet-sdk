@@ -1,4 +1,4 @@
-use crate::{ConfigError, PredeployTokens};
+use crate::types::{ConfigError, PredeployTokens};
 use alloy::{
     genesis::Genesis,
     primitives::{address, Address},

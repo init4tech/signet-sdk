@@ -171,9 +171,9 @@ mod test {
             .with_block_number(1)
             .enter(TEST_USERS[0], (GWEI_TO_WEI * 4) as usize)
             .enter(TEST_USERS[1], (GWEI_TO_WEI * 2) as usize)
-            .enter_token(TEST_USERS[2], 10_000_000, USDC)
+            .enter_token(TEST_USERS[2], 10_000_000, HOST_USDC)
             .simple_transact(TEST_USERS[0], TEST_USERS[4], [1, 2, 3, 4], GWEI_TO_WEI as usize)
-            .fill(USDT, TEST_USERS[4], 10_000)
+            .fill(HOST_USDT, TEST_USERS[4], 10_000)
             .submit_block(ru_block);
         let (chain, _) = hbs.to_chain();
 

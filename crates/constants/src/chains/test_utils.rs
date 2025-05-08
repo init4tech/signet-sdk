@@ -7,7 +7,7 @@ use alloy::primitives::Address;
 pub const DEFAULT_REWARD_ADDRESS: Address = Address::repeat_byte(0x81);
 
 /// Test chain id for the host chain.
-pub const HOST_ID: u64 = 1;
+pub const HOST_CHAIN_ID: u64 = 1;
 /// Test deployment height.
 pub const DEPLOY_HEIGHT: u64 = 0;
 /// Test address for the host zenith.
@@ -27,14 +27,14 @@ pub const HOST_USDT: Address = Address::repeat_byte(0x8a);
 pub const HOST_WBTC: Address = Address::repeat_byte(0x8b);
 
 /// Test address for predeployed USDC
-pub const RU_USDC: Address = Address::repeat_byte(0x89);
+pub const RU_USDC: Address = HOST_USDC;
 /// Test address for predeployed USDT
-pub const RU_USDT: Address = Address::repeat_byte(0x8a);
+pub const RU_USDT: Address = HOST_USDT;
 /// Test address for predeployed WBTC
-pub const RU_WBTC: Address = Address::repeat_byte(0x8b);
+pub const RU_WBTC: Address = HOST_WBTC;
 
 /// Test chain id for the RU chain.
-pub const ROLLUP_ID: u64 = 15;
+pub const RU_CHAIN_ID: u64 = 15;
 /// Test address for the RU zenith.
 pub const RU_ORDERS: Address = Address::repeat_byte(0x86);
 /// Test address for the RU passage.
@@ -50,7 +50,7 @@ pub const RU_TOKENS: PredeployTokens = PredeployTokens::new(RU_USDC, RU_USDT, RU
 
 /// Host config
 pub const HOST: HostConstants = HostConstants::new(
-    HOST_ID,
+    HOST_CHAIN_ID,
     0,
     HOST_ZENITH,
     HOST_ORDERS,
@@ -61,7 +61,7 @@ pub const HOST: HostConstants = HostConstants::new(
 
 /// Rollup config
 pub const ROLLUP: RollupConstants =
-    RollupConstants::new(ROLLUP_ID, RU_ORDERS, RU_PASSAGE, BASE_FEE_RECIPIENT, RU_TOKENS);
+    RollupConstants::new(RU_CHAIN_ID, RU_ORDERS, RU_PASSAGE, BASE_FEE_RECIPIENT, RU_TOKENS);
 
 /// Test constants for unit tests.
 pub const TEST_CONSTANTS: SignetSystemConstants = SignetSystemConstants::new(HOST, ROLLUP);
