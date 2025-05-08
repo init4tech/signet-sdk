@@ -1,3 +1,5 @@
+//! Constants for local testnet chains.
+
 use crate::{HostConstants, PredeployTokens, RollupConstants, SignetSystemConstants};
 use alloy::primitives::Address;
 

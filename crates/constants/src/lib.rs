@@ -25,13 +25,13 @@ pub use height::PairedHeights;
 mod host;
 pub use host::HostConstants;
 
-pub mod pecorino;
+mod chains;
+pub use chains::pecorino;
+#[cfg(any(test, feature = "test-utils"))]
+pub use chains::test_utils;
 
 mod rollup;
 pub use rollup::{RollupConstants, MINTER_ADDRESS};
-
-#[cfg(any(test, feature = "test-utils"))]
-pub mod test_utils;
 
 mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
