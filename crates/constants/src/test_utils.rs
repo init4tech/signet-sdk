@@ -40,10 +40,10 @@ pub const RU_PASSAGE: Address = Address::repeat_byte(0x87);
 /// Test address for the base fee recipient.
 pub const BASE_FEE_RECIPIENT: Address = Address::repeat_byte(0x88);
 
-/// Host system tokens for Pecorino.
+/// Host system tokens.
 pub const HOST_TOKENS: PredeployTokens = PredeployTokens::new(HOST_USDC, HOST_USDT, HOST_WBTC);
 
-/// RU system tokens for Pecorino.
+/// RU system tokens.
 pub const RU_TOKENS: PredeployTokens = PredeployTokens::new(RU_USDC, RU_USDT, RU_WBTC);
 
 /// Host config
