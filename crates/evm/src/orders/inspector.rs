@@ -4,7 +4,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use reth::revm::interpreter::InterpreterTypes;
-use signet_types::{config::SignetSystemConstants, AggregateFills, AggregateOrders};
+use signet_types::{constants::SignetSystemConstants, AggregateFills, AggregateOrders};
 use signet_zenith::RollupOrders;
 use trevm::{
     helpers::Ctx,

@@ -22,7 +22,7 @@ use reth::{
     },
 };
 use signet_extract::{ExtractedEvent, Extracts};
-use signet_types::{config::SignetSystemConstants, AggregateFills, MarketError};
+use signet_types::{constants::SignetSystemConstants, AggregateFills, MarketError};
 use signet_zenith::{Passage, Transactor, MINTER_ADDRESS};
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, debug_span, warn};

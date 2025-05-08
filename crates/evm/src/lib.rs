@@ -31,7 +31,7 @@ pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector, SignetInspe
 mod result;
 pub use result::BlockResult;
 
-use signet_types::config::SignetSystemConstants;
+use signet_types::constants::SignetSystemConstants;
 use trevm::{
     helpers::Ctx,
     inspectors::Layered,
