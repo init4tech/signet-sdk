@@ -110,14 +110,14 @@ impl TxCacheTransactionsResponse {
     }
 }
 
-/// A response from the transaction cache, containing a transaction hash.
+/// Response from the transaction cache to successfully adding a transaction.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct TxCacheTransactionResponse {
+pub struct TxCacheSendTransactionResponse {
     /// The transaction hash
     tx_hash: B256,
 }
 
-impl TxCacheTransactionResponse {
+impl TxCacheSendTransactionResponse {
     /// Create a new transaction response from a transaction hash.
     pub const fn from_tx_hash(tx_hash: B256) -> Self {
         Self { tx_hash }
