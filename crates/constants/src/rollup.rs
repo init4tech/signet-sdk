@@ -1,4 +1,4 @@
-use crate::config::{ConfigError, PredeployTokens};
+use crate::{ConfigError, PredeployTokens};
 use alloy::{
     genesis::Genesis,
     primitives::{address, Address},
@@ -17,7 +17,7 @@ pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e6164
 /// node should listen to, and the addresses of system-priveleged tokens.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RollupConfig {
+pub struct RollupConstants {
     /// Rollup chain ID.
     chain_id: u64,
     /// Address of the orders contract.
@@ -30,7 +30,7 @@ pub struct RollupConfig {
     tokens: PredeployTokens,
 }
 
-impl RollupConfig {
+impl RollupConstants {
     /// Create a new rollup configuration.
     pub const fn new(
         chain_id: u64,

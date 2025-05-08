@@ -1,16 +1,41 @@
+//! Signet system constants.
+//!
+//! This crate contains the system constants for Signet chains, including the
+//! host and rollup system contracts, pre-deployed tokens, etc.
+//!
+
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
 mod error;
 pub use error::ConfigError;
 
+mod height;
+pub use height::PairedHeights;
+
 mod host;
-pub use host::HostConfig;
+pub use host::HostConstants;
+
+pub mod pecorino;
 
 mod rollup;
-pub use rollup::{RollupConfig, MINTER_ADDRESS};
+pub use rollup::{RollupConstants, MINTER_ADDRESS};
+
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils;
 
 mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
 
-use crate::PairedHeights;
 use alloy::{
     genesis::Genesis,
     primitives::{Address, U256},
@@ -25,14 +50,14 @@ use alloy::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetSystemConstants {
     /// Host constants.
-    host: HostConfig,
+    host: HostConstants,
     /// Rollup constants.
-    rollup: RollupConfig,
+    rollup: RollupConstants,
 }
 
 impl SignetSystemConstants {
     /// Create a new set of constants.
-    pub const fn new(host: HostConfig, rollup: RollupConfig) -> Self {
+    pub const fn new(host: HostConstants, rollup: RollupConstants) -> Self {
         Self { host, rollup }
     }
 
@@ -45,12 +70,12 @@ impl SignetSystemConstants {
     }
 
     /// Get the host addresses.
-    pub const fn host(&self) -> HostConfig {
+    pub const fn host(&self) -> HostConstants {
         self.host
     }
 
     /// Get the rollup addresses.
-    pub const fn rollup(&self) -> RollupConfig {
+    pub const fn rollup(&self) -> RollupConstants {
         self.rollup
     }
 

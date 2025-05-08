@@ -946,7 +946,7 @@ mod test {
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
     use signet_types::{
-        config::{HostConfig, PredeployTokens, RollupConfig},
+        config::{HostConfig, PredeployTokens, RollupConstants},
         test_utils::*,
     };
     use trevm::revm::database::in_memory_db::InMemoryDB;
@@ -1044,7 +1044,7 @@ mod test {
                             Address::repeat_byte(0xdc),
                         ),
                     ),
-                    RollupConfig::new(
+                    RollupConstants::new(
                         TEST_RU_CHAIN_ID,
                         Address::repeat_byte(0xff),
                         Address::repeat_byte(0),

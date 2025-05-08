@@ -1,4 +1,4 @@
-use crate::config::{ConfigError, PredeployTokens};
+use crate::{ConfigError, PredeployTokens};
 use alloy::{genesis::Genesis, primitives::Address};
 use serde_json::Value;
 
@@ -9,7 +9,7 @@ use serde_json::Value;
 /// node should listen to, and the addresses of system-priveleged tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct HostConfig {
+pub struct HostConstants {
     /// Host chain ID.
     chain_id: u64,
     /// Height at which the host chain deployed the rollup contracts.
@@ -26,7 +26,7 @@ pub struct HostConfig {
     tokens: PredeployTokens,
 }
 
-impl std::fmt::Display for HostConfig {
+impl std::fmt::Display for HostConstants {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -36,7 +36,7 @@ impl std::fmt::Display for HostConfig {
     }
 }
 
-impl HostConfig {
+impl HostConstants {
     /// Create a new host configuration.
     pub const fn new(
         chain_id: u64,

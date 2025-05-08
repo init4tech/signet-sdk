@@ -1,5 +1,5 @@
 [package]
-name = "signet-types"
+name = "signet-constants"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,20 +9,12 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-signet-zenith.workspace = true
-
 alloy.workspace = true
-
-hex.workspace = true
-serde = { workspace = true, features = ["derive"] }
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-chrono.workspace = true
-signet-constants.workspace = true
 
-[dev-dependencies]
-tokio = { version = "1.37.0", features = ["macros"] }
 
 [features]
 default = []
-test-utils = ["signet-constants/test-utils"]
+test-utils = []
