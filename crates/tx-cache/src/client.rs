@@ -1,5 +1,6 @@
 use crate::types::{
-    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse, TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse
+    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse,
+    TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -46,8 +47,7 @@ impl TxCache {
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not forwarding transaction."))?;
 
         // Send the object.
-        self
-            .client
+        self.client
             .post(url)
             .json(&obj)
             .send()
@@ -82,13 +82,19 @@ impl TxCache {
 
     /// Forwards a raw transaction to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<TxCacheSendTransactionResponse, Error> {
+    pub async fn forward_raw_transaction(
+        &self,
+        tx: TxEnvelope,
+    ) -> Result<TxCacheSendTransactionResponse, Error> {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
     /// Forward a bundle to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<TxCacheSendBundleResponse, Error> {
+    pub async fn forward_bundle(
+        &self,
+        bundle: SignetEthBundle,
+    ) -> Result<TxCacheSendBundleResponse, Error> {
         self.forward_inner(BUNDLES, bundle).await
     }
 

@@ -14,7 +14,7 @@ use alloy::{
 };
 use eyre::{eyre, Error};
 use signet_bundle::SignetEthBundle;
-use signet_tx_cache::client::TxCache;
+use signet_tx_cache::{client::TxCache, types::TxCacheSendBundleResponse};
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
 use std::{collections::HashMap, slice::from_ref};
 
@@ -109,11 +109,10 @@ where
     /// If a single Order is passed to this fn,
     /// Filling Orders individually ensures that even if some Orders are not fillable, others may still mine;
     /// however, it is less gas efficient.
-    pub async fn fill(&self, orders: &[SignedOrder]) -> Result<(), Error> {
-        // if orders is empty, exit the function without doing anything
+    pub async fn fill(&self, orders: &[SignedOrder]) -> Result<TxCacheSendBundleResponse, Error> {
+        // if orders is empty, error out
         if orders.is_empty() {
-            println!("No orders to fill");
-            return Ok(());
+            eyre::bail!("no orders to fill")
         }
 
         // sign a SignedFill for the orders
