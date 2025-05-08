@@ -1,6 +1,5 @@
 use crate::types::{
-    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse,
-    TxCacheTransactionsResponse,
+    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse, TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -35,11 +34,11 @@ impl TxCache {
         Self { url, client: reqwest::Client::new() }
     }
 
-    async fn forward_inner<T: Serialize + Send>(
+    async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
         &self,
         join: &'static str,
         obj: T,
-    ) -> Result<(), Error> {
+    ) -> Result<R, Error> {
         // Append the path to the URL.
         let url = self
             .url
@@ -47,15 +46,17 @@ impl TxCache {
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not forwarding transaction."))?;
 
         // Send the object.
-        let _ = self
+        self
             .client
             .post(url)
             .json(&obj)
             .send()
             .await
-            .inspect_err(|e| warn!(%e, "Failed to forward object"))?;
-
-        Ok(())
+            .inspect_err(|e| warn!(%e, "Failed to forward object"))?
+            .json::<R>()
+            .await
+            .map_err(Into::into)
+            .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
     }
 
     async fn get_inner<T>(&self, join: &'static str) -> Result<T, Error>
@@ -81,13 +82,13 @@ impl TxCache {
 
     /// Forwards a raw transaction to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<(), Error> {
+    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<TxCacheSendTransactionResponse, Error> {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
     /// Forward a bundle to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<(), Error> {
+    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<TxCacheSendBundleResponse, Error> {
         self.forward_inner(BUNDLES, bundle).await
     }
 
