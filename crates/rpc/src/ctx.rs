@@ -3,7 +3,7 @@ use crate::{
     interest::{ActiveFilter, FilterManager, FilterOutput, SubscriptionManager},
     receipts::build_signet_receipt,
     util::BlockRangeInclusiveIter,
-    Pnt, TxCache,
+    Pnt,
 };
 use alloy::{
     consensus::{BlockHeader, Header, Signed, Transaction, TxEnvelope},
@@ -41,6 +41,7 @@ use reth_chainspec::{BaseFeeParams, ChainSpec, ChainSpecProvider};
 use reth_node_api::{BlockBody, FullNodeComponents};
 use reth_rpc_eth_api::{RpcBlock, RpcReceipt, RpcTransaction};
 use signet_evm::{EvmNeedsTx, RuRevmState};
+use signet_tx_cache::client::TxCache;
 use signet_types::{config::SignetSystemConstants, MagicSig};
 use std::{marker::PhantomData, sync::Arc};
 use tracing::{instrument, trace, Level};

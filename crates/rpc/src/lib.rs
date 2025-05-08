@@ -62,9 +62,6 @@ pub use signet::{error::SignetError, signet};
 
 mod interest;
 
-mod cache;
-pub use cache::{SignetEthBundleResponse, TxCache};
-
 pub mod receipts;
 
 /// Utils and simple serve functions.

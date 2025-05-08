@@ -1,5 +1,7 @@
 [package]
-name = "signet-rpc"
+name = "signet-tx-cache"
+description = "Types and helpers for using the Signet transaction cache"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,7 +14,7 @@ repository.workspace = true
 signet-bundle.workspace = true
 signet-evm.workspace = true
 signet-types.workspace = true
-signet-tx-cache.workspace = true
+signet-zenith.workspace = true
 
 ajj.workspace = true
 trevm.workspace = true
@@ -29,9 +31,10 @@ dashmap = "6.1.0"
 eyre.workspace = true
 interprocess = { version = "2.2.2", features = ["tokio"] }
 reqwest.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tokio-util = "0.7.13"
 tower-http = { version = "0.6.2", features = ["cors"] }
 tracing.workspace = true
+uuid = { workspace = true, features = ["serde"] }

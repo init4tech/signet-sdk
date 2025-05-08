@@ -41,16 +41,22 @@ signet-node = { path = "crates/node" }
 signet-rpc = { path = "crates/rpc" }
 signet-sim = { path = "crates/sim" }
 signet-types = { path = "crates/types" }
+signet-tx-cache = { path = "crates/tx-cache" }
 signet-zenith = { path = "crates/zenith" }
 
 # ajj
 ajj = { version = "0.3.1" }
 
 # trevm
-trevm = { version = "0.20.7", features = ["full_env_cfg"] }
+trevm = { version = "0.20.10", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
-alloy = { version = "=0.12.6", features = ["full", "rpc-types-mev", "genesis", "arbitrary"] }
+alloy = { version = "=0.12.6", features = [
+    "full",
+    "rpc-types-mev",
+    "genesis",
+    "arbitrary",
+] }
 alloy-contract = { version = "=0.12.6", features = ["pubsub"] }
 
 # Reth
@@ -103,7 +109,7 @@ chrono = "0.4.38"
 hex = { package = "const-hex", version = "1.10", default-features = false, features = [
     "alloc",
 ] }
+uuid = "1.16.0"
 
 # Test Utils
 alloy-rlp = "0.3.11"
-
