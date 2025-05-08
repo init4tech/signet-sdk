@@ -1,5 +1,5 @@
 use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
-use signet_types::config::SignetSystemConstants;
+use signet_types::constants::SignetSystemConstants;
 use tokio::select;
 use tracing::{debug, info_span, trace, Instrument};
 use trevm::{

@@ -1,16 +1,18 @@
 mod error;
 pub use error::ConfigError;
 
+mod height;
+pub use height::PairedHeights;
+
 mod host;
-pub use host::HostConfig;
+pub use host::HostConstants;
 
 mod rollup;
-pub use rollup::{RollupConfig, MINTER_ADDRESS};
+pub use rollup::{RollupConstants, MINTER_ADDRESS};
 
 mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
 
-use crate::PairedHeights;
 use alloy::{
     genesis::Genesis,
     primitives::{Address, U256},
@@ -25,15 +27,26 @@ use alloy::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetSystemConstants {
     /// Host constants.
-    host: HostConfig,
+    host: HostConstants,
     /// Rollup constants.
-    rollup: RollupConfig,
+    rollup: RollupConstants,
 }
 
 impl SignetSystemConstants {
     /// Create a new set of constants.
-    pub const fn new(host: HostConfig, rollup: RollupConfig) -> Self {
+    pub const fn new(host: HostConstants, rollup: RollupConstants) -> Self {
         Self { host, rollup }
+    }
+
+    /// Get the hard-coded pecorino system constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::PECORINO
+    }
+
+    /// Get the hard-coded local test constants.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test() -> Self {
+        crate::chains::test_utils::TEST_CONSTANTS
     }
 
     /// Load the constants from a [`Genesis`].
@@ -45,12 +58,12 @@ impl SignetSystemConstants {
     }
 
     /// Get the host addresses.
-    pub const fn host(&self) -> HostConfig {
+    pub const fn host(&self) -> HostConstants {
         self.host
     }
 
     /// Get the rollup addresses.
-    pub const fn rollup(&self) -> RollupConfig {
+    pub const fn rollup(&self) -> RollupConstants {
         self.rollup
     }
 

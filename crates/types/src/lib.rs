@@ -16,7 +16,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 /// Structs that hold Signet system configuration.
-pub mod config;
+pub use signet_constants as constants;
+pub use signet_constants::PairedHeights;
 
 mod agg;
 pub use agg::{AggregateFills, AggregateOrders, MarketError};
@@ -28,9 +29,6 @@ pub use signing::{
 
 mod magic_sig;
 pub use magic_sig::{MagicSig, MagicSigInfo};
-
-mod height;
-pub use height::PairedHeights;
 
 mod seq;
 pub use seq::{RequestSigner, SignRequest, SignResponse};

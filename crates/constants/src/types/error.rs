@@ -16,7 +16,7 @@ pub enum ConfigError {
     ParseBool,
     /// Error parsing hex from environment variable
     #[error("failed to parse hex: {0}")]
-    Hex(#[from] hex::FromHexError),
+    Hex(#[from] alloy::hex::FromHexError),
     /// Error parsing JSON
     #[error("failed to parse JSON: {0}")]
     Json(#[from] serde_json::Error),

@@ -23,8 +23,8 @@ use std::collections::HashMap;
 ///
 /// ```
 /// # use alloy::primitives::{Address, U256};
-/// # use signet_types::AggregateFills;
-/// # use signet_zenith::{AggregateOrders, RollupOrders};
+/// # use signet_zenith::RollupOrders;
+/// # use signet_types::{AggregateFills, AggregateOrders};
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let fill = RollupOrders::Filled {
 /// #   outputs: vec![],

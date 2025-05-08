@@ -7,7 +7,7 @@ honestly.
 
 ## What's in this crate?
 
-- `mod config` - contains `SignetSystemConstants` a configuration object that
+- `mod constants` - contains `SignetSystemConstants` a configuration object that
   holds the system constants and is used by the extractor, the EVM, and the
   node.
 - `AggregateFills` - a struct that holds the aggregate fill status for

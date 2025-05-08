@@ -1,4 +1,4 @@
-use crate::config::{ConfigError, PredeployTokens};
+use crate::types::{ConfigError, PredeployTokens};
 use alloy::{
     genesis::Genesis,
     primitives::{address, Address},
@@ -17,7 +17,7 @@ pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e6164
 /// node should listen to, and the addresses of system-priveleged tokens.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RollupConfig {
+pub struct RollupConstants {
     /// Rollup chain ID.
     chain_id: u64,
     /// Address of the orders contract.
@@ -30,7 +30,7 @@ pub struct RollupConfig {
     tokens: PredeployTokens,
 }
 
-impl RollupConfig {
+impl RollupConstants {
     /// Create a new rollup configuration.
     pub const fn new(
         chain_id: u64,
@@ -40,6 +40,17 @@ impl RollupConfig {
         tokens: PredeployTokens,
     ) -> Self {
         Self { chain_id, orders, passage, base_fee_recipient, tokens }
+    }
+
+    /// Get the hard-coded pecorino rollup constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::ROLLUP
+    }
+
+    /// Get the hard-coded local test rollup constants.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test() -> Self {
+        crate::chains::test_utils::ROLLUP
     }
 
     /// Load the constants from a [`Genesis`].

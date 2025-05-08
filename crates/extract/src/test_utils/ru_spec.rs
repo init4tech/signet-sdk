@@ -9,7 +9,7 @@ use alloy::{
     signers::local::PrivateKeySigner,
 };
 use reth::primitives::TransactionSigned;
-use signet_types::config::SignetSystemConstants;
+use signet_types::constants::SignetSystemConstants;
 use signet_zenith::Zenith::{self};
 
 /// A block spec for the Ru chain.
@@ -38,6 +38,16 @@ impl RuBlockSpec {
     /// Create a new empty RU block spec.
     pub const fn new(constants: SignetSystemConstants) -> Self {
         Self { constants, tx: vec![], gas_limit: None, reward_address: None }
+    }
+
+    /// Create a new empty RU block spec with the pecorino constants.
+    pub const fn pecorino() -> Self {
+        Self::new(SignetSystemConstants::pecorino())
+    }
+
+    /// Create a new empty RU block spec with the test constants.
+    pub const fn test() -> Self {
+        Self::new(SignetSystemConstants::test())
     }
 
     /// Builder method to set the gas limit.

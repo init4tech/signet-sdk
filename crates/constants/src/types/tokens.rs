@@ -30,6 +30,28 @@ impl PredeployTokens {
         Self { usdc, usdt, wbtc }
     }
 
+    /// Get the hard-coded pecorino host tokens.
+    pub const fn pecorino_host() -> Self {
+        crate::chains::pecorino::HOST_TOKENS
+    }
+
+    /// Get the hard-coded local test rollup tokens.
+    pub const fn pecorino_rollup() -> Self {
+        crate::chains::pecorino::RU_TOKENS
+    }
+
+    /// Get the hard-coded local test host tokens.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test_host() -> Self {
+        crate::chains::test_utils::HOST_TOKENS
+    }
+
+    /// Get the hard-coded local test rollup tokens.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test_rollup() -> Self {
+        crate::chains::test_utils::RU_TOKENS
+    }
+
     /// Get the token for the given address.
     pub const fn const_token_for(&self, address: Address) -> Option<PermissionedToken> {
         if address.const_eq(&self.usdc) {

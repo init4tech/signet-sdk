@@ -10,18 +10,18 @@ repository.workspace = true
 
 [dependencies]
 signet-zenith.workspace = true
+signet-constants.workspace = true
 
 alloy.workspace = true
 
-hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 tokio = { version = "1.37.0", features = ["macros"] }
 
 [features]
 default = []
-test-utils = []
+test-utils = ["signet-constants/test-utils"]

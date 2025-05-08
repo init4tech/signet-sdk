@@ -35,6 +35,7 @@ incremental = false
 
 [workspace.dependencies]
 signet-bundle = { path = "crates/bundle" }
+signet-constants = { path = "crates/constants" }
 signet-evm = { path = "crates/evm" }
 signet-extract = { path = "crates/extract" }
 signet-node = { path = "crates/node" }

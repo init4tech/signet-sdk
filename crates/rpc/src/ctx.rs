@@ -42,7 +42,7 @@ use reth_node_api::{BlockBody, FullNodeComponents};
 use reth_rpc_eth_api::{RpcBlock, RpcReceipt, RpcTransaction};
 use signet_evm::{EvmNeedsTx, RuRevmState};
 use signet_tx_cache::client::TxCache;
-use signet_types::{config::SignetSystemConstants, MagicSig};
+use signet_types::{constants::SignetSystemConstants, MagicSig};
 use std::{marker::PhantomData, sync::Arc};
 use tracing::{instrument, trace, Level};
 use trevm::{

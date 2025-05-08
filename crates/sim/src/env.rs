@@ -3,7 +3,7 @@ use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetLayered;
-use signet_types::config::SignetSystemConstants;
+use signet_types::constants::SignetSystemConstants;
 use std::{convert::Infallible, marker::PhantomData, ops::Deref, sync::Arc, time::Instant};
 use tokio::{
     select,
