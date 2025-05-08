@@ -65,6 +65,12 @@ impl Clone for HostBlockSpec {
     }
 }
 
+impl From<SignetSystemConstants> for HostBlockSpec {
+    fn from(constants: SignetSystemConstants) -> Self {
+        Self::new(constants)
+    }
+}
+
 impl HostBlockSpec {
     /// Make a new block spec
     pub const fn new(constants: SignetSystemConstants) -> Self {
@@ -77,6 +83,16 @@ impl HostBlockSpec {
             block_number: AtomicU64::new(0),
             events: vec![],
         }
+    }
+
+    /// Make a new block spec with pecorino constants.
+    pub const fn pecorino() -> Self {
+        Self::new(SignetSystemConstants::pecorino())
+    }
+
+    /// Make a new block spec with test constants.
+    pub const fn test() -> Self {
+        Self::new(SignetSystemConstants::test())
     }
 
     /// Set the block number.

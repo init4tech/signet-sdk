@@ -38,6 +38,17 @@ impl SignetSystemConstants {
         Self { host, rollup }
     }
 
+    /// Get the hard-coded pecorino system constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::PECORINO
+    }
+
+    /// Get the hard-coded local test constants.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test() -> Self {
+        crate::chains::test_utils::TEST_CONSTANTS
+    }
+
     /// Load the constants from a [`Genesis`].
     pub fn try_from_genesis(genesis: &Genesis) -> Result<Self, ConfigError> {
         let k = "signetConstants";

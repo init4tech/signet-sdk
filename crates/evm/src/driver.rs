@@ -945,10 +945,7 @@ mod test {
     };
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
-    use signet_types::{
-        constants::{HostConstants, PredeployTokens, RollupConstants},
-        test_utils::*,
-    };
+    use signet_types::test_utils::*;
     use trevm::revm::database::in_memory_db::InMemoryDB;
 
     /// Make a fake block with a specific number.
@@ -1030,32 +1027,7 @@ mod test {
                 extracts,
                 txns.into(),
                 SealedHeader::new(header, hash),
-                SignetSystemConstants::new(
-                    HostConstants::new(
-                        1,
-                        0,
-                        Address::repeat_byte(0xdd),
-                        Address::repeat_byte(0xee),
-                        Address::repeat_byte(0xff),
-                        Address::repeat_byte(0x66),
-                        PredeployTokens::new(
-                            Address::repeat_byte(0xba),
-                            Address::repeat_byte(0xcb),
-                            Address::repeat_byte(0xdc),
-                        ),
-                    ),
-                    RollupConstants::new(
-                        RU_CHAIN_ID,
-                        Address::repeat_byte(0xff),
-                        Address::repeat_byte(0),
-                        Address::repeat_byte(1),
-                        PredeployTokens::new(
-                            Address::repeat_byte(0xaa),
-                            Address::repeat_byte(0xbb),
-                            Address::repeat_byte(0xcc),
-                        ),
-                    ),
-                ),
+                SignetSystemConstants::test(),
             )
         }
 

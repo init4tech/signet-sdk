@@ -50,6 +50,17 @@ impl HostConstants {
         Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
     }
 
+    /// Get the hard-coded pecorino host constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::HOST
+    }
+
+    /// Get the hard-coded local test host constants.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test() -> Self {
+        crate::chains::test_utils::HOST
+    }
+
     /// Load the constants from a [`Genesis`].
     pub fn try_from_genesis(genesis: &Genesis) -> Result<Self, ConfigError> {
         let constants = genesis

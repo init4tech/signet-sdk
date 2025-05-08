@@ -40,6 +40,16 @@ impl RuBlockSpec {
         Self { constants, tx: vec![], gas_limit: None, reward_address: None }
     }
 
+    /// Create a new empty RU block spec with the pecorino constants.
+    pub const fn pecorino() -> Self {
+        Self::new(SignetSystemConstants::pecorino())
+    }
+
+    /// Create a new empty RU block spec with the test constants.
+    pub const fn test() -> Self {
+        Self::new(SignetSystemConstants::test())
+    }
+
     /// Builder method to set the gas limit.
     pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = Some(gas_limit);

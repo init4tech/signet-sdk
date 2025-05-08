@@ -42,6 +42,17 @@ impl RollupConstants {
         Self { chain_id, orders, passage, base_fee_recipient, tokens }
     }
 
+    /// Get the hard-coded pecorino rollup constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::ROLLUP
+    }
+
+    /// Get the hard-coded local test rollup constants.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test() -> Self {
+        crate::chains::test_utils::ROLLUP
+    }
+
     /// Load the constants from a [`Genesis`].
     pub fn try_from_genesis(genesis: &Genesis) -> Result<Self, ConfigError> {
         let constants = genesis

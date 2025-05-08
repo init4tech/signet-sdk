@@ -25,8 +25,8 @@ pub struct Extractor {
 
 impl Extractor {
     /// Create a new [`Extractor`] from system constants.
-    pub const fn new(constants: &SignetSystemConstants) -> Self {
-        Self { constants: *constants }
+    pub const fn new(constants: SignetSystemConstants) -> Self {
+        Self { constants }
     }
 
     /// Get the system constants.
@@ -162,12 +162,12 @@ mod test {
 
     #[test]
     fn extraction() {
-        let mut ru_block = RuBlockSpec::new(TEST_CONSTANTS)
+        let mut ru_block = RuBlockSpec::test()
             .with_gas_limit(12345)
             .with_reward_address(Address::repeat_byte(0x99));
         ru_block.add_simple_send(&TEST_SIGNERS[0], TEST_USERS[1], U256::from(GWEI_TO_WEI), 0);
 
-        let hbs = HostBlockSpec::new(TEST_CONSTANTS)
+        let hbs = HostBlockSpec::test()
             .with_block_number(1)
             .enter(TEST_USERS[0], (GWEI_TO_WEI * 4) as usize)
             .enter(TEST_USERS[1], (GWEI_TO_WEI * 2) as usize)
@@ -177,7 +177,7 @@ mod test {
             .submit_block(ru_block);
         let (chain, _) = hbs.to_chain();
 
-        let extractor = Extractor::new(&TEST_CONSTANTS);
+        let extractor = Extractor::new(TEST_CONSTANTS);
         let extracts = extractor.extract_signet(&chain).next().unwrap();
 
         hbs.assert_conforms(&extracts);
