@@ -38,4 +38,5 @@ tracing.workspace = true
 
 [dev-dependencies]
 signet-zenith.workspace = true
+signet-constants.workspace = true
 chrono.workspace = true
