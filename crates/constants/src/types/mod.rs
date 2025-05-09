@@ -87,6 +87,17 @@ impl SignetSystemConstants {
         self.host.is_system_contract(address)
     }
 
+    /// Get the Order contract address for the given chain id.
+    pub const fn orders_for(&self, chain_id: u64) -> Option<Address> {
+        if chain_id == self.host_chain_id() {
+            Some(self.host_orders())
+        } else if chain_id == self.ru_chain_id() {
+            Some(self.ru_orders())
+        } else {
+            None
+        }
+    }
+
     /// Get the host chain ID.
     pub const fn host_chain_id(&self) -> u64 {
         self.host.chain_id()

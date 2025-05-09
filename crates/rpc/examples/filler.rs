@@ -1,7 +1,7 @@
 use alloy::{
     eips::Encodable2718,
     network::{Ethereum, EthereumWallet, TransactionBuilder},
-    primitives::{Address, Bytes},
+    primitives::Bytes,
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
@@ -14,6 +14,7 @@ use alloy::{
 };
 use eyre::{eyre, Error};
 use signet_bundle::SignetEthBundle;
+use signet_constants::SignetSystemConstants;
 use signet_tx_cache::{client::TxCache, types::TxCacheSendBundleResponse};
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
 use std::{collections::HashMap, slice::from_ref};
@@ -34,9 +35,6 @@ type Provider = FillProvider<
     Ethereum,
 >;
 
-/// Empty main to silence clippy.
-fn main() {}
-
 /// Example code demonstrating API usage and patterns for Signet Fillers.
 #[derive(Debug)]
 pub struct Filler<S: Signer> {
@@ -46,13 +44,8 @@ pub struct Filler<S: Signer> {
     ru_provider: Provider,
     /// The transaction cache endpoint.
     tx_cache: TxCache,
-    /// A HashMap of the Order contract addresses for each chain.
-    /// MUST contain an address for both Host and Rollup.
-    order_contracts: HashMap<u64, Address>,
-    /// The chain id of the rollup.
-    ru_chain_id: u64,
-    /// The chain id of the host.
-    host_chain_id: u64,
+    /// The system constants.
+    constants: SignetSystemConstants,
 }
 
 impl<S> Filler<S>
@@ -64,11 +57,9 @@ where
         signer: S,
         ru_provider: Provider,
         tx_cache: TxCache,
-        order_contracts: HashMap<u64, Address>,
-        ru_chain_id: u64,
-        host_chain_id: u64,
+        constants: SignetSystemConstants,
     ) -> Self {
-        Self { signer, ru_provider, tx_cache, order_contracts, ru_chain_id, host_chain_id }
+        Self { signer, ru_provider, tx_cache, constants }
     }
 
     /// Query the transaction cache to get all possible orders.
@@ -125,7 +116,7 @@ where
         let txs = self.sign_and_encode_txns(tx_requests).await?;
 
         // get the aggregated host fill for the Bundle, if any
-        let host_fills = signed_fills.remove(&self.host_chain_id);
+        let host_fills = signed_fills.remove(&self.constants.host().chain_id());
 
         // set the Bundle to only be valid if mined in the next rollup block
         let block_number = self.ru_provider.get_block_number().await? + 1;
@@ -165,8 +156,12 @@ where
         let mut unsigned_fill = UnsignedFill::from(&agg);
         // populate the Order contract addresses for each chain
         for chain_id in agg.destination_chain_ids() {
-            unsigned_fill =
-                unsigned_fill.with_chain(chain_id, self.order_contract_address_for(chain_id)?);
+            unsigned_fill = unsigned_fill.with_chain(
+                chain_id,
+                self.constants
+                    .orders_for(chain_id)
+                    .ok_or(eyre!("invalid target chain id {}", chain_id))?,
+            );
         }
         // sign the UnsignedFill, producing a SignedFill for each target chain
         Ok(unsigned_fill.sign(&self.signer).await?)
@@ -194,17 +189,17 @@ where
         // Note that `fill` transactions MUST be mined *before* the corresponding Order(s) `initiate` transactions in order to cound
         // Host `fill` transactions are always considered to be mined "before" the rollup block is processed,
         // but Rollup `fill` transactions MUST take care to be ordered before the Orders are `initiate`d
-        if let Some(rollup_fill) = signed_fills.get(&self.ru_chain_id) {
+        if let Some(rollup_fill) = signed_fills.get(&self.constants.rollup().chain_id()) {
             // add the fill tx to the rollup txns
-            let ru_fill_tx = rollup_fill.to_fill_tx(self.ru_order_contract()?);
+            let ru_fill_tx = rollup_fill.to_fill_tx(self.constants.rollup().orders());
             tx_requests.push(ru_fill_tx);
         }
 
         // next, add a transaction to initiate each SignedOrder
         for signed_order in orders {
             // add the initiate tx to the rollup txns
-            let ru_initiate_tx =
-                signed_order.to_initiate_tx(self.signer.address(), self.ru_order_contract()?);
+            let ru_initiate_tx = signed_order
+                .to_initiate_tx(self.signer.address(), self.constants.rollup().orders());
             tx_requests.push(ru_initiate_tx);
         }
 
@@ -238,17 +233,7 @@ where
         }
         Ok(encoded_txs)
     }
-
-    /// Get the Order contract address for the given chain id.
-    fn order_contract_address_for(&self, chain_id: u64) -> Result<Address, Error> {
-        self.order_contracts
-            .get(&chain_id)
-            .copied()
-            .ok_or(eyre!("No Order contract address configured for chain id {}", chain_id))
-    }
-
-    /// Get the Order contract address for the rollup.
-    fn ru_order_contract(&self) -> Result<Address, Error> {
-        self.order_contract_address_for(self.ru_chain_id)
-    }
 }
+
+/// Empty main to silence clippy.
+fn main() {}
