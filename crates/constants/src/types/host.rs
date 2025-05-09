@@ -10,6 +10,8 @@ use serde_json::Value;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostConstants {
+    /// Name of the host chain.
+    name: &'static str,
     /// Host chain ID.
     chain_id: u64,
     /// Height at which the host chain deployed the rollup contracts.
@@ -39,6 +41,7 @@ impl std::fmt::Display for HostConstants {
 impl HostConstants {
     /// Create a new host configuration.
     pub const fn new(
+        name: &'static str,
         chain_id: u64,
         deploy_height: u64,
         zenith: Address,
@@ -47,7 +50,7 @@ impl HostConstants {
         transactor: Address,
         tokens: PredeployTokens,
     ) -> Self {
-        Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
+        Self { name, chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
     }
 
     /// Get the hard-coded pecorino host constants.
@@ -87,6 +90,11 @@ impl HostConstants {
             || address == self.orders
             || address == self.passage
             || address == self.transactor
+    }
+
+    /// Get the host chain name.
+    pub const fn name(&self) -> &'static str {
+        self.name
     }
 
     /// Get the host chain ID.
