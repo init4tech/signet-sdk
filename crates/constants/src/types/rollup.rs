@@ -18,6 +18,8 @@ pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e6164
 #[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RollupConstants {
+    /// The name of the network.
+    name: &'static str,
     /// Rollup chain ID.
     chain_id: u64,
     /// Address of the orders contract.
@@ -33,13 +35,14 @@ pub struct RollupConstants {
 impl RollupConstants {
     /// Create a new rollup configuration.
     pub const fn new(
+        name: &'static str,
         chain_id: u64,
         orders: Address,
         passage: Address,
         base_fee_recipient: Address,
         tokens: PredeployTokens,
     ) -> Self {
-        Self { chain_id, orders, passage, base_fee_recipient, tokens }
+        Self { name, chain_id, orders, passage, base_fee_recipient, tokens }
     }
 
     /// Get the hard-coded pecorino rollup constants.
@@ -63,6 +66,11 @@ impl RollupConstants {
             .and_then(|v| v.get("rollup"))
             .ok_or_else(|| ConfigError::missing("signetConstants.rollup"))?;
         serde_json::from_value(constants.clone()).map_err(Into::into)
+    }
+
+    /// Get the rollup chain name.
+    pub const fn name(&self) -> &'static str {
+        self.name
     }
 
     /// Get the address of the orders contract.
