@@ -88,7 +88,7 @@ pub mod test_utils {
     /// Create a new Signet EVM with an in-memory database for testing.
     pub fn test_signet_evm() -> super::EvmNeedsBlock<trevm::revm::database::in_memory_db::InMemoryDB>
     {
-        super::signet_evm(InMemoryDB::default(), TEST_CONSTANTS).fill_cfg(&TestCfg)
+        super::signet_evm(InMemoryDB::default(), TEST_SYS).fill_cfg(&TestCfg)
     }
 
     /// Test configuration for the Signet EVM.

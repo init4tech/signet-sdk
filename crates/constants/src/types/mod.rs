@@ -13,6 +13,9 @@ pub use rollup::{RollupConstants, MINTER_ADDRESS};
 mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
 
+mod environment;
+pub use environment::SignetEnvironmentConstants;
+
 use alloy::{
     genesis::Genesis,
     primitives::{Address, U256},
@@ -40,13 +43,13 @@ impl SignetSystemConstants {
 
     /// Get the hard-coded pecorino system constants.
     pub const fn pecorino() -> Self {
-        crate::chains::pecorino::PECORINO
+        crate::chains::pecorino::PECORINO_SYS
     }
 
     /// Get the hard-coded local test constants.
     #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
-        crate::chains::test_utils::TEST_CONSTANTS
+        crate::chains::test_utils::TEST_SYS
     }
 
     /// Load the constants from a [`Genesis`].
@@ -207,5 +210,45 @@ impl SignetSystemConstants {
     /// Get the minter address.
     pub const fn minter(&self) -> Address {
         self.rollup.minter()
+    }
+}
+
+/// All constants pertaining to the Signet system.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct SignetConstants {
+    /// System constants for a Signet chain.
+    system: SignetSystemConstants,
+    /// Environment constants for a Signet chain.
+    environment: SignetEnvironmentConstants,
+}
+
+impl SignetConstants {
+    /// Create a new set of Signet constants.
+    pub const fn new(
+        system: SignetSystemConstants,
+        environment: SignetEnvironmentConstants,
+    ) -> Self {
+        Self { system, environment }
+    }
+
+    /// Get the hard-coded pecorino rollup constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::PECORINO
+    }
+
+    /// Get the hard-coded local test rollup constants.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub const fn test() -> Self {
+        crate::chains::test_utils::TEST
+    }
+
+    /// Get the system constants.
+    pub const fn system(&self) -> &SignetSystemConstants {
+        &self.system
+    }
+
+    /// Get the environment constants.
+    pub const fn environment(&self) -> &SignetEnvironmentConstants {
+        &self.environment
     }
 }
