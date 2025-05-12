@@ -98,8 +98,7 @@ impl TxCacheSendBundleResponse {
         Self { id }
     }
 
-    /// Convert the bundle response to a [uuid::Uuid].
-    pub const fn into_bundle_id(self) -> uuid::Uuid {
+    pub fn id(&self) -> uuid::Uuid {
         self.id
     }
 }
