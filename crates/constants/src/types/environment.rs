@@ -2,16 +2,16 @@
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetEnvironmentConstants {
     /// Name of the host chain.
-    host_name: String,
+    host_name: &'static str,
     /// Name of the rollup.
-    rollup_name: String,
+    rollup_name: &'static str,
     /// URL of the Transaction Cache
-    transaction_cache: String,
+    transaction_cache: &'static str,
 }
 
 impl SignetEnvironmentConstants {
     /// Create a new set of environment constants.
-    pub const fn new(host_name: String, rollup_name: String, transaction_cache: String) -> Self {
+    pub const fn new(host_name: &'static str, rollup_name: &'static str, transaction_cache: &'static str) -> Self {
         Self { host_name, rollup_name, transaction_cache }
     }
 

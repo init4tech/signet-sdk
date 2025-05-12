@@ -76,9 +76,9 @@ pub const PECORINO_SYS: SignetSystemConstants = crate::SignetSystemConstants::ne
 
 /// Signet environment constants for Pecorino.
 pub const PECORINO_ENV: SignetEnvironmentConstants = SignetEnvironmentConstants::new(
-    HOST_NAME.to_string(),
-    RU_NAME.to_string(),
-    TX_CACHE_URL.to_string(),
+    HOST_NAME,
+    RU_NAME,
+    TX_CACHE_URL,
 );
 
 /// Signet constants for Pecorino.

@@ -213,6 +213,7 @@ impl SignetSystemConstants {
     }
 }
 
+
 /// All constants pertaining to the Signet system.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetConstants {
