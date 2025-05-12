@@ -11,7 +11,11 @@ pub struct SignetEnvironmentConstants {
 
 impl SignetEnvironmentConstants {
     /// Create a new set of environment constants.
-    pub const fn new(host_name: &'static str, rollup_name: &'static str, transaction_cache: &'static str) -> Self {
+    pub const fn new(
+        host_name: &'static str,
+        rollup_name: &'static str,
+        transaction_cache: &'static str,
+    ) -> Self {
         Self { host_name, rollup_name, transaction_cache }
     }
 
