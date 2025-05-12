@@ -27,8 +27,12 @@ where
     S: Signer,
 {
     /// Create a new SendOrder instance.
-    pub fn new(signer: S, constants: SignetConstants) -> Self {
-        Self { signer, tx_cache: TxCache::from(&constants), constants }
+    pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
+        Ok(Self {
+            signer,
+            tx_cache: TxCache::from_environment(&constants.environment())?,
+            constants,
+        })
     }
 
     /// Construct a simple example Order, sign it, and send it.

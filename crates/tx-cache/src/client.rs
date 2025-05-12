@@ -6,7 +6,7 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
-use signet_constants::{SignetConstants, SignetEnvironmentConstants};
+use signet_constants::{pecorino, SignetEnvironmentConstants};
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
@@ -38,15 +38,31 @@ impl TxCache {
 
     /// Create a new cache for Pecorino.
     pub fn pecorino() -> Self {
-        (&SignetEnvironmentConstants::pecorino()).into()
+        let url =
+            reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
+        Self::new(url)
     }
 
     /// Create a new cache for Pecorino and client.
     pub fn pecorino_with_client(client: reqwest::Client) -> Self {
-        Self::new_with_client(
-            SignetEnvironmentConstants::pecorino().transaction_cache_url(),
-            client,
-        )
+        let url =
+            reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
+        Self::new_with_client(url, client)
+    }
+
+    /// Create a new cache for a given SignetEnvironmentConstants.
+    pub fn from_environment(env: &SignetEnvironmentConstants) -> Result<Self, Error> {
+        let url = reqwest::Url::parse(env.transaction_cache())?;
+        Ok(Self::new(url))
+    }
+
+    /// Create a new cache for a given SignetEnvironmentConstants and client.
+    pub fn from_environment_with_client(
+        env: &SignetEnvironmentConstants,
+        client: reqwest::Client,
+    ) -> Result<Self, Error> {
+        let url = reqwest::Url::parse(env.transaction_cache())?;
+        Ok(Self::new_with_client(url, client))
     }
 
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
@@ -148,19 +164,5 @@ impl TxCache {
         let response: TxCacheOrdersResponse =
             self.get_inner::<TxCacheOrdersResponse>(ORDERS).await?;
         Ok(response.orders)
-    }
-}
-
-// implement a From trait for TxCache from SignetEnvironmentConstants
-impl From<&SignetEnvironmentConstants> for TxCache {
-    fn from(constants: &SignetEnvironmentConstants) -> Self {
-        Self::new(constants.transaction_cache_url())
-    }
-}
-
-// implement a From trait for TxCache from SignetConstants
-impl From<&SignetConstants> for TxCache {
-    fn from(constants: &SignetConstants) -> Self {
-        Self::new(constants.environment().transaction_cache_url())
     }
 }

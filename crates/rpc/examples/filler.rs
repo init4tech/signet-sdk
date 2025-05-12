@@ -53,8 +53,17 @@ where
     S: Signer,
 {
     /// Create a new Filler with the given signer, provider, and transaction cache endpoint.
-    pub fn new(signer: S, ru_provider: Provider, constants: SignetConstants) -> Self {
-        Self { signer, ru_provider, tx_cache: TxCache::from(&constants), constants }
+    pub fn new(
+        signer: S,
+        ru_provider: Provider,
+        constants: SignetConstants,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            signer,
+            ru_provider,
+            tx_cache: TxCache::from_environment(&constants.environment())?,
+            constants,
+        })
     }
 
     /// Query the transaction cache to get all possible orders.
