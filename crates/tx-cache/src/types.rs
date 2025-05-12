@@ -96,10 +96,6 @@ impl TxCacheSendBundleResponse {
     pub fn new(id: uuid::Uuid) -> Self {
         id.into()
     }
-
-    pub fn id(&self) -> uuid::Uuid {
-        self.id
-    }
 }
 
 impl From<uuid::Uuid> for TxCacheSendBundleResponse {
