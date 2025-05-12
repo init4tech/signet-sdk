@@ -86,10 +86,28 @@ impl TxCacheBundlesResponse {
 }
 
 /// Represents a response to successfully adding or updating a bundle in the transaction cache.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct TxCacheSendBundleResponse {
     /// The bundle id (a UUID)
     pub id: uuid::Uuid,
+}
+
+impl TxCacheSendBundleResponse {
+    pub fn new(id: uuid::Uuid) -> Self {
+        id.into()
+    }
+}
+
+impl From<uuid::Uuid> for TxCacheSendBundleResponse {
+    fn from(id: uuid::Uuid) -> Self {
+        Self { id }
+    }
+}
+
+impl From<TxCacheSendBundleResponse> for uuid::Uuid {
+    fn from(response: TxCacheSendBundleResponse) -> Self {
+        response.id
+    }
 }
 
 /// Response from the transaction cache `transactions` endpoint, containing a list of transactions.
