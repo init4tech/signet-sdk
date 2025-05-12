@@ -6,7 +6,7 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
-use signet_constants::SignetEnvironmentConstants;
+use signet_constants::{SignetConstants, SignetEnvironmentConstants};
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
@@ -38,7 +38,7 @@ impl TxCache {
 
     /// Create a new cache for Pecorino.
     pub fn pecorino() -> Self {
-        SignetEnvironmentConstants::pecorino().into()
+        (&SignetEnvironmentConstants::pecorino()).into()
     }
 
     /// Create a new cache for Pecorino and client.
@@ -152,8 +152,15 @@ impl TxCache {
 }
 
 // implement a From trait for TxCache from SignetEnvironmentConstants
-impl From<SignetEnvironmentConstants> for TxCache {
-    fn from(constants: SignetEnvironmentConstants) -> Self {
+impl From<&SignetEnvironmentConstants> for TxCache {
+    fn from(constants: &SignetEnvironmentConstants) -> Self {
         Self::new(constants.transaction_cache_url())
+    }
+}
+
+// implement a From trait for TxCache from SignetConstants
+impl From<&SignetConstants> for TxCache {
+    fn from(constants: &SignetConstants) -> Self {
+        Self::new(constants.environment().transaction_cache_url())
     }
 }
