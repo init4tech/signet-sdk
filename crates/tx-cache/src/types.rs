@@ -103,6 +103,12 @@ impl TxCacheSendBundleResponse {
     }
 }
 
+impl From<uuid::Uuid> for TxCacheSendBundleResponse {
+    fn from(id: uuid::Uuid) -> Self {
+        Self { id }
+    }
+}
+
 /// Response from the transaction cache `transactions` endpoint, containing a list of transactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxCacheTransactionsResponse {
