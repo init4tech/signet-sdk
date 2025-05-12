@@ -60,6 +60,12 @@ pub use eth::{eth, CallErrorData, EthError};
 mod signet;
 pub use signet::{error::SignetError, signet};
 
+mod debug;
+pub use debug::debug;
+
+mod trace;
+pub use trace::trace;
+
 mod interest;
 
 pub mod receipts;
@@ -80,5 +86,9 @@ where
     Host: FullNodeComponents,
     Signet: Pnt,
 {
-    ajj::Router::new().nest("eth", eth::<Host, Signet>()).nest("signet", signet::<Host, Signet>())
+    ajj::Router::new()
+        .nest("eth", eth::<Host, Signet>())
+        .nest("signet", signet::<Host, Signet>())
+        .nest("debug", debug::<Host, Signet>())
+        .nest("trace", trace::<Host, Signet>())
 }
