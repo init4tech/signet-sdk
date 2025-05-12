@@ -93,6 +93,10 @@ pub struct TxCacheSendBundleResponse {
 }
 
 impl TxCacheSendBundleResponse {
+    pub fn new(id: uuid::Uuid) -> Self {
+        id.into()
+    }
+
     pub fn id(&self) -> uuid::Uuid {
         self.id
     }
