@@ -6,6 +6,7 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
+use signet_constants::SignetEnvironmentConstants;
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
@@ -33,6 +34,19 @@ impl TxCache {
     /// Instantiate a new cache with the given URL and a new reqwest client.
     pub fn new(url: reqwest::Url) -> Self {
         Self { url, client: reqwest::Client::new() }
+    }
+
+    /// Create a new cache for Pecorino.
+    pub fn pecorino() -> Self {
+        SignetEnvironmentConstants::pecorino().into()
+    }
+
+    /// Create a new cache for Pecorino and client.
+    pub fn pecorino_with_client(client: reqwest::Client) -> Self {
+        Self::new_with_client(
+            SignetEnvironmentConstants::pecorino().transaction_cache_url(),
+            client,
+        )
     }
 
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
@@ -134,5 +148,12 @@ impl TxCache {
         let response: TxCacheOrdersResponse =
             self.get_inner::<TxCacheOrdersResponse>(ORDERS).await?;
         Ok(response.orders)
+    }
+}
+
+// implement a From trait for TxCache from SignetEnvironmentConstants
+impl From<SignetEnvironmentConstants> for TxCache {
+    fn from(constants: SignetEnvironmentConstants) -> Self {
+        Self::new(constants.transaction_cache_url())
     }
 }

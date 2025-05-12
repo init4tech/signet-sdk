@@ -44,4 +44,9 @@ impl SignetEnvironmentConstants {
     pub const fn transaction_cache(&self) -> &str {
         self.transaction_cache
     }
+
+    /// Get the transaction cache URL.
+    pub fn transaction_cache_url(&self) -> reqwest::Url {
+        reqwest::Url::parse(self.transaction_cache).expect("Invalid transaction cache URL")
+    }
 }
