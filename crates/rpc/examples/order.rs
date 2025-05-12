@@ -4,7 +4,7 @@ use alloy::{
 };
 use chrono::Utc;
 use eyre::Error;
-use signet_constants::{SignetConstants, SignetSystemConstants};
+use signet_constants::SignetConstants;
 use signet_tx_cache::client::TxCache;
 use signet_types::UnsignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
