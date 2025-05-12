@@ -92,6 +92,18 @@ pub struct TxCacheSendBundleResponse {
     pub id: uuid::Uuid,
 }
 
+impl TxCacheSendBundleResponse {
+    /// Create a new bundle response from a bundle id.
+    pub const fn new(id: uuid::Uuid) -> Self {
+        Self { id }
+    }
+
+    /// Convert the bundle response to a [uuid::Uuid].
+    pub const fn into_bundle_id(self) -> uuid::Uuid {
+        self.id
+    }
+}
+
 /// Response from the transaction cache `transactions` endpoint, containing a list of transactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxCacheTransactionsResponse {
