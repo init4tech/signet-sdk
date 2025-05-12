@@ -6,7 +6,7 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
-use signet_constants::{pecorino, SignetEnvironmentConstants};
+use signet_constants::pecorino;
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
@@ -36,6 +36,12 @@ impl TxCache {
         Self { url, client: reqwest::Client::new() }
     }
 
+    /// Create a new cache given a string (not URL).
+    pub fn new_from_string(url: &str) -> Result<Self, Error> {
+        let url = reqwest::Url::parse(url)?;
+        Ok(Self::new(url))
+    }
+
     /// Create a new cache for Pecorino.
     pub fn pecorino() -> Self {
         let url =
@@ -48,21 +54,6 @@ impl TxCache {
         let url =
             reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
         Self::new_with_client(url, client)
-    }
-
-    /// Create a new cache for a given SignetEnvironmentConstants.
-    pub fn from_environment(env: &SignetEnvironmentConstants) -> Result<Self, Error> {
-        let url = reqwest::Url::parse(env.transaction_cache())?;
-        Ok(Self::new(url))
-    }
-
-    /// Create a new cache for a given SignetEnvironmentConstants and client.
-    pub fn from_environment_with_client(
-        env: &SignetEnvironmentConstants,
-        client: reqwest::Client,
-    ) -> Result<Self, Error> {
-        let url = reqwest::Url::parse(env.transaction_cache())?;
-        Ok(Self::new_with_client(url, client))
     }
 
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
