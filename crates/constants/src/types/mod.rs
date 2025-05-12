@@ -243,12 +243,22 @@ impl SignetConstants {
     }
 
     /// Get the system constants.
-    pub const fn system(&self) -> &SignetSystemConstants {
-        &self.system
+    pub const fn system(&self) -> SignetSystemConstants {
+        self.system
+    }
+
+    /// Get the host constants.
+    pub const fn host(&self) -> HostConstants {
+        self.system.host
+    }
+
+    /// Get the rollup constants.
+    pub const fn rollup(&self) -> RollupConstants {
+        self.system.rollup
     }
 
     /// Get the environment constants.
-    pub const fn environment(&self) -> &SignetEnvironmentConstants {
-        &self.environment
+    pub const fn environment(&self) -> SignetEnvironmentConstants {
+        self.environment
     }
 }
