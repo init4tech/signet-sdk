@@ -93,11 +93,6 @@ pub struct TxCacheSendBundleResponse {
 }
 
 impl TxCacheSendBundleResponse {
-    /// Create a new bundle response from a bundle id.
-    pub const fn new(id: uuid::Uuid) -> Self {
-        Self { id }
-    }
-
     pub fn id(&self) -> uuid::Uuid {
         self.id
     }
@@ -106,6 +101,12 @@ impl TxCacheSendBundleResponse {
 impl From<uuid::Uuid> for TxCacheSendBundleResponse {
     fn from(id: uuid::Uuid) -> Self {
         Self { id }
+    }
+}
+
+impl From<TxCacheSendBundleResponse> for uuid::Uuid {
+    fn from(response: TxCacheSendBundleResponse) -> Self {
+        response.id
     }
 }
 
