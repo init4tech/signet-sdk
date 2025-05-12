@@ -30,7 +30,7 @@ where
     pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
         Ok(Self {
             signer,
-            tx_cache: TxCache::new_from_string(&constants.environment().transaction_cache())?,
+            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
             constants,
         })
     }

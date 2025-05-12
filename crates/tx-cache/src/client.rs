@@ -44,9 +44,7 @@ impl TxCache {
 
     /// Create a new cache for Pecorino.
     pub fn pecorino() -> Self {
-        let url =
-            reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
-        Self::new(url)
+        Self::new_from_string(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid")
     }
 
     /// Create a new cache for Pecorino and client.

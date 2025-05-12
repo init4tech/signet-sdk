@@ -61,7 +61,7 @@ where
         Ok(Self {
             signer,
             ru_provider,
-            tx_cache: TxCache::new_from_string(&constants.environment().transaction_cache())?,
+            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
             constants,
         })
     }
