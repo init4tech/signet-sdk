@@ -86,7 +86,7 @@ impl TxCacheBundlesResponse {
 }
 
 /// Represents a response to successfully adding or updating a bundle in the transaction cache.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct TxCacheSendBundleResponse {
     /// The bundle id (a UUID)
     pub id: uuid::Uuid,
