@@ -6,7 +6,10 @@ use alloy::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use signet_zenith::RollupOrders::{fillPermit2Call, Output, Permit2Batch, TokenPermissions};
+use signet_zenith::{
+    BundleHelper::{FillPermit2, IOrders},
+    RollupOrders::{fillPermit2Call, Output, Permit2Batch, TokenPermissions},
+};
 use std::{borrow::Cow, collections::HashMap};
 
 /// SignedFill type is constructed by Fillers to fill a batch of Orders.
@@ -85,6 +88,24 @@ impl SignedFill {
 
         // construct fill tx request
         TransactionRequest::default().with_input(fill_data).with_to(order_contract)
+    }
+}
+
+impl From<SignedFill> for FillPermit2 {
+    fn from(fill: SignedFill) -> Self {
+        FillPermit2 {
+            permit2: fill.permit.into(),
+            outputs: fill.outputs.into_iter().map(IOrders::Output::from).collect(),
+        }
+    }
+}
+
+impl From<&SignedFill> for FillPermit2 {
+    fn from(fill: &SignedFill) -> Self {
+        FillPermit2 {
+            permit2: (&fill.permit).into(),
+            outputs: fill.outputs.iter().map(IOrders::Output::from).collect(),
+        }
     }
 }
 
