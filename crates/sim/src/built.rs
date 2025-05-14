@@ -1,3 +1,4 @@
+use crate::{outcome::SimulatedItem, SimItem};
 use alloy::{
     consensus::{SidecarBuilder, SidecarCoder, TxEnvelope},
     eips::Decodable2718,
@@ -10,8 +11,6 @@ use signet_types::SignedFill;
 use signet_zenith::{encode_txns, Alloy2718Coder};
 use std::sync::OnceLock;
 use tracing::{error, trace};
-
-use crate::{outcome::SimulatedItem, SimItem};
 
 /// A block that has been built by the simulator.
 #[derive(Clone, Default)]
@@ -71,6 +70,12 @@ impl BuiltBlock {
     #[allow(clippy::missing_const_for_fn)] // false positive, const deref
     pub fn transactions(&self) -> &[TxEnvelope] {
         &self.transactions
+    }
+
+    /// Get the current list of host fills included in this block.
+    #[allow(clippy::missing_const_for_fn)] // false positive, const deref
+    pub fn host_fills(&self) -> &[SignedFill] {
+        &self.host_fills
     }
 
     /// Unseal the block
