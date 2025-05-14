@@ -93,7 +93,7 @@ impl From<SignedFill> for FillPermit2 {
     fn from(fill: SignedFill) -> Self {
         FillPermit2 {
             permit2: fill.permit.into(),
-            outputs: fill.outputs.iter().map(IOrders::Output::from).collect(),
+            outputs: fill.outputs.into_iter().map(IOrders::Output::from).collect(),
         }
     }
 }

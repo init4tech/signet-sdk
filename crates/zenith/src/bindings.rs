@@ -499,7 +499,7 @@ mod bundle_helper {
     impl From<RollupOrders::PermitBatchTransferFrom> for PermitBatchTransferFrom {
         fn from(permit: HostOrders::PermitBatchTransferFrom) -> PermitBatchTransferFrom {
             PermitBatchTransferFrom {
-                permitted: permit.permitted.iter().map(TokenPermissions::from).collect(),
+                permitted: permit.permitted.into_iter().map(TokenPermissions::from).collect(),
                 nonce: permit.nonce,
                 deadline: permit.deadline,
             }
