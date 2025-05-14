@@ -432,12 +432,91 @@ mod rollup_passage {
 }
 
 mod bundle_helper {
+    use super::*;
+
+    use ISignatureTransfer::{PermitBatchTransferFrom, TokenPermissions};
+    use UsesPermit2::Permit2Batch;
+
     alloy::sol!(
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         #[sol(rpc)]
         BundleHelper,
         "abi/BundleHelper.json"
     );
+
+    impl From<&RollupOrders::Output> for IOrders::Output {
+        fn from(output: &RollupOrders::Output) -> IOrders::Output {
+            IOrders::Output {
+                token: output.token,
+                amount: output.amount,
+                recipient: output.recipient,
+                chainId: output.chainId,
+            }
+        }
+    }
+
+    impl From<RollupOrders::Output> for IOrders::Output {
+        fn from(output: RollupOrders::Output) -> IOrders::Output {
+            IOrders::Output {
+                token: output.token,
+                amount: output.amount,
+                recipient: output.recipient,
+                chainId: output.chainId,
+            }
+        }
+    }
+
+    impl From<RollupOrders::Permit2Batch> for Permit2Batch {
+        fn from(permit: HostOrders::Permit2Batch) -> Permit2Batch {
+            Permit2Batch {
+                permit: permit.permit.into(),
+                owner: permit.owner,
+                signature: permit.signature,
+            }
+        }
+    }
+
+    impl From<&RollupOrders::Permit2Batch> for Permit2Batch {
+        fn from(permit: &HostOrders::Permit2Batch) -> Permit2Batch {
+            Permit2Batch {
+                permit: (&permit.permit).into(),
+                owner: permit.owner,
+                signature: permit.signature.clone(),
+            }
+        }
+    }
+
+    impl From<&RollupOrders::PermitBatchTransferFrom> for PermitBatchTransferFrom {
+        fn from(permit: &HostOrders::PermitBatchTransferFrom) -> PermitBatchTransferFrom {
+            PermitBatchTransferFrom {
+                permitted: permit.permitted.iter().map(TokenPermissions::from).collect(),
+                nonce: permit.nonce,
+                deadline: permit.deadline,
+            }
+        }
+    }
+
+    impl From<RollupOrders::PermitBatchTransferFrom> for PermitBatchTransferFrom {
+        fn from(permit: HostOrders::PermitBatchTransferFrom) -> PermitBatchTransferFrom {
+            PermitBatchTransferFrom {
+                permitted: permit.permitted.iter().map(TokenPermissions::from).collect(),
+                nonce: permit.nonce,
+                deadline: permit.deadline,
+            }
+        }
+    }
+
+    impl From<&crate::bindings::orders::ISignatureTransfer::TokenPermissions> for TokenPermissions {
+        fn from(perm: &HostOrders::TokenPermissions) -> TokenPermissions {
+            TokenPermissions { token: perm.token, amount: perm.amount }
+        }
+    }
+
+    impl From<crate::bindings::orders::ISignatureTransfer::TokenPermissions> for TokenPermissions {
+        fn from(perm: HostOrders::TokenPermissions) -> TokenPermissions {
+            TokenPermissions { token: perm.token, amount: perm.amount }
+        }
+    }
 }
 
 pub use zenith::Zenith;
@@ -496,5 +575,6 @@ pub mod RollupPassage {
 #[allow(non_snake_case)]
 pub mod BundleHelper {
     pub use super::bundle_helper::BundleHelper::*;
+    pub use super::bundle_helper::IOrders;
     pub use super::bundle_helper::Zenith::BlockHeader;
 }

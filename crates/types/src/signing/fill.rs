@@ -6,6 +6,7 @@ use alloy::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use signet_zenith::BundleHelper::{FillPermit2, IOrders};
 use signet_zenith::RollupOrders::{fillPermit2Call, Output, Permit2Batch, TokenPermissions};
 use std::{borrow::Cow, collections::HashMap};
 
@@ -85,6 +86,24 @@ impl SignedFill {
 
         // construct fill tx request
         TransactionRequest::default().with_input(fill_data).with_to(order_contract)
+    }
+}
+
+impl From<SignedFill> for FillPermit2 {
+    fn from(fill: SignedFill) -> Self {
+        FillPermit2 {
+            permit2: fill.permit.into(),
+            outputs: fill.outputs.iter().map(IOrders::Output::from).collect(),
+        }
+    }
+}
+
+impl From<&SignedFill> for FillPermit2 {
+    fn from(fill: &SignedFill) -> Self {
+        FillPermit2 {
+            permit2: (&fill.permit).into(),
+            outputs: fill.outputs.iter().map(IOrders::Output::from).collect(),
+        }
     }
 }
 
