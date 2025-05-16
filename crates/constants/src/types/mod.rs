@@ -258,7 +258,7 @@ impl SignetConstants {
     }
 
     /// Get the environment constants.
-    pub const fn environment(&self) -> SignetEnvironmentConstants {
-        self.environment
+    pub const fn environment(&self) -> &SignetEnvironmentConstants {
+        &self.environment
     }
 }

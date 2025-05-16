@@ -5,6 +5,7 @@ use crate::{
     SignetSystemConstants,
 };
 use alloy::primitives::{address, Address};
+use std::borrow::Cow;
 
 /// Name for the host chain.
 pub const HOST_NAME: &str = "Pecorino Host";
@@ -75,8 +76,11 @@ pub const ROLLUP: RollupConstants =
 pub const PECORINO_SYS: SignetSystemConstants = crate::SignetSystemConstants::new(HOST, ROLLUP);
 
 /// Signet environment constants for Pecorino.
-pub const PECORINO_ENV: SignetEnvironmentConstants =
-    SignetEnvironmentConstants::new(HOST_NAME, RU_NAME, TX_CACHE_URL);
+pub const PECORINO_ENV: SignetEnvironmentConstants = SignetEnvironmentConstants::new(
+    Cow::Borrowed(HOST_NAME),
+    Cow::Borrowed(RU_NAME),
+    Cow::Borrowed(TX_CACHE_URL),
+);
 
 /// Signet constants for Pecorino.
 pub const PECORINO: SignetConstants = SignetConstants::new(PECORINO_SYS, PECORINO_ENV);

@@ -5,6 +5,7 @@ use crate::{
     SignetSystemConstants,
 };
 use alloy::primitives::{address, Address};
+use std::borrow::Cow;
 
 /// Default reward address used in tests when no other is specified.
 pub const DEFAULT_REWARD_ADDRESS: Address = Address::repeat_byte(0x81);
@@ -77,8 +78,11 @@ pub const ROLLUP: RollupConstants =
 pub const TEST_SYS: SignetSystemConstants = SignetSystemConstants::new(HOST, ROLLUP);
 
 /// Environment constants for unit tests.
-pub const TEST_ENV: SignetEnvironmentConstants =
-    SignetEnvironmentConstants::new(HOST_NAME, RU_NAME, TX_CACHE_URL);
+pub const TEST_ENV: SignetEnvironmentConstants = SignetEnvironmentConstants::new(
+    Cow::Borrowed(HOST_NAME),
+    Cow::Borrowed(RU_NAME),
+    Cow::Borrowed(TX_CACHE_URL),
+);
 
 /// Signet constants for Pecorino.
 pub const TEST: SignetConstants = SignetConstants::new(TEST_SYS, TEST_ENV);

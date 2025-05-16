@@ -1,20 +1,22 @@
+use std::borrow::Cow;
+
 /// Signet Environment constants.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetEnvironmentConstants {
     /// Name of the host chain.
-    host_name: &'static str,
+    host_name: Cow<'static, str>,
     /// Name of the rollup.
-    rollup_name: &'static str,
+    rollup_name: Cow<'static, str>,
     /// URL of the Transaction Cache
-    transaction_cache: &'static str,
+    transaction_cache: Cow<'static, str>,
 }
 
 impl SignetEnvironmentConstants {
     /// Create a new set of environment constants.
     pub const fn new(
-        host_name: &'static str,
-        rollup_name: &'static str,
-        transaction_cache: &'static str,
+        host_name: Cow<'static, str>,
+        rollup_name: Cow<'static, str>,
+        transaction_cache: Cow<'static, str>,
     ) -> Self {
         Self { host_name, rollup_name, transaction_cache }
     }
@@ -31,17 +33,36 @@ impl SignetEnvironmentConstants {
     }
 
     /// Get the host name.
-    pub const fn host_name(&self) -> &str {
-        self.host_name
+    pub fn host_name(&self) -> &str {
+        self.host_name.as_ref()
     }
 
     /// Get the rollup name.
-    pub const fn rollup_name(&self) -> &str {
-        self.rollup_name
+    pub fn rollup_name(&self) -> &str {
+        self.rollup_name.as_ref()
     }
 
     /// Get the transaction cache URL.
-    pub const fn transaction_cache(&self) -> &str {
-        self.transaction_cache
+    pub fn transaction_cache(&self) -> &str {
+        self.transaction_cache.as_ref()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn load_built_ins() {
+        // deserialize json
+
+        let json = serde_json::json!({
+            "host_name": "pecorino",
+            "rollup_name": "pecorino",
+            "transaction_cache": "https://pecorino.com"
+        });
+
+        let s = serde_json::from_value::<SignetEnvironmentConstants>(json.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&s).unwrap(), json)
     }
 }
