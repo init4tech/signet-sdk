@@ -177,7 +177,7 @@ mod test {
             .submit_block(ru_block);
         let (chain, _) = hbs.to_chain();
 
-        let extractor = Extractor::new(TEST_CONSTANTS);
+        let extractor = Extractor::new(TEST_SYS);
         let extracts = extractor.extract_signet(&chain).next().unwrap();
 
         hbs.assert_conforms(&extracts);
