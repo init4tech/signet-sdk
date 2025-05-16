@@ -24,8 +24,8 @@ use tracing::{debug, debug_span, enabled, trace, Instrument};
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(untagged)]
 pub enum Either {
-    Log(Log),
-    Block(Header),
+    Log(Box<Log>),
+    Block(Box<Header>),
 }
 
 /// Buffer for subscription outputs.
@@ -65,8 +65,8 @@ impl SubscriptionBuffer {
     /// Pop the front of the buffer.
     pub fn pop_front(&mut self) -> Option<Either> {
         match self {
-            Self::Log(buf) => buf.pop_front().map(Either::Log),
-            Self::Block(buf) => buf.pop_front().map(Either::Block),
+            Self::Log(buf) => buf.pop_front().map(|log| Either::Log(Box::new(log))),
+            Self::Block(buf) => buf.pop_front().map(|header| Either::Block(Box::new(header))),
         }
     }
 }
