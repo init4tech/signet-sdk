@@ -1,1 +1,2 @@
 too-large-for-stack = 128
+large-error-threshold = 256
