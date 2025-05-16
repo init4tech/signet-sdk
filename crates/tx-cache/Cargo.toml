@@ -12,29 +12,12 @@ repository.workspace = true
 
 [dependencies]
 signet-bundle.workspace = true
-signet-evm.workspace = true
 signet-types.workspace = true
-signet-zenith.workspace = true
-
-ajj.workspace = true
-trevm.workspace = true
 
 alloy.workspace = true
-reth.workspace = true
-reth-chainspec.workspace = true
-reth-evm-ethereum.workspace = true
-reth-node-api.workspace = true
-reth-rpc-eth-api.workspace = true
 
-axum = "0.8.1"
-dashmap = "6.1.0"
 eyre.workspace = true
-interprocess = { version = "2.2.2", features = ["tokio"] }
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
-thiserror.workspace = true
-tokio = { workspace = true, features = ["macros"] }
-tokio-util = "0.7.13"
-tower-http = { version = "0.6.2", features = ["cors"] }
 tracing.workspace = true
 uuid = { workspace = true, features = ["serde"] }
