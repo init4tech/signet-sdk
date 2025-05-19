@@ -36,18 +36,18 @@ impl TxCache {
         Self { url, client: reqwest::Client::new() }
     }
 
-    /// Create a new cache given a string (not URL).
+    /// Create a new cache given a string URL.
     pub fn new_from_string(url: &str) -> Result<Self, Error> {
         let url = reqwest::Url::parse(url)?;
         Ok(Self::new(url))
     }
 
-    /// Create a new cache for Pecorino.
+    /// Connect to the Pecorino tx cache.
     pub fn pecorino() -> Self {
         Self::new_from_string(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid")
     }
 
-    /// Create a new cache for Pecorino and client.
+    /// Connect to the Pecornio tx cache, using a specific [`Client`].
     pub fn pecorino_with_client(client: reqwest::Client) -> Self {
         let url =
             reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
