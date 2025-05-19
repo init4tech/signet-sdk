@@ -6,6 +6,7 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
+use signet_constants::pecorino;
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
@@ -33,6 +34,24 @@ impl TxCache {
     /// Instantiate a new cache with the given URL and a new reqwest client.
     pub fn new(url: reqwest::Url) -> Self {
         Self { url, client: reqwest::Client::new() }
+    }
+
+    /// Create a new cache given a string URL.
+    pub fn new_from_string(url: &str) -> Result<Self, Error> {
+        let url = reqwest::Url::parse(url)?;
+        Ok(Self::new(url))
+    }
+
+    /// Connect to the Pecorino tx cache.
+    pub fn pecorino() -> Self {
+        Self::new_from_string(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid")
+    }
+
+    /// Connect to the Pecornio tx cache, using a specific [`Client`].
+    pub fn pecorino_with_client(client: reqwest::Client) -> Self {
+        let url =
+            reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
+        Self::new_with_client(url, client)
     }
 
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(

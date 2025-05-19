@@ -58,7 +58,7 @@ pub async fn test_simulator() {
     // Set up the simulator
     let built = BlockBuild::<_, NoOpInspector>::new(
         db,
-        TEST_CONSTANTS,
+        TEST_SYS,
         TestCfg,
         NoopBlock,
         std::time::Instant::now() + std::time::Duration::from_millis(200),

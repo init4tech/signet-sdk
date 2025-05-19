@@ -1,11 +1,17 @@
 //! Constants for local testnet chains.
 
-use crate::{HostConstants, PredeployTokens, RollupConstants, SignetSystemConstants};
+use crate::{
+    HostConstants, PredeployTokens, RollupConstants, SignetConstants, SignetEnvironmentConstants,
+    SignetSystemConstants,
+};
 use alloy::primitives::{address, Address};
+use std::borrow::Cow;
 
 /// Default reward address used in tests when no other is specified.
 pub const DEFAULT_REWARD_ADDRESS: Address = Address::repeat_byte(0x81);
 
+/// Name for the host chain.
+pub const HOST_NAME: &str = "Test Host";
 /// Test chain id for the host chain.
 pub const HOST_CHAIN_ID: u64 = 1;
 /// Test deployment height.
@@ -33,6 +39,8 @@ pub const RU_USDT: Address = address!("0xF34326d3521F1b07d1aa63729cB14A372f8A737
 /// Test address for predeployed WBTC
 pub const RU_WBTC: Address = address!("0xE3d7066115f7d6b65F88Dff86288dB4756a7D733");
 
+/// Name for the network.
+pub const RU_NAME: &str = "Test Rollup";
 /// Test chain id for the RU chain.
 pub const RU_CHAIN_ID: u64 = 15;
 /// Test address for the RU zenith.
@@ -47,6 +55,9 @@ pub const HOST_TOKENS: PredeployTokens = PredeployTokens::new(HOST_USDC, HOST_US
 
 /// RU system tokens.
 pub const RU_TOKENS: PredeployTokens = PredeployTokens::new(RU_USDC, RU_USDT, RU_WBTC);
+
+/// The URL of the Transaction Cache endpoint.
+pub const TX_CACHE_URL: &str = "localhost:8080/txcache";
 
 /// Host config
 pub const HOST: HostConstants = HostConstants::new(
@@ -63,5 +74,15 @@ pub const HOST: HostConstants = HostConstants::new(
 pub const ROLLUP: RollupConstants =
     RollupConstants::new(RU_CHAIN_ID, RU_ORDERS, RU_PASSAGE, BASE_FEE_RECIPIENT, RU_TOKENS);
 
-/// Test constants for unit tests.
-pub const TEST_CONSTANTS: SignetSystemConstants = SignetSystemConstants::new(HOST, ROLLUP);
+/// System constants for unit tests.
+pub const TEST_SYS: SignetSystemConstants = SignetSystemConstants::new(HOST, ROLLUP);
+
+/// Environment constants for unit tests.
+pub const TEST_ENV: SignetEnvironmentConstants = SignetEnvironmentConstants::new(
+    Cow::Borrowed(HOST_NAME),
+    Cow::Borrowed(RU_NAME),
+    Cow::Borrowed(TX_CACHE_URL),
+);
+
+/// Signet constants for Pecorino.
+pub const TEST: SignetConstants = SignetConstants::new(TEST_SYS, TEST_ENV);

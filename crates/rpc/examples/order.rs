@@ -4,7 +4,7 @@ use alloy::{
 };
 use chrono::Utc;
 use eyre::Error;
-use signet_constants::SignetSystemConstants;
+use signet_constants::SignetConstants;
 use signet_tx_cache::client::TxCache;
 use signet_types::UnsignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
@@ -19,7 +19,7 @@ pub struct SendOrder<S: Signer> {
     /// The transaction cache endpoint.
     tx_cache: TxCache,
     /// The system constants.
-    constants: SignetSystemConstants,
+    constants: SignetConstants,
 }
 
 impl<S> SendOrder<S>
@@ -27,8 +27,12 @@ where
     S: Signer,
 {
     /// Create a new SendOrder instance.
-    pub const fn new(signer: S, tx_cache: TxCache, constants: SignetSystemConstants) -> Self {
-        Self { signer, tx_cache, constants }
+    pub fn new(signer: S, constants: SignetConstants) -> Result<Self, Error> {
+        Ok(Self {
+            signer,
+            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
+            constants,
+        })
     }
 
     /// Construct a simple example Order, sign it, and send it.

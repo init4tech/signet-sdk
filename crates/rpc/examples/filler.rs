@@ -14,7 +14,7 @@ use alloy::{
 };
 use eyre::{eyre, Error};
 use signet_bundle::SignetEthBundle;
-use signet_constants::SignetSystemConstants;
+use signet_constants::SignetConstants;
 use signet_tx_cache::{client::TxCache, types::TxCacheSendBundleResponse};
 use signet_types::{AggregateOrders, SignedFill, SignedOrder, UnsignedFill};
 use std::{collections::HashMap, slice::from_ref};
@@ -45,7 +45,7 @@ pub struct Filler<S: Signer> {
     /// The transaction cache endpoint.
     tx_cache: TxCache,
     /// The system constants.
-    constants: SignetSystemConstants,
+    constants: SignetConstants,
 }
 
 impl<S> Filler<S>
@@ -53,13 +53,17 @@ where
     S: Signer,
 {
     /// Create a new Filler with the given signer, provider, and transaction cache endpoint.
-    pub const fn new(
+    pub fn new(
         signer: S,
         ru_provider: Provider,
-        tx_cache: TxCache,
-        constants: SignetSystemConstants,
-    ) -> Self {
-        Self { signer, ru_provider, tx_cache, constants }
+        constants: SignetConstants,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            signer,
+            ru_provider,
+            tx_cache: TxCache::new_from_string(constants.environment().transaction_cache())?,
+            constants,
+        })
     }
 
     /// Query the transaction cache to get all possible orders.
@@ -159,6 +163,7 @@ where
             unsigned_fill = unsigned_fill.with_chain(
                 chain_id,
                 self.constants
+                    .system()
                     .orders_for(chain_id)
                     .ok_or(eyre!("invalid target chain id {}", chain_id))?,
             );
