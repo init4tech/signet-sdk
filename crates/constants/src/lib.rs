@@ -23,7 +23,7 @@ pub use chains::test_utils;
 
 mod types;
 pub use types::{
-    ConfigError, HostConstants, PairedHeights, ParseChainError, PermissionedToken, PredeployTokens,
-    RollupConstants, SignetConstants, SignetEnvironmentConstants, SignetSystemConstants,
-    MINTER_ADDRESS,
+    ConfigError, HostConstants, KnownChains, PairedHeights, ParseChainError, PermissionedToken,
+    PredeployTokens, RollupConstants, SignetConstants, SignetEnvironmentConstants,
+    SignetSystemConstants, MINTER_ADDRESS,
 };

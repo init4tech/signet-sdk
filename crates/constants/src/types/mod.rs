@@ -10,11 +10,14 @@ pub use host::HostConstants;
 mod rollup;
 pub use rollup::{RollupConstants, MINTER_ADDRESS};
 
+mod chains;
+pub use chains::{KnownChains, ParseChainError};
+
 mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
 
 mod environment;
-pub use environment::{ParseChainError, SignetEnvironmentConstants};
+pub use environment::SignetEnvironmentConstants;
 
 use alloy::{
     genesis::Genesis,
@@ -218,12 +221,11 @@ impl FromStr for SignetSystemConstants {
     type Err = ParseChainError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim().to_lowercase();
-        match s.as_str() {
-            "pecorino" => Ok(Self::pecorino()),
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
-            "test" => Ok(Self::test()),
-            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+            KnownChains::Test => Ok(Self::test()),
         }
     }
 }
@@ -282,12 +284,11 @@ impl FromStr for SignetConstants {
     type Err = ParseChainError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim().to_lowercase();
-        match s.as_str() {
-            "pecorino" => Ok(Self::pecorino()),
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
-            "test" => Ok(Self::test()),
-            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+            KnownChains::Test => Ok(Self::test()),
         }
     }
 }

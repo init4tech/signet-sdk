@@ -1,3 +1,4 @@
+use crate::{KnownChains, ParseChainError};
 use std::{borrow::Cow, str::FromStr};
 
 /// Signet Environment constants.
@@ -48,24 +49,15 @@ impl SignetEnvironmentConstants {
     }
 }
 
-/// Error type for parsing struct from a chain name.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum ParseChainError {
-    /// The chain name is not supported.
-    #[error("chain name {0} is not parseable. supported chains: {1}")]
-    ChainNotSupported(String, String),
-}
-
 impl FromStr for SignetEnvironmentConstants {
     type Err = ParseChainError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim().to_lowercase();
-        match s.as_str() {
-            "pecorino" => Ok(Self::pecorino()),
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
-            "test" => Ok(Self::test()),
-            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+            KnownChains::Test => Ok(Self::test()),
         }
     }
 }
