@@ -1,5 +1,8 @@
 use std::str::FromStr;
 
+/// The list of known chains as a string.
+const KNOWN_CHAINS: &str = "pecorino, test";
+
 /// Error type for parsing struct from a chain name.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ParseChainError {
@@ -7,9 +10,6 @@ pub enum ParseChainError {
     #[error("chain name {0} is not parseable. supported chains: {KNOWN_CHAINS}")]
     ChainNotSupported(String),
 }
-
-/// The list of known chains as a string.
-const KNOWN_CHAINS: &str = "pecorino, test";
 
 /// Known chains for the Signet system.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
