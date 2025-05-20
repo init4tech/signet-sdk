@@ -1,6 +1,7 @@
-use crate::types::{ConfigError, PredeployTokens};
+use crate::types::{ConfigError, ParseChainError, PredeployTokens};
 use alloy::{genesis::Genesis, primitives::Address};
 use serde_json::Value;
+use std::str::FromStr;
 
 /// System addresses and other configuration details on the host chain.
 ///
@@ -122,5 +123,19 @@ impl HostConstants {
     /// Get the host tokens.
     pub const fn tokens(&self) -> PredeployTokens {
         self.tokens
+    }
+}
+
+impl FromStr for HostConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim().to_lowercase();
+        match s.as_str() {
+            "pecorino" => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            "test" => Ok(Self::test()),
+            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+        }
     }
 }

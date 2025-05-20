@@ -9,8 +9,9 @@ use alloy::{
     signers::local::PrivateKeySigner,
 };
 use reth::primitives::TransactionSigned;
-use signet_types::constants::SignetSystemConstants;
+use signet_types::constants::{ParseChainError, SignetSystemConstants};
 use signet_zenith::Zenith::{self};
+use std::str::FromStr;
 
 /// A block spec for the Ru chain.
 ///
@@ -141,6 +142,20 @@ impl RuBlockSpec {
 
         if let Some(reward_address) = self.reward_address {
             assert_eq!(submitted.reward_address(), reward_address)
+        }
+    }
+}
+
+impl FromStr for RuBlockSpec {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim().to_lowercase();
+        match s.as_str() {
+            "pecorino" => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            "test" => Ok(Self::test()),
+            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
         }
     }
 }

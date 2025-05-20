@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, str::FromStr};
 
 /// Signet Environment constants.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -45,6 +45,28 @@ impl SignetEnvironmentConstants {
     /// Get the transaction cache URL.
     pub fn transaction_cache(&self) -> &str {
         self.transaction_cache.as_ref()
+    }
+}
+
+/// Error type for parsing struct from a chain name.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ParseChainError {
+    /// The chain name is not supported.
+    #[error("chain name {0} is not parseable. supported chains: {1}")]
+    ChainNotSupported(String, String),
+}
+
+impl FromStr for SignetEnvironmentConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim().to_lowercase();
+        match s.as_str() {
+            "pecorino" => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            "test" => Ok(Self::test()),
+            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+        }
     }
 }
 

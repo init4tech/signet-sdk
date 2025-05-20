@@ -14,12 +14,13 @@ mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
 
 mod environment;
-pub use environment::SignetEnvironmentConstants;
+pub use environment::{ParseChainError, SignetEnvironmentConstants};
 
 use alloy::{
     genesis::Genesis,
     primitives::{Address, U256},
 };
+use std::str::FromStr;
 
 /// Signet constants.
 ///
@@ -213,6 +214,20 @@ impl SignetSystemConstants {
     }
 }
 
+impl FromStr for SignetSystemConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim().to_lowercase();
+        match s.as_str() {
+            "pecorino" => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            "test" => Ok(Self::test()),
+            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+        }
+    }
+}
+
 /// All constants pertaining to the Signet system.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignetConstants {
@@ -260,5 +275,19 @@ impl SignetConstants {
     /// Get the environment constants.
     pub const fn environment(&self) -> &SignetEnvironmentConstants {
         &self.environment
+    }
+}
+
+impl FromStr for SignetConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim().to_lowercase();
+        match s.as_str() {
+            "pecorino" => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            "test" => Ok(Self::test()),
+            _ => Err(ParseChainError::ChainNotSupported(s, "pecorino, test".to_string())),
+        }
     }
 }
