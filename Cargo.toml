@@ -77,6 +77,9 @@ reth-prune-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4"
 reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
 reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
 reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
+# adjacent reth revm inspectors
+revm-inspectors = "0.17.0-alpha.1"
+
 
 # Foundry periphery
 foundry-blob-explorers = "0.10"
