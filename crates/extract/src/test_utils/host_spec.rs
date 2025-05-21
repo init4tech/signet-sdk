@@ -14,10 +14,14 @@ use reth::{
     },
     providers::{Chain, ExecutionOutcome},
 };
-use signet_types::{constants::SignetSystemConstants, AggregateFills};
+use signet_types::{
+    constants::{KnownChains, ParseChainError, SignetSystemConstants},
+    AggregateFills,
+};
 use signet_zenith::{Passage, RollupOrders, Transactor};
 use std::{
     borrow::Borrow,
+    str::FromStr,
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -403,6 +407,19 @@ impl HostBlockSpec {
         assert!(enter_tokens.next().is_none());
         assert!(transacts.next().is_none());
         assert_eq!(extracts.aggregate_fills(), context);
+    }
+}
+
+impl FromStr for HostBlockSpec {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            KnownChains::Test => Ok(Self::test()),
+        }
     }
 }
 

@@ -1,9 +1,10 @@
-use crate::types::{ConfigError, PredeployTokens};
+use crate::types::{ConfigError, KnownChains, ParseChainError, PredeployTokens};
 use alloy::{
     genesis::Genesis,
     primitives::{address, Address},
 };
 use serde_json::Value;
+use std::str::FromStr;
 
 /// System address with permission to mint tokens. This is the address from
 /// which the node will issue transactions to mint ETH or ERC20 tokens.
@@ -103,5 +104,18 @@ impl RollupConstants {
     /// Get the address of the minter.
     pub const fn minter(&self) -> Address {
         MINTER_ADDRESS
+    }
+}
+
+impl FromStr for RollupConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            KnownChains::Test => Ok(Self::test()),
+        }
     }
 }

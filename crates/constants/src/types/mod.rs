@@ -10,6 +10,9 @@ pub use host::HostConstants;
 mod rollup;
 pub use rollup::{RollupConstants, MINTER_ADDRESS};
 
+mod chains;
+pub use chains::{KnownChains, ParseChainError};
+
 mod tokens;
 pub use tokens::{PermissionedToken, PredeployTokens};
 
@@ -20,6 +23,7 @@ use alloy::{
     genesis::Genesis,
     primitives::{Address, U256},
 };
+use std::str::FromStr;
 
 /// Signet constants.
 ///
@@ -213,6 +217,19 @@ impl SignetSystemConstants {
     }
 }
 
+impl FromStr for SignetSystemConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            KnownChains::Test => Ok(Self::test()),
+        }
+    }
+}
+
 /// All constants pertaining to the Signet system.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignetConstants {
@@ -260,5 +277,18 @@ impl SignetConstants {
     /// Get the environment constants.
     pub const fn environment(&self) -> &SignetEnvironmentConstants {
         &self.environment
+    }
+}
+
+impl FromStr for SignetConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            KnownChains::Test => Ok(Self::test()),
+        }
     }
 }

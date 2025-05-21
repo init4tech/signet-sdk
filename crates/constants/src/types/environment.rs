@@ -1,4 +1,5 @@
-use std::borrow::Cow;
+use crate::{KnownChains, ParseChainError};
+use std::{borrow::Cow, str::FromStr};
 
 /// Signet Environment constants.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -45,6 +46,19 @@ impl SignetEnvironmentConstants {
     /// Get the transaction cache URL.
     pub fn transaction_cache(&self) -> &str {
         self.transaction_cache.as_ref()
+    }
+}
+
+impl FromStr for SignetEnvironmentConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let chain: KnownChains = s.parse()?;
+        match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
+            #[cfg(any(test, feature = "test-utils"))]
+            KnownChains::Test => Ok(Self::test()),
+        }
     }
 }
 
