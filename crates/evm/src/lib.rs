@@ -43,14 +43,6 @@ mod sys_log;
 
 pub(crate) const BASE_GAS: usize = 21_000;
 
-/// Type alias for EVMs using a [`StateProviderBox`] as the `DB` type for
-/// trevm.
-///
-/// [`StateProviderBox`]: reth::providers::StateProviderBox
-pub type RuRevmState = reth::revm::db::State<
-    reth::revm::database::StateProviderDatabase<reth::providers::StateProviderBox>,
->;
-
 /// Create a new EVM with the given database.
 pub fn signet_evm<Db: Database + DatabaseCommit>(
     db: Db,

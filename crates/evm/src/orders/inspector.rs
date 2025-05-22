@@ -3,7 +3,6 @@ use alloy::{
     primitives::{Address, Log, U256},
     sol_types::SolEvent,
 };
-use reth::revm::interpreter::InterpreterTypes;
 use signet_types::{constants::SignetSystemConstants, AggregateFills, AggregateOrders};
 use signet_zenith::RollupOrders;
 use trevm::{
@@ -11,6 +10,7 @@ use trevm::{
     revm::{
         interpreter::{
             CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter,
+            InterpreterTypes,
         },
         Database, Inspector,
     },

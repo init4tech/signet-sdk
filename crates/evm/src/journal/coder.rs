@@ -2,12 +2,12 @@ use crate::{AcctDiff, BundleStateIndex, HostJournal, InfoOutcome};
 use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::rlp::{Buf, BufMut};
 use eyre::Result;
-use reth::revm::{
+use signet_zenith::Zenith;
+use std::{borrow::Cow, collections::BTreeMap, fmt::Debug, sync::Arc};
+use trevm::revm::{
     db::{states::StorageSlot, BundleState},
     primitives::{AccountInfo, Bytecode, Eof},
 };
-use std::{borrow::Cow, collections::BTreeMap, fmt::Debug, sync::Arc};
-use signet_zenith::Zenith;
 
 const TAG_ACCT_CREATED: u8 = 0;
 const TAG_ACCT_DIFF: u8 = 1;

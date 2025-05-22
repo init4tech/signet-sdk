@@ -4,22 +4,16 @@ use crate::{
     BlockResult, EvmNeedsTx, EvmTransacted, RunTxResult, SignetLayered, ToRethPrimitive, BASE_GAS,
 };
 use alloy::{
-    consensus::{ReceiptEnvelope, Transaction as _},
+    consensus::{Header, ReceiptEnvelope, Transaction as _, TxType},
     eips::eip1559::{BaseFeeParams, INITIAL_BASE_FEE as EIP1559_INITIAL_BASE_FEE},
     primitives::{Address, Bloom, U256},
 };
 use reth::{
     core::primitives::SignedTransaction,
     primitives::{
-        Block, BlockBody, Header, Receipt, RecoveredBlock, SealedHeader, Transaction,
-        TransactionSigned, TxType,
+        Block, BlockBody, Receipt, RecoveredBlock, SealedHeader, Transaction, TransactionSigned,
     },
     providers::ExecutionOutcome,
-    revm::{
-        context::{ContextTr, TransactTo},
-        context_interface::block::BlobExcessGasAndPrice,
-        Inspector,
-    },
 };
 use signet_extract::{ExtractedEvent, Extracts};
 use signet_types::{constants::SignetSystemConstants, AggregateFills, MarketError};
@@ -32,10 +26,11 @@ use trevm::{
     revm::{
         context::{
             result::{EVMError, ExecutionResult},
-            BlockEnv, CfgEnv, TxEnv,
+            BlockEnv, CfgEnv, ContextTr, TransactTo, TxEnv,
         },
+        context_interface::block::BlobExcessGasAndPrice,
         database::State,
-        Database, DatabaseCommit,
+        Database, DatabaseCommit, Inspector,
     },
     trevm_try, BlockDriver, BlockOutput, Tx,
 };

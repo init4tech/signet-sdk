@@ -4,11 +4,13 @@ pub use framed::{Framed, FramedFilleds, FramedOrders};
 mod inspector;
 pub use inspector::OrderDetector;
 
-use reth::revm::interpreter::{interpreter::EthInterpreter, InterpreterTypes};
 use trevm::{
     helpers::Ctx,
     inspectors::Layered,
-    revm::{Database, Inspector},
+    revm::{
+        interpreter::{interpreter::EthInterpreter, InterpreterTypes},
+        Database, Inspector,
+    },
 };
 
 /// Inspector containing an accessible [`OrderDetector`].
