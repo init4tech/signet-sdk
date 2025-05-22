@@ -2,7 +2,7 @@
 
 use alloy::{
     consensus::{ReceiptEnvelope, TxEip1559},
-    primitives::{Address, PrimitiveSignature as Signature, U256},
+    primitives::{Address, Signature, U256},
     sol_types::SolCall,
 };
 use reth::{
