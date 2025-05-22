@@ -9,7 +9,7 @@ use alloy::{
     primitives::{Address, Bloom, U256},
 };
 use reth::{
-    core::primitives::{SignedTransaction, SignerRecoverable},
+    core::primitives::SignerRecoverable,
     primitives::{
         Block, BlockBody, Receipt, RecoveredBlock, SealedHeader, Transaction, TransactionSigned,
     },

@@ -5,7 +5,6 @@ use alloy::consensus::{transaction::TransactionMeta, ReceiptEnvelope, TxReceipt}
 use alloy::primitives::{Address, TxKind};
 use alloy::rpc::types::eth::{Log, ReceiptWithBloom, TransactionReceipt};
 use reth::core::primitives::SignerRecoverable;
-use reth::primitives::transaction::SignedTransaction;
 use reth::primitives::{Receipt, TransactionSigned, TxType};
 use reth::rpc::server_types::eth::{EthApiError, EthResult};
 use signet_types::MagicSig;

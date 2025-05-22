@@ -13,7 +13,7 @@ use alloy::{
     rpc::types::{FeeHistory, Filter, Log},
 };
 use reth::{
-    core::primitives::{SignedTransaction, SignerRecoverable},
+    core::primitives::SignerRecoverable,
     primitives::{Block, EthPrimitives, Receipt, Recovered, RecoveredBlock, TransactionSigned},
     providers::{
         providers::{BlockchainProvider, ProviderNodeTypes},
@@ -801,7 +801,7 @@ where
                     append_matching_block_logs(
                         &mut all_logs,
                         ProviderOrBlock::<BlockchainProvider<Inner>>::Block(block),
-                        &filter,
+                        filter,
                         block_num_hash,
                         &receipts,
                         false,
