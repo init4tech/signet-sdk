@@ -40,7 +40,7 @@ use reth::{
 use reth_chainspec::{BaseFeeParams, ChainSpec, ChainSpecProvider};
 use reth_node_api::{BlockBody, FullNodeComponents};
 use reth_rpc_eth_api::{RpcBlock, RpcReceipt, RpcTransaction};
-use signet_evm::{EvmNeedsTx, RuRevmState};
+use signet_evm::EvmNeedsTx;
 use signet_tx_cache::client::TxCache;
 use signet_types::{constants::SignetSystemConstants, MagicSig};
 use std::{marker::PhantomData, sync::Arc};
@@ -49,6 +49,14 @@ use trevm::{
     revm::{context::CfgEnv, database::StateBuilder},
     Cfg,
 };
+
+/// Type alias for EVMs using a [`StateProviderBox`] as the `DB` type for
+/// trevm.
+///
+/// [`StateProviderBox`]: reth::providers::StateProviderBox
+pub type RuRevmState = trevm::revm::database::State<
+    reth::revm::database::StateProviderDatabase<reth::providers::StateProviderBox>,
+>;
 
 /// The maximum number of headers we read at once when handling a range filter.
 const MAX_HEADERS_RANGE: u64 = 1_000; // with ~530bytes per header this is ~500kb

@@ -52,7 +52,7 @@ mod config;
 pub use config::{RpcServerGuard, ServeConfig};
 
 mod ctx;
-pub use ctx::RpcCtx;
+pub use ctx::{RpcCtx, RuRevmState};
 
 mod eth;
 pub use eth::{eth, CallErrorData, EthError};
