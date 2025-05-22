@@ -1,5 +1,5 @@
 use crate::SignRequest;
-use alloy::primitives::{Address, PrimitiveSignature, SignatureError};
+use alloy::primitives::{Address, Signature, SignatureError};
 use serde::{Deserialize, Serialize};
 
 /// A signature response from a [`RequestSigner`].
@@ -11,7 +11,7 @@ pub struct SignResponse {
     /// The request that was signed.
     pub req: SignRequest,
     /// The signature over that request.
-    pub sig: PrimitiveSignature,
+    pub sig: Signature,
 }
 
 impl SignResponse {

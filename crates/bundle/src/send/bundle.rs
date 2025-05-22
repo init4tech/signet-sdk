@@ -100,7 +100,7 @@ impl SignetEthBundle {
     /// checks that the tokens can actually be transferred.
     pub async fn alloy_validate_fills_onchain<Db, P, N>(
         &self,
-        orders: HostOrdersInstance<(), P, N>,
+        orders: HostOrdersInstance<P, N>,
     ) -> Result<(), SignetEthBundleError<Db>>
     where
         Db: Database,

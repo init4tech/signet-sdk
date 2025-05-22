@@ -3,10 +3,7 @@ use alloy::{
     consensus::BlockHeader,
     rpc::types::{Filter, Header, Log},
 };
-use reth::{
-    providers::CanonStateNotification,
-    rpc::{server_types::eth::logs_utils::log_matches_filter, types::FilteredParams},
-};
+use reth::{providers::CanonStateNotification, rpc::types::FilteredParams};
 use std::collections::VecDeque;
 
 /// The different kinds of filters that can be created.
@@ -51,12 +48,10 @@ impl InterestKind {
     }
 
     fn apply_filter(&self, notif: &CanonStateNotification) -> SubscriptionBuffer {
-        let filter = self.as_filter().unwrap();
-
         // NB: borrowing OUTSIDE the top-level closure prevents this value from
         // being moved into the closure, which would result in the inner
         // closures violating borrowing rules.
-        let filter_params = &FilteredParams::new(Some(filter.clone()));
+        let filter = self.as_filter().unwrap();
 
         let address_filter = FilteredParams::address_filter(&filter.address);
         let topics_filter = FilteredParams::topics_filter(&filter.topics);
@@ -76,7 +71,7 @@ impl InterestKind {
                     let transaction_hash = *block.body().transactions[transaction_index].hash();
 
                     receipt.logs.iter().enumerate().filter_map(move |(log_index, log)| {
-                        if log_matches_filter(block_num_hash, log, filter_params) {
+                        if filter.matches(log) {
                             Some(Log {
                                 inner: log.clone(),
                                 block_hash: Some(block_num_hash.hash),

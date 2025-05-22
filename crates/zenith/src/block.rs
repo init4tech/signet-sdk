@@ -224,13 +224,13 @@ where
 #[cfg(test)]
 mod test {
     use alloy::consensus::{Signed, TxEip1559};
-    use alloy::primitives::{b256, bytes, Address, PrimitiveSignature, U256};
+    use alloy::primitives::{b256, bytes, Address, Signature, U256};
 
     use super::*;
 
     #[test]
     fn encode_decode() {
-        let sig = PrimitiveSignature::from_scalars_and_parity(
+        let sig = Signature::from_scalars_and_parity(
             b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,

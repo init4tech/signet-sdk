@@ -13,7 +13,7 @@ use alloy::{
     rpc::types::{FeeHistory, Filter, Log},
 };
 use reth::{
-    core::primitives::SignedTransaction,
+    core::primitives::SignerRecoverable,
     primitives::{Block, EthPrimitives, Receipt, Recovered, RecoveredBlock, TransactionSigned},
     providers::{
         providers::{BlockchainProvider, ProviderNodeTypes},
@@ -403,7 +403,7 @@ where
         let hash = *tx.hash();
         let signature = *tx.signature();
 
-        let inner: TxEnvelope = match tx.into_inner().into_transaction() {
+        let inner: TxEnvelope = match tx.into_inner().into_typed_transaction() {
             reth::primitives::Transaction::Legacy(tx) => {
                 Signed::new_unchecked(tx, signature, hash).into()
             }
@@ -727,7 +727,7 @@ where
         append_matching_block_logs(
             &mut all_logs,
             ProviderOrBlock::<BlockchainProvider<Inner>>::Block(block),
-            &FilteredParams::new(Some(filter.clone())),
+            filter,
             block_num_hash,
             &receipts,
             false,
@@ -742,6 +742,8 @@ where
     /// Returns an error if:
     ///  - underlying database error
     ///  - amount of matches exceeds configured limit
+    ///
+    /// https://github.com/paradigmxyz/reth/blob/d01658e516abbf2a1a76855a26d7123286865f22/crates/rpc/rpc/src/eth/filter.rs#L506
     async fn get_logs_in_block_range(
         &self,
         filter: &Filter,
@@ -760,7 +762,6 @@ where
         }
 
         let mut all_logs = Vec::new();
-        let filter_params = FilteredParams::new(Some(filter.clone()));
 
         // derive bloom filters from filter input, so we can check headers for matching logs
         let address_filter = FilteredParams::address_filter(&filter.address);
@@ -800,7 +801,7 @@ where
                     append_matching_block_logs(
                         &mut all_logs,
                         ProviderOrBlock::<BlockchainProvider<Inner>>::Block(block),
-                        &filter_params,
+                        filter,
                         block_num_hash,
                         &receipts,
                         false,

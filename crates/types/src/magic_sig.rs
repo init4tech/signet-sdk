@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, PrimitiveSignature as Signature, B256};
+use alloy::primitives::{Address, Signature, B256};
 use signet_zenith::MINTER_ADDRESS;
 
 /// A sentinel value to identify the magic signature. This is encoded in the

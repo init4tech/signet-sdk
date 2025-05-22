@@ -100,9 +100,9 @@ where
             return;
         }
 
-        if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log, true) {
+        if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log) {
             self.orders.add(data);
-        } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log, true) {
+        } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log) {
             self.filleds.add(data);
         }
     }

@@ -1,7 +1,4 @@
-use alloy::{
-    eips::Typed2718,
-    primitives::{Log, TxHash, U256},
-};
+use alloy::primitives::{Log, TxHash, U256};
 use reth::primitives::{Receipt, TransactionSigned};
 use signet_zenith::{Passage, RollupOrders, Transactor, Zenith};
 
@@ -191,7 +188,7 @@ impl ExtractedEvent<'_, Zenith::BlockSubmitted> {
     }
 
     /// True if the transaction is an EIP-4844 transaction.
-    pub fn is_eip4844(&self) -> bool {
+    pub const fn is_eip4844(&self) -> bool {
         self.tx.is_eip4844()
     }
 }

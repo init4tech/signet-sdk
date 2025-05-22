@@ -185,7 +185,7 @@ where
 
             // Taking these clears the order detector
             let (orders, fills) =
-                trevm.inner_mut_unchecked().data.inspector.as_mut_detector().take_aggregates();
+                trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
             self.response.orders = orders;
             self.response.fills = fills;
 

@@ -31,7 +31,7 @@ use alloy::{
 /// "tokenadmin"
 pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e61646d696e");
 
-impl<P, N> HostOrders::HostOrdersInstance<(), P, N>
+impl<P, N> HostOrders::HostOrdersInstance<P, N>
 where
     P: Provider<N>,
     N: Network,

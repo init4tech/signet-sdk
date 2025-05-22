@@ -11,9 +11,7 @@ pub trait RequestSigner {
     fn sign_request(
         &self,
         request: &SignRequest,
-    ) -> impl std::future::Future<
-        Output = Result<alloy::primitives::PrimitiveSignature, alloy::signers::Error>,
-    > + Send;
+    ) -> impl std::future::Future<Output = Result<alloy::signers::Signature, alloy::signers::Error>> + Send;
 }
 
 impl<T> RequestSigner for T
@@ -23,7 +21,7 @@ where
     async fn sign_request(
         &self,
         request: &SignRequest,
-    ) -> Result<alloy::primitives::PrimitiveSignature, alloy::signers::Error> {
+    ) -> Result<alloy::signers::Signature, alloy::signers::Error> {
         let hash = request.signing_hash();
         self.sign_hash(&hash).await
     }
