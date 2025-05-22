@@ -28,9 +28,13 @@ pub use journal::HostJournal;
 mod orders;
 pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector, SignetInspector};
 
+mod precompiles;
+pub use precompiles::signet_precompiles;
+
 mod result;
 pub use result::BlockResult;
 
+use reth::revm::primitives::hardfork::SpecId;
 use signet_types::constants::SignetSystemConstants;
 use trevm::{
     helpers::Ctx,
@@ -51,6 +55,7 @@ pub fn signet_evm<Db: Database + DatabaseCommit>(
     TrevmBuilder::new()
         .with_db(db)
         .with_insp(Layered::new(NoOpInspector, OrderDetector::new(constants)))
+        .with_precompiles(signet_precompiles())
         .build_trevm()
         .expect("db set")
 }
@@ -67,7 +72,12 @@ where
 {
     let inspector = SignetLayered::new(inner, OrderDetector::new(constants));
 
-    TrevmBuilder::new().with_db(db).with_insp(inspector).build_trevm().expect("db set")
+    TrevmBuilder::new()
+        .with_db(db)
+        .with_insp(inspector)
+        .with_precompiles(signet_precompiles())
+        .build_trevm()
+        .expect("db set")
 }
 
 /// Test utilities for the Signet EVM impl.
