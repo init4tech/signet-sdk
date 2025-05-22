@@ -73,7 +73,7 @@ impl InterestKind {
                     let transaction_hash = *block.body().transactions[transaction_index].hash();
 
                     receipt.logs.iter().enumerate().filter_map(move |(log_index, log)| {
-                        if log_matches_filter(block_num_hash, log, filter_params) {
+                        if filter.matches(log) {
                             Some(Log {
                                 inner: log.clone(),
                                 block_hash: Some(block_num_hash.hash),
