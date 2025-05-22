@@ -1,6 +1,6 @@
 //! Signet bundle types.
 use alloy::{
-    consensus::{Transaction, TxEnvelope},
+    consensus::{transaction::SignerRecoverable, Transaction, TxEnvelope},
     eips::{eip2718::Encodable2718, BlockNumberOrTag, Decodable2718},
     primitives::{keccak256, Bytes, B256, U256},
     rlp::Buf,

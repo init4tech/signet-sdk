@@ -49,34 +49,35 @@ signet-zenith = { path = "crates/zenith" }
 ajj = { version = "0.3.1" }
 
 # trevm
-trevm = { version = "0.20.10", features = ["full_env_cfg"] }
+trevm = { version = "0.23.2", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
-alloy = { version = "=0.12.6", features = [
+alloy = { version = "=1.0.5", features = [
     "full",
     "rpc-types-mev",
     "genesis",
     "arbitrary",
 ] }
-alloy-contract = { version = "=0.12.6", features = ["pubsub"] }
+alloy-contract = { version = "=1.0.5", features = ["pubsub"] }
 
 # Reth
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-db-common = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-eth-wire-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-prune-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
-reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.3.4" }
+reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-db-common = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-eth-wire-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-prune-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
+reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
 
 # Foundry periphery
 foundry-blob-explorers = "0.10"

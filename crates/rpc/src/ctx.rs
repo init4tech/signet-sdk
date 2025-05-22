@@ -13,7 +13,7 @@ use alloy::{
     rpc::types::{FeeHistory, Filter, Log},
 };
 use reth::{
-    core::primitives::SignedTransaction,
+    core::primitives::{SignedTransaction, SignerRecoverable},
     primitives::{Block, EthPrimitives, Receipt, Recovered, RecoveredBlock, TransactionSigned},
     providers::{
         providers::{BlockchainProvider, ProviderNodeTypes},
@@ -403,7 +403,7 @@ where
         let hash = *tx.hash();
         let signature = *tx.signature();
 
-        let inner: TxEnvelope = match tx.into_inner().into_transaction() {
+        let inner: TxEnvelope = match tx.into_inner().into_typed_transaction() {
             reth::primitives::Transaction::Legacy(tx) => {
                 Signed::new_unchecked(tx, signature, hash).into()
             }

@@ -9,7 +9,7 @@ use alloy::{
     primitives::{Address, Bloom, U256},
 };
 use reth::{
-    core::primitives::SignedTransaction,
+    core::primitives::{SignedTransaction, SignerRecoverable},
     primitives::{
         Block, BlockBody, Receipt, RecoveredBlock, SealedHeader, Transaction, TransactionSigned,
     },
@@ -136,8 +136,9 @@ impl Tx for FillShim<'_> {
 
         *caller = self.1;
 
-        match self.0.as_ref() {
-            Transaction::Legacy(tx) => {
+        match self.0 {
+            TransactionSigned::Legacy(tx) => {
+                let tx = tx.tx();
                 *tx_type = TxType::Legacy as u8;
                 *gas_limit = tx.gas_limit;
                 *gas_price = tx.gas_price;
@@ -152,7 +153,8 @@ impl Tx for FillShim<'_> {
                 *max_fee_per_blob_gas = 0;
                 authorization_list.clear();
             }
-            Transaction::Eip2930(tx) => {
+            TransactionSigned::Eip2930(tx) => {
+                let tx = tx.tx();
                 *tx_type = TxType::Eip2930 as u8;
                 *gas_limit = tx.gas_limit;
                 *gas_price = tx.gas_price;
@@ -167,7 +169,8 @@ impl Tx for FillShim<'_> {
                 *max_fee_per_blob_gas = 0;
                 authorization_list.clear();
             }
-            Transaction::Eip1559(tx) => {
+            TransactionSigned::Eip1559(tx) => {
+                let tx = tx.tx();
                 *tx_type = TxType::Eip1559 as u8;
                 *gas_limit = tx.gas_limit;
                 *gas_price = tx.max_fee_per_gas;
@@ -182,7 +185,8 @@ impl Tx for FillShim<'_> {
                 *max_fee_per_blob_gas = 0;
                 authorization_list.clear();
             }
-            Transaction::Eip4844(tx) => {
+            TransactionSigned::Eip4844(tx) => {
+                let tx = tx.tx();
                 *tx_type = TxType::Eip4844 as u8;
                 *gas_limit = tx.gas_limit;
                 *gas_price = tx.max_fee_per_gas;
@@ -197,7 +201,8 @@ impl Tx for FillShim<'_> {
                 *max_fee_per_blob_gas = tx.max_fee_per_blob_gas;
                 authorization_list.clear();
             }
-            Transaction::Eip7702(tx) => {
+            TransactionSigned::Eip7702(tx) => {
+                let tx = tx.tx();
                 *tx_type = TxType::Eip7702 as u8;
                 *gas_limit = tx.gas_limit;
                 *gas_price = tx.max_fee_per_gas;
@@ -210,7 +215,13 @@ impl Tx for FillShim<'_> {
                 access_list.clone_from(&tx.access_list);
                 blob_hashes.clear();
                 *max_fee_per_blob_gas = 0;
-                authorization_list.clone_from(&tx.authorization_list);
+                authorization_list.clone_from(
+                    &tx.authorization_list
+                        .iter()
+                        .cloned()
+                        .map(alloy::signers::Either::Left)
+                        .collect(),
+                );
             }
         }
     }
@@ -438,7 +449,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     {
         // Taking these clears the context for reuse.
         let (agg_orders, agg_fills) =
-            trevm.inner_mut_unchecked().data.inspector.as_mut_detector().take_aggregates();
+            trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
 
         // We check the AggregateFills here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
@@ -486,7 +497,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let (result, trevm) = trevm.accept();
 
         // Create a receipt for the transaction.
-        let tx_env = trevm.inner().data.ctx.tx();
+        let tx_env = trevm.inner().ctx.tx();
         let sender = tx_env.caller;
         // 4844 transactions are not allowed
         let receipt = self.make_receipt(result).into();
@@ -936,7 +947,7 @@ mod test {
             SignableTransaction, TxEip1559,
         },
         primitives::{Sealable, B256, B64},
-        signers::{local::PrivateKeySigner, SignerSync},
+        signers::{local::PrivateKeySigner, Signature, SignerSync},
     };
     use reth::primitives::{Block, RecoveredBlock, Transaction};
     use signet_extract::ExtractedEvent;
@@ -1158,7 +1169,7 @@ mod test {
         let user = Address::repeat_byte(2);
 
         // Set up a fake event
-        let fake_tx = TransactionSigned::default();
+        let fake_tx = fake_tx();
         let fake_receipt: reth::primitives::Receipt = Default::default();
 
         let enter = signet_zenith::Passage::Enter {
@@ -1199,7 +1210,7 @@ mod test {
         let recipient = Address::repeat_byte(2);
 
         // Set up a couple fake events
-        let fake_tx = TransactionSigned::default();
+        let fake_tx = fake_tx();
         let fake_receipt: reth::primitives::Receipt = Default::default();
 
         let enter = signet_zenith::Passage::Enter {
@@ -1250,5 +1261,11 @@ mod test {
         );
         assert_eq!(receipts.len(), 2);
         assert_eq!(trevm.read_balance(recipient), U256::from(100));
+    }
+
+    fn fake_tx() -> TransactionSigned {
+        let tx = TxEip1559::default();
+        let signature = Signature::test_signature();
+        TransactionSigned::new_unhashed(tx.into(), signature)
     }
 }

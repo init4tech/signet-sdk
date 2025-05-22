@@ -3,7 +3,7 @@ use crate::{
     Events, Extracts,
 };
 use alloy::{
-    consensus::{constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip4844},
+    consensus::{constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip1559, TxEip4844},
     primitives::{Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
     signers::Signature,
 };
@@ -277,7 +277,20 @@ impl HostBlockSpec {
 
     /// Make dummy txns. The blob txn will always be at the end of the block
     fn make_txns(&self) -> Vec<TransactionSigned> {
-        self.receipts.iter().map(|_| Default::default()).chain(self.blob_txn()).collect()
+        self.receipts
+            .iter()
+            .map(|_| {
+                Some(
+                    alloy::consensus::Signed::new_unhashed(
+                        TxEip1559::default(),
+                        Signature::test_signature(),
+                    )
+                    .into(),
+                )
+            })
+            .chain(std::iter::once(self.blob_txn()))
+            .flatten()
+            .collect()
     }
 
     /// Get the block number

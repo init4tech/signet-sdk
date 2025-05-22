@@ -3,10 +3,7 @@ use alloy::{
     consensus::BlockHeader,
     rpc::types::{Filter, Header, Log},
 };
-use reth::{
-    providers::CanonStateNotification,
-    rpc::{server_types::eth::logs_utils::log_matches_filter, types::FilteredParams},
-};
+use reth::{providers::CanonStateNotification, rpc::types::FilteredParams};
 use std::collections::VecDeque;
 
 /// The different kinds of filters that can be created.

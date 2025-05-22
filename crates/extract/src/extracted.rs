@@ -1,7 +1,4 @@
-use alloy::{
-    eips::Typed2718,
-    primitives::{Log, TxHash, U256},
-};
+use alloy::primitives::{Log, TxHash, U256};
 use reth::primitives::{Receipt, TransactionSigned};
 use signet_zenith::{Passage, RollupOrders, Transactor, Zenith};
 
