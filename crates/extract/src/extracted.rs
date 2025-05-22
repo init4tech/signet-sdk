@@ -188,7 +188,7 @@ impl ExtractedEvent<'_, Zenith::BlockSubmitted> {
     }
 
     /// True if the transaction is an EIP-4844 transaction.
-    pub fn is_eip4844(&self) -> bool {
+    pub const fn is_eip4844(&self) -> bool {
         self.tx.is_eip4844()
     }
 }

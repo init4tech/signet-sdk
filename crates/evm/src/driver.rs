@@ -10,9 +10,7 @@ use alloy::{
 };
 use reth::{
     core::primitives::SignerRecoverable,
-    primitives::{
-        Block, BlockBody, Receipt, RecoveredBlock, SealedHeader, Transaction, TransactionSigned,
-    },
+    primitives::{Block, BlockBody, Receipt, RecoveredBlock, SealedHeader, TransactionSigned},
     providers::ExecutionOutcome,
 };
 use signet_extract::{ExtractedEvent, Extracts};
