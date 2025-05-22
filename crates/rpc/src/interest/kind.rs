@@ -48,12 +48,10 @@ impl InterestKind {
     }
 
     fn apply_filter(&self, notif: &CanonStateNotification) -> SubscriptionBuffer {
-        let filter = self.as_filter().unwrap();
-
         // NB: borrowing OUTSIDE the top-level closure prevents this value from
         // being moved into the closure, which would result in the inner
         // closures violating borrowing rules.
-        let filter_params = &FilteredParams::new(Some(filter.clone()));
+        let filter = self.as_filter().unwrap();
 
         let address_filter = FilteredParams::address_filter(&filter.address);
         let topics_filter = FilteredParams::topics_filter(&filter.topics);
