@@ -19,6 +19,8 @@ pub struct BuiltBlock {
     pub(crate) host_fills: Vec<SignedFill>,
     /// Transactions in the block.
     pub(crate) transactions: Vec<TxEnvelope>,
+    /// The block number for the block.
+    pub(crate) block_number: u64,
 
     /// The amount of gas used by the block so far
     pub(crate) gas_used: u64,
@@ -35,6 +37,8 @@ impl fmt::Debug for BuiltBlock {
             .field("host_fills", &self.host_fills.len())
             .field("transactions", &self.transactions.len())
             .field("gas_used", &self.gas_used)
+            .field("block_number", &self.block_number)
+            .field("hash", &self.contents_hash())
             .finish()
     }
 }
@@ -45,10 +49,21 @@ impl BuiltBlock {
         Self {
             host_fills: Vec::new(),
             transactions: Vec::new(),
+            block_number: 0,
             gas_used: 0,
             raw_encoding: OnceLock::new(),
             hash: OnceLock::new(),
         }
+    }
+
+    /// Gets the block number for the block.
+    pub fn block_number(&self) -> u64 {
+        self.block_number
+    }
+
+    /// Sets the block number for the block.
+    pub fn set_block_number(&mut self, block_number: u64) {
+        self.block_number = block_number;
     }
 
     /// Get the amount of gas used by the block.
