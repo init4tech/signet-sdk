@@ -9,7 +9,7 @@ use tokio::{
     select,
     sync::{mpsc, watch},
 };
-use tracing::{instrument, trace, trace_span};
+use tracing::{instrument, trace, error, trace_span};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
@@ -298,7 +298,11 @@ where
                 // Create the outcome
                 Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
             }
-            Err(e) => Err(SignetEthBundleError::from(e.into_error())),
+            Err(e) => {
+                error!(err = ?e.error(), "simulation error details");
+                error!(?e, "error during transaction simulation");
+                Err(SignetEthBundleError::from(e.into_error()))
+            },
         }
     }
 
@@ -387,7 +391,9 @@ where
                             trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
                         }
                         Err(e) => {
-                            trace!(?identifier, ?e, "Simulation failed");
+                            let err_str = e.to_string();
+                            error!(err_str, "simulation error str");
+                            error!(?identifier, ?e, "Simulation failed");
                         }
                     };
                     // fall through applies to all errors, occurs if
