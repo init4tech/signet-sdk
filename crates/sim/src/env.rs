@@ -9,7 +9,7 @@ use tokio::{
     select,
     sync::{mpsc, watch},
 };
-use tracing::{instrument, error, trace, trace_span};
+use tracing::{instrument, trace, trace_span};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
@@ -314,10 +314,7 @@ where
                 // Create the outcome
                 Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
             }
-            Err(e) => {
-                error!(err = ?e.error(), "simulation error details");
-                Err(SignetEthBundleError::from(e.into_error()))
-            }
+            Err(e) => Err(SignetEthBundleError::from(e.into_error())),
         }
     }
 
