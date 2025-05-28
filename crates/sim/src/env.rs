@@ -9,7 +9,7 @@ use tokio::{
     select,
     sync::{mpsc, watch},
 };
-use tracing::{instrument, trace, error, trace_span};
+use tracing::{error, instrument, trace, trace_span};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
@@ -318,7 +318,7 @@ where
                 error!(err = ?e.error(), "simulation error details");
                 error!(?e, "error during transaction simulation");
                 Err(SignetEthBundleError::from(e.into_error()))
-            },
+            }
         }
     }
 
