@@ -15,7 +15,10 @@ use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
     revm::{
-        context::result::{EVMError, ExecutionResult},
+        context::{
+            result::{EVMError, ExecutionResult},
+            BlockEnv, CfgEnv,
+        },
         database::{Cache, CacheDB},
         inspector::NoOpInspector,
         DatabaseRef, Inspector,
@@ -63,15 +66,19 @@ where
     Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
 {
     /// Creates a new `SimEnv` instance.
-    pub fn new(
+    pub fn new<C, B>(
         db: Db,
         constants: SignetSystemConstants,
-        cfg: Box<dyn Cfg>,
-        block: Box<dyn Block>,
+        cfg: C,
+        block: B,
         finish_by: std::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
-    ) -> Self {
+    ) -> Self
+    where
+        C: Cfg,
+        B: Block,
+    {
         SimEnv::new(db, constants, cfg, block, finish_by, concurrency_limit, sim_items).into()
     }
 
@@ -125,10 +132,10 @@ pub struct SimEnv<Db, Insp = NoOpInspector> {
     constants: SignetSystemConstants,
 
     /// Chain cfg to use for the simulation.
-    cfg: Box<dyn Cfg>,
+    cfg: CfgEnv,
 
     /// Block to use for the simulation.
-    block: Box<dyn Block>,
+    block: BlockEnv,
 
     /// The instant by which the simulation should finish.
     finish_by: std::time::Instant,
@@ -151,15 +158,24 @@ impl<Db, Insp> fmt::Debug for SimEnv<Db, Insp> {
 
 impl<Db, Insp> SimEnv<Db, Insp> {
     /// Creates a new `SimFactory` instance.
-    pub fn new(
+    pub fn new<C, B>(
         db: Db,
         constants: SignetSystemConstants,
-        cfg: Box<dyn Cfg>,
-        block: Box<dyn Block>,
+        cfg_ref: C,
+        block_ref: B,
         finish_by: std::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
-    ) -> Self {
+    ) -> Self
+    where
+        C: Cfg,
+        B: Block,
+    {
+        let mut cfg = CfgEnv::default();
+        cfg_ref.fill_cfg_env(&mut cfg);
+        let mut block = BlockEnv::default();
+        block_ref.fill_block_env(&mut block);
+
         Self {
             db: Arc::new(CacheDB::new(db)),
             constants,
@@ -188,12 +204,12 @@ impl<Db, Insp> SimEnv<Db, Insp> {
     }
 
     /// Get a reference to the chain cfg.
-    pub fn cfg(&self) -> &dyn Cfg {
+    pub const fn cfg(&self) -> &CfgEnv {
         &self.cfg
     }
 
     /// Get a reference to the block.
-    pub fn block(&self) -> &dyn Block {
+    pub const fn block(&self) -> &BlockEnv {
         &self.block
     }
 

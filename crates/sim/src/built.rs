@@ -38,18 +38,17 @@ impl fmt::Debug for BuiltBlock {
             .field("transactions", &self.transactions.len())
             .field("gas_used", &self.gas_used)
             .field("block_number", &self.block_number)
-            .field("hash", &self.contents_hash())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl BuiltBlock {
     /// Create a new `BuiltBlock`
-    pub const fn new() -> Self {
+    pub const fn new(block_number: u64) -> Self {
         Self {
             host_fills: Vec::new(),
             transactions: Vec::new(),
-            block_number: 0,
+            block_number,
             gas_used: 0,
             raw_encoding: OnceLock::new(),
             hash: OnceLock::new(),
@@ -57,13 +56,8 @@ impl BuiltBlock {
     }
 
     /// Gets the block number for the block.
-    pub fn block_number(&self) -> u64 {
+    pub const fn block_number(&self) -> u64 {
         self.block_number
-    }
-
-    /// Sets the block number for the block.
-    pub fn set_block_number(&mut self, block_number: u64) {
-        self.block_number = block_number;
     }
 
     /// Get the amount of gas used by the block.
