@@ -34,7 +34,6 @@ pub use precompiles::signet_precompiles;
 mod result;
 pub use result::BlockResult;
 
-use reth::revm::primitives::hardfork::SpecId;
 use signet_types::constants::SignetSystemConstants;
 use trevm::{
     helpers::Ctx,
