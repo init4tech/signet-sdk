@@ -42,12 +42,9 @@ where
         max_gas: u64,
     ) -> Self
     where
-        C: Cfg + 'static,
-        B: Block + 'static,
+        C: Cfg,
+        B: Block,
     {
-        let cfg: Box<dyn Cfg> = Box::new(cfg);
-        let block: Box<dyn Block> = Box::new(block);
-
         let env = SimEnv::<Db, Insp>::new(
             db,
             constants,
@@ -58,7 +55,8 @@ where
             sim_items,
         );
         let finish_by = env.finish_by();
-        Self { env: env.into(), block: BuiltBlock::new(), finish_by, max_gas }
+        let number = env.block().number;
+        Self { env: env.into(), block: BuiltBlock::new(number), finish_by, max_gas }
     }
 
     /// Run a simulation round, and accumulate the results into the block.
