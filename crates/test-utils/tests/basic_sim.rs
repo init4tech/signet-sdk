@@ -7,9 +7,12 @@ use alloy::{
     primitives::{Address, TxKind, U256},
     signers::Signature,
 };
-use signet_evm::test_utils::TestCfg;
 use signet_sim::{BlockBuild, SimCache};
-use signet_types::test_utils::*;
+use signet_test_utils::{
+    evm::TestCfg,
+    test_constants::*,
+    users::{TEST_SIGNERS, TEST_USERS},
+};
 use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 use trevm::{

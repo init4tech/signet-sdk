@@ -1,7 +1,7 @@
-use crate::test_utils::HostBlockSpec;
+use crate::{convert::ToRethPrimitive, specs::HostBlockSpec};
 use alloy::consensus::BlobTransactionSidecar;
-use reth::primitives::TransactionSigned;
 use reth_exex::ExExNotification;
+use signet_types::primitives::TransactionSigned;
 use std::{collections::BTreeMap, sync::Arc};
 
 /// A notification spec.
@@ -60,7 +60,7 @@ impl NotificationSpec {
             let (mut chain, sidecar) = self.new[0].to_chain();
             // accumulate sidecar if necessary
             if let Some(sidecar) = sidecar {
-                let tx = self.new[0].block().body().transactions().last().unwrap().clone();
+                let tx = self.new[0].sealed_block().body.transactions().last().unwrap().clone();
                 sidecars.insert(num, (sidecar, tx));
             }
 
@@ -72,7 +72,7 @@ impl NotificationSpec {
 
                 // accumualate the sidecar here if necessary
                 if let Some(sidecar) = block.sidecar.clone() {
-                    let tx = block.block().body().transactions().last().unwrap().clone();
+                    let tx = block.sealed_block().body.transactions().last().unwrap().clone();
                     sidecars.insert(block.block_number(), (sidecar, tx));
                 }
 
@@ -87,17 +87,21 @@ impl NotificationSpec {
         match (old_chain, new_chain) {
             (Some(old_chain), Some(new_chain)) => NotificationWithSidecars {
                 notification: ExExNotification::ChainReorged {
-                    old: Arc::new(old_chain),
-                    new: Arc::new(new_chain),
+                    old: Arc::new(old_chain.to_reth()),
+                    new: Arc::new(new_chain.to_reth()),
                 },
                 sidecars,
             },
             (Some(old_chain), None) => NotificationWithSidecars {
-                notification: ExExNotification::ChainReverted { old: Arc::new(old_chain) },
+                notification: ExExNotification::ChainReverted {
+                    old: Arc::new(old_chain.to_reth()),
+                },
                 sidecars,
             },
             (None, Some(new_chain)) => NotificationWithSidecars {
-                notification: ExExNotification::ChainCommitted { new: Arc::new(new_chain) },
+                notification: ExExNotification::ChainCommitted {
+                    new: Arc::new(new_chain.to_reth()),
+                },
                 sidecars,
             },
             (None, None) => panic!("missing old and new chains"),

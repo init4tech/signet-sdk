@@ -1,5 +1,5 @@
-use reth::revm::precompile::{secp256r1, Precompiles};
 use std::sync::OnceLock;
+use trevm::revm::precompile::{secp256r1, Precompiles};
 
 static PRECOMPILES: OnceLock<Precompiles> = OnceLock::new();
 

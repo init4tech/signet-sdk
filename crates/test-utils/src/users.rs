@@ -4,8 +4,6 @@ use alloy::{
 };
 use std::sync::LazyLock;
 
-pub use signet_constants::test_utils::*;
-
 /// Test signers used in tests.
 pub static TEST_SIGNERS: LazyLock<[PrivateKeySigner; 10]> = LazyLock::new(|| {
     [

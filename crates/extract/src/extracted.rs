@@ -1,8 +1,17 @@
-use alloy::primitives::{Log, TxHash, U256};
-use reth::primitives::{Receipt, TransactionSigned};
+use crate::Events;
+use alloy::{
+    consensus::{TxEip1559, TxReceipt},
+    primitives::{Address, Log, TxHash, U256},
+    sol_types::SolCall,
+};
+use signet_types::{
+    primitives::{Transaction, TransactionSigned},
+    MagicSig, MagicSigInfo,
+};
 use signet_zenith::{Passage, RollupOrders, Transactor, Zenith};
 
-use crate::Events;
+/// Basic gas cost for a transaction.
+const BASE_TX_GAS_COST: u64 = 21_000;
 
 /// A single event extracted from the host chain.
 ///
@@ -12,26 +21,34 @@ use crate::Events;
 ///
 /// Events may be either the enum type [`Events`], or a specific event type.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtractedEvent<'a, T = Events> {
+pub struct ExtractedEvent<'a, R, E = Events> {
     /// The transaction that caused the event
     pub tx: &'a TransactionSigned,
     /// The receipt that the event was extracted from.
-    pub receipt: &'a Receipt,
+    pub receipt: &'a R,
     /// The index of the log in the receipt's logs.
     pub log_index: usize,
     /// The extracted event.
-    pub event: T,
+    pub event: E,
 }
 
-impl<T> std::ops::Deref for ExtractedEvent<'_, T> {
-    type Target = T;
+impl<R, E> std::ops::Deref for ExtractedEvent<'_, R, E>
+where
+    R: TxReceipt<Log = Log>,
+    E: Into<Events>,
+{
+    type Target = E;
 
     fn deref(&self) -> &Self::Target {
         &self.event
     }
 }
 
-impl<T> ExtractedEvent<'_, T> {
+impl<R, E> ExtractedEvent<'_, R, E>
+where
+    R: TxReceipt<Log = Log>,
+    E: Into<Events>,
+{
     /// Get the transaction hash of the extracted event.
     pub fn tx_hash(&self) -> TxHash {
         *self.tx.hash()
@@ -39,11 +56,14 @@ impl<T> ExtractedEvent<'_, T> {
 
     /// Borrow the raw log from the receipt.
     pub fn raw_log(&self) -> &Log {
-        &self.receipt.logs[self.log_index]
+        &self.receipt.logs()[self.log_index]
     }
 }
 
-impl<'a> ExtractedEvent<'a, Events> {
+impl<'a, R> ExtractedEvent<'a, R, Events>
+where
+    R: TxReceipt<Log = Log>,
+{
     /// True if the event is an [`Passage::EnterToken`].
     pub const fn is_enter_token(&self) -> bool {
         self.event.is_enter_token()
@@ -59,7 +79,7 @@ impl<'a> ExtractedEvent<'a, Events> {
     /// not an [`EnterToken`], it returns an error.
     ///
     /// [`EnterToken`]: Passage::EnterToken
-    pub fn try_into_enter_token(self) -> Result<ExtractedEvent<'a, Passage::EnterToken>, Self> {
+    pub fn try_into_enter_token(self) -> Result<ExtractedEvent<'a, R, Passage::EnterToken>, Self> {
         match self.event {
             Events::EnterToken(event) => Ok(ExtractedEvent {
                 tx: self.tx,
@@ -87,7 +107,7 @@ impl<'a> ExtractedEvent<'a, Events> {
     /// [`Enter`], it will be returned as an error.
     ///
     /// [`Enter`]: Passage::Enter
-    pub fn try_into_enter(self) -> Result<ExtractedEvent<'a, Passage::Enter>, Self> {
+    pub fn try_into_enter(self) -> Result<ExtractedEvent<'a, R, Passage::Enter>, Self> {
         match self.event {
             Events::Enter(event) => Ok(ExtractedEvent {
                 tx: self.tx,
@@ -117,7 +137,7 @@ impl<'a> ExtractedEvent<'a, Events> {
     /// [`BlockSubmitted`]: Zenith::BlockSubmitted
     pub fn try_into_block_submitted(
         self,
-    ) -> Result<ExtractedEvent<'a, Zenith::BlockSubmitted>, Self> {
+    ) -> Result<ExtractedEvent<'a, R, Zenith::BlockSubmitted>, Self> {
         match self.event {
             Events::BlockSubmitted(event) => Ok(ExtractedEvent {
                 tx: self.tx,
@@ -143,7 +163,7 @@ impl<'a> ExtractedEvent<'a, Events> {
     /// an [`Transact`], it will be returned as an error.
     ///
     /// [`Transact`]: Transactor::Transact
-    pub fn try_into_transact(self) -> Result<ExtractedEvent<'a, Transactor::Transact>, Self> {
+    pub fn try_into_transact(self) -> Result<ExtractedEvent<'a, R, Transactor::Transact>, Self> {
         match self.event {
             Events::Transact(event) => Ok(ExtractedEvent {
                 tx: self.tx,
@@ -168,7 +188,7 @@ impl<'a> ExtractedEvent<'a, Events> {
     /// Attempt to convert this event into an [`RollupOrders::Filled`]. If the
     /// event is not an [`RollupOrders::Filled`], it will be returned as an
     /// error.
-    pub fn try_into_filled(self) -> Result<ExtractedEvent<'a, RollupOrders::Filled>, Self> {
+    pub fn try_into_filled(self) -> Result<ExtractedEvent<'a, R, RollupOrders::Filled>, Self> {
         match self.event {
             Events::Filled(event) => Ok(ExtractedEvent {
                 tx: self.tx,
@@ -181,14 +201,117 @@ impl<'a> ExtractedEvent<'a, Events> {
     }
 }
 
-impl ExtractedEvent<'_, Zenith::BlockSubmitted> {
+impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Transactor::Transact> {
+    /// Create a magic signature for the transact event, containing sender
+    /// information.
+    pub fn magic_sig(&self) -> MagicSig {
+        MagicSig {
+            ty: MagicSigInfo::Transact { sender: self.sender() },
+            txid: self.tx_hash(),
+            event_idx: self.log_index,
+        }
+    }
+
+    /// Create the signature for the transact event.
+    fn signature(&self) -> alloy::primitives::Signature {
+        self.magic_sig().into()
+    }
+
+    /// Make the transaction that corresponds to this transact event,
+    /// using the provided nonce.
+    pub fn make_transaction(&self, nonce: u64) -> TransactionSigned {
+        TransactionSigned::new_unhashed(
+            Transaction::Eip1559(TxEip1559 {
+                chain_id: self.rollup_chain_id(),
+                nonce,
+                gas_limit: self.gas.to::<u64>(),
+                max_fee_per_gas: self.maxFeePerGas.to::<u128>(),
+                max_priority_fee_per_gas: 0,
+                to: self.to.into(),
+                value: self.value,
+                access_list: Default::default(),
+                input: self.data.clone(),
+            }),
+            self.signature(),
+        )
+    }
+}
+
+impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Passage::Enter> {
+    /// Get the magic signature for the enter event.
+    pub fn magic_sig(&self) -> MagicSig {
+        MagicSig { ty: MagicSigInfo::Enter, txid: self.tx_hash(), event_idx: self.log_index }
+    }
+
+    /// Get the reth transaction signature for the enter event.
+    fn signature(&self) -> alloy::primitives::Signature {
+        self.magic_sig().into()
+    }
+
+    /// Make the transaction that corresponds to this enter event, using the
+    /// provided nonce.
+    pub fn make_transaction(&self, nonce: u64) -> TransactionSigned {
+        TransactionSigned::new_unhashed(
+            Transaction::Eip1559(TxEip1559 {
+                chain_id: self.rollup_chain_id(),
+                nonce,
+                gas_limit: BASE_TX_GAS_COST,
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+                to: self.rollupRecipient.into(),
+                value: self.amount,
+                access_list: Default::default(),
+                input: Default::default(),
+            }),
+            self.signature(),
+        )
+    }
+}
+
+impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Passage::EnterToken> {
+    /// Get the magic signature for the enter token event.
+    pub fn magic_sig(&self) -> MagicSig {
+        MagicSig { ty: MagicSigInfo::EnterToken, txid: self.tx_hash(), event_idx: self.log_index }
+    }
+
+    /// Get the reth transaction signature for the enter token event.
+    fn signature(&self) -> alloy::primitives::Signature {
+        self.magic_sig().into()
+    }
+
+    /// Make the transaction that corresponds to this enter token event,
+    /// using the provided nonce.
+    pub fn make_transaction(&self, nonce: u64, token: Address) -> TransactionSigned {
+        let input = signet_zenith::mintCall { amount: self.amount(), to: self.rollupRecipient }
+            .abi_encode()
+            .into();
+
+        TransactionSigned::new_unhashed(
+            Transaction::Eip1559(TxEip1559 {
+                chain_id: self.rollup_chain_id(),
+                nonce,
+                gas_limit: BASE_TX_GAS_COST,
+                max_fee_per_gas: 0,
+                max_priority_fee_per_gas: 0,
+                // NB: set to the address of the token contract.
+                to: token.into(),
+                value: U256::ZERO,
+                access_list: Default::default(),
+                input, // NB: set to the ABI-encoded input for the `mint` function, which dictates the amount and recipient.
+            }),
+            self.signature(),
+        )
+    }
+}
+
+impl<R> ExtractedEvent<'_, R, Zenith::BlockSubmitted> {
     /// Get the header of the block that was submitted.
     pub fn ru_header(&self, host_block_number: u64) -> Zenith::BlockHeader {
         Zenith::BlockHeader::from_block_submitted(self.event, U256::from(host_block_number))
     }
 
     /// True if the transaction is an EIP-4844 transaction.
-    pub const fn is_eip4844(&self) -> bool {
+    pub fn is_eip4844(&self) -> bool {
         self.tx.is_eip4844()
     }
 }

@@ -1,0 +1,28 @@
+[package]
+name = "signet-test-utils"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+signet-constants = { workspace = true, features = ["test-utils"] }
+signet-types.workspace = true
+signet-evm.workspace = true
+signet-zenith.workspace = true
+signet-extract.workspace = true
+signet-bundle.workspace = true
+signet-sim.workspace = true
+
+trevm = { workspace = true, features = ["test-utils"] }
+
+alloy.workspace = true
+
+reth.workspace = true
+reth-exex.workspace = true
+
+tracing-subscriber.workspace = true
+tokio.workspace = true
