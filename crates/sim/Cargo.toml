@@ -9,11 +9,13 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-alloy.workspace = true
 signet-bundle.workspace = true
 signet-evm.workspace = true
 signet-types.workspace = true
 signet-zenith.workspace = true
+
+alloy.workspace = true
+
 tokio.workspace = true
 tracing.workspace = true
 trevm.workspace = true
