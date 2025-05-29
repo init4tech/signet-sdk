@@ -673,7 +673,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
         let extract = &self.extracts.enter_tokens[idx];
 
-        let filler = EnterTokenFiller { enter_token: &extract, nonce, token: ru_token_addr };
+        let filler = EnterTokenFiller { enter_token: extract, nonce, token: ru_token_addr };
         let mut t = run_tx_early_return!(self, trevm, &filler, MINTER_ADDRESS);
 
         // push a sys_log to the outcome

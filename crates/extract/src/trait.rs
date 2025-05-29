@@ -32,6 +32,6 @@ impl HasTxns for signet_types::primitives::SealedBlock {
 
 impl HasTxns for RecoveredBlock {
     fn transactions(&self) -> &[TransactionSigned] {
-        &self.block.body.transactions.as_slice()
+        self.block.body.transactions.as_slice()
     }
 }

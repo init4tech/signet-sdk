@@ -23,12 +23,12 @@ pub struct SealedHeader<H = Header> {
 
 impl<H> SealedHeader<H> {
     /// Create a new sealed header.
-    pub fn new(header: H) -> Self {
+    pub const fn new(header: H) -> Self {
         Self { hash: OnceLock::new(), header }
     }
 
     /// Get the header
-    pub fn header(&self) -> &H {
+    pub const fn header(&self) -> &H {
         &self.header
     }
 }
@@ -36,7 +36,7 @@ impl<H> SealedHeader<H> {
 impl SealedHeader {
     /// Get the block hash of the sealed header.
     pub fn hash(&self) -> BlockHash {
-        self.hash.get_or_init(|| BlockHash::from(self.header.hash_slow())).clone()
+        *self.hash.get_or_init(|| BlockHash::from(self.header.hash_slow()))
     }
 
     /// Split the sealed header into its components.
@@ -143,7 +143,7 @@ pub struct SealedBlock<T = TransactionSigned, H = Header> {
 
 impl<T, H> SealedBlock<T, H> {
     /// Create a new sealed block without checking the header hash.
-    pub fn new_unchecked(header: SealedHeader<H>, body: AlloyBlockBody<T, H>) -> Self {
+    pub const fn new_unchecked(header: SealedHeader<H>, body: AlloyBlockBody<T, H>) -> Self {
         Self { header, body }
     }
 }
@@ -245,7 +245,7 @@ pub struct RecoveredBlock<T = TransactionSigned, H = Header> {
 
 impl<T, H> RecoveredBlock<T, H> {
     /// Create a new recovered block.
-    pub fn new(block: SealedBlock<T, H>, senders: Vec<Address>) -> Self {
+    pub const fn new(block: SealedBlock<T, H>, senders: Vec<Address>) -> Self {
         Self { block, senders }
     }
 }

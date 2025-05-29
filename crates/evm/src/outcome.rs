@@ -21,7 +21,7 @@ impl<T> Default for ExecutionOutcome<T> {
 
 impl<T> ExecutionOutcome<T> {
     /// Create a new execution outcome.
-    pub fn new(bundle: BundleState, receipts: Vec<Vec<T>>, first_block: u64) -> Self {
+    pub const fn new(bundle: BundleState, receipts: Vec<Vec<T>>, first_block: u64) -> Self {
         Self { bundle, receipts, first_block }
     }
 
