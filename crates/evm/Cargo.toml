@@ -12,7 +12,7 @@ repository.workspace = true
 signet-extract.workspace = true
 signet-types.workspace = true
 
-trevm.workspace = true
+trevm = { workspace = true, features = ["secp256r1"] }
 signet-zenith.workspace = true
 
 alloy.workspace = true
