@@ -22,17 +22,16 @@ pub use signet_constants::PairedHeights;
 mod agg;
 pub use agg::{AggregateFills, AggregateOrders, MarketError};
 
-mod signing;
-pub use signing::{
-    SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
-};
-
 mod magic_sig;
 pub use magic_sig::{MagicSig, MagicSigInfo};
+
+/// Primitive block types used in Signet.
+pub mod primitives;
 
 mod seq;
 pub use seq::{RequestSigner, SignRequest, SignResponse};
 
-#[cfg(any(test, feature = "test-utils"))]
-/// Utils for unit and integration tests.
-pub mod test_utils;
+mod signing;
+pub use signing::{
+    SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
+};

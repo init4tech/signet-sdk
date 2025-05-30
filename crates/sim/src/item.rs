@@ -62,10 +62,11 @@ impl SimItem {
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
+// Testing functions
 impl SimItem {
     /// Create an invalid test item. This will be a [`TxEnvelope`] containing
     /// an EIP-1559 transaction with an invalid signature and hash.
+    #[doc(hidden)]
     pub fn invalid_item() -> Self {
         TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
             alloy::consensus::TxEip1559::default(),
@@ -78,6 +79,7 @@ impl SimItem {
     /// Create an invalid test item with a given gas limit and max priority fee
     /// per gas. As [`Self::invalid_test_item`] but with a custom gas limit and
     /// `max_priority_fee_per_gas`.
+    #[doc(hidden)]
     pub fn invalid_item_with_score(gas_limit: u64, mpfpg: u128) -> Self {
         let tx = alloy::consensus::TxEip1559 {
             gas_limit,

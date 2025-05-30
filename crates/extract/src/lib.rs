@@ -25,6 +25,9 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+mod block;
+pub use block::Extracts;
+
 mod events;
 pub use events::Events;
 
@@ -34,9 +37,5 @@ pub use extracted::ExtractedEvent;
 mod extractor;
 pub use extractor::Extractor;
 
-mod block;
-pub use block::Extracts;
-
-#[cfg(any(test, feature = "test-utils"))]
-/// Utils for unit and integration tests.
-pub mod test_utils;
+mod r#trait;
+pub use r#trait::{Extractable, HasTxns};

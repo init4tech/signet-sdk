@@ -15,10 +15,6 @@
 mod aliases;
 pub use aliases::*;
 
-/// Utilities for converting types to Reth primitives.
-pub mod convert;
-pub use convert::ToRethPrimitive;
-
 mod driver;
 pub use driver::SignetDriver;
 
@@ -27,6 +23,9 @@ pub use journal::HostJournal;
 
 mod orders;
 pub use orders::{Framed, FramedFilleds, FramedOrders, OrderDetector, SignetInspector};
+
+mod outcome;
+pub use outcome::ExecutionOutcome;
 
 mod precompiles;
 pub use precompiles::signet_precompiles;
@@ -77,32 +76,4 @@ where
         .with_precompiles(signet_precompiles())
         .build_trevm()
         .expect("db set")
-}
-
-/// Test utilities for the Signet EVM impl.
-#[cfg(any(test, feature = "test-utils"))]
-pub mod test_utils {
-    use crate::signet_evm;
-    use reth::revm::{context::CfgEnv, primitives::hardfork::SpecId};
-    use signet_types::test_utils::*;
-    use trevm::revm::database::in_memory_db::InMemoryDB;
-
-    /// Create a new Signet EVM with an in-memory database for testing.
-    pub fn test_signet_evm() -> super::EvmNeedsBlock<trevm::revm::database::in_memory_db::InMemoryDB>
-    {
-        signet_evm(InMemoryDB::default(), TEST_SYS).fill_cfg(&TestCfg)
-    }
-
-    /// Test configuration for the Signet EVM.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct TestCfg;
-
-    impl trevm::Cfg for TestCfg {
-        fn fill_cfg_env(&self, cfg_env: &mut reth::revm::context::CfgEnv) {
-            let CfgEnv { chain_id, spec, .. } = cfg_env;
-
-            *chain_id = RU_CHAIN_ID;
-            *spec = SpecId::default();
-        }
-    }
 }

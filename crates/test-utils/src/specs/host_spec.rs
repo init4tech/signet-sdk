@@ -1,18 +1,19 @@
 use crate::{
-    test_utils::{NotificationSpec, NotificationWithSidecars, RuBlockSpec},
-    Events, Extracts,
+    chain::Chain,
+    specs::{NotificationSpec, NotificationWithSidecars, RuBlockSpec},
 };
 use alloy::{
-    consensus::{constants::GWEI_TO_WEI, BlobTransactionSidecar, TxEip1559, TxEip4844},
-    primitives::{Address, Bytes, FixedBytes, Log, LogData, Sealable, B256, U256},
+    consensus::{
+        constants::GWEI_TO_WEI, BlobTransactionSidecar, Header, Receipt, ReceiptEnvelope,
+        TxEip1559, TxEip4844,
+    },
+    primitives::{Address, Bytes, FixedBytes, Log, LogData, B256, U256},
     signers::Signature,
 };
-use reth::{
-    primitives::{
-        Block, BlockBody, Header, Receipt, RecoveredBlock, SealedBlock, SealedHeader, Transaction,
-        TransactionSigned, TxType,
-    },
-    providers::{Chain, ExecutionOutcome},
+use signet_evm::ExecutionOutcome;
+use signet_extract::{Events, Extractable, Extracts};
+use signet_types::primitives::{
+    BlockBody, RecoveredBlock, SealedBlock, SealedHeader, Transaction, TransactionSigned,
 };
 use signet_types::{
     constants::{KnownChains, ParseChainError, SignetSystemConstants},
@@ -41,13 +42,13 @@ pub struct HostBlockSpec {
     pub constants: SignetSystemConstants,
 
     /// The Zenith-event receipts in the block.
-    pub receipts: Vec<Receipt>,
+    pub receipts: Vec<ReceiptEnvelope>,
     /// The Ru block associated with this host block (if any).
     pub ru_block: Option<RuBlockSpec>,
     /// The sidecar associated with the Ru block (if any).
     pub sidecar: Option<BlobTransactionSidecar>,
     /// The receipt for the Ru block (if any).
-    pub ru_block_receipt: Option<Receipt>,
+    pub ru_block_receipt: Option<ReceiptEnvelope>,
     /// The block number. This will be overridden when making chains of blocks.
     pub block_number: AtomicU64,
 
@@ -308,7 +309,7 @@ impl HostBlockSpec {
     /// This function is a little weird because reth @ 1.2.0 rejiggered the
     /// block structs in odd ways.
     pub fn header(&self) -> SealedHeader {
-        let (header, hash) = Header {
+        let header = Header {
             difficulty: U256::from(0x4000_0000),
             number: self.block_number(),
             mix_hash: B256::repeat_byte(0xed),
@@ -316,36 +317,28 @@ impl HostBlockSpec {
             timestamp: 1716555586, // the time when i wrote this function lol
             excess_blob_gas: Some(0),
             ..Default::default()
-        }
-        .seal_slow()
-        .into_parts();
-        SealedHeader::new(header, hash)
+        };
+        SealedHeader::new(header)
     }
 
     /// Make a block
-    ///
-    /// This function is a little weird because reth @ 1.2.0 rejiggered the
-    /// block structs in odd ways.
-    pub fn block(&self) -> SealedBlock {
-        let (header, hash) = self.header().split();
-        SealedBlock::new_unchecked(
-            Block::new(
-                header,
-                BlockBody { transactions: self.make_txns(), ommers: vec![], withdrawals: None },
-            ),
-            hash,
-        )
+    pub fn sealed_block(&self) -> SealedBlock {
+        let header = self.header();
+
+        let body = BlockBody { transactions: self.make_txns(), ommers: vec![], withdrawals: None };
+
+        SealedBlock::new_unchecked(header, body)
     }
 
     /// Make a block with senders
     ///
     /// This function is a little weird because reth @ 1.2.0 rejiggered the
     /// block structs in odd ways.
-    pub fn recovered_block(&self) -> RecoveredBlock<Block> {
-        let (block, hash) = self.block().split();
+    pub fn recovered_block(&self) -> RecoveredBlock {
+        let block = self.sealed_block();
         let senders = block.body.transactions().map(|_| Address::ZERO).collect::<Vec<_>>();
 
-        RecoveredBlock::new(block, senders, hash)
+        RecoveredBlock::new(block, senders)
     }
 
     /// Make an execution outcome
@@ -355,19 +348,14 @@ impl HostBlockSpec {
             receipts.first_mut().unwrap().push(receipt);
         }
 
-        ExecutionOutcome {
-            bundle: Default::default(),
-            receipts,
-            first_block: self.block_number(),
-            requests: vec![],
-        }
+        ExecutionOutcome { bundle: Default::default(), receipts, first_block: self.block_number() }
     }
 
     /// Make a chain
     pub fn to_chain(&self) -> (Chain, Option<BlobTransactionSidecar>) {
         let execution_outcome = self.execution_outcome();
 
-        let chain = Chain::from_block(self.recovered_block(), execution_outcome, None);
+        let chain = Chain::from_block(self.recovered_block(), execution_outcome);
 
         (chain, self.sidecar.clone())
     }
@@ -388,7 +376,7 @@ impl HostBlockSpec {
     }
 
     /// Assert that the block conforms to the spec
-    pub fn assert_conforms(&self, extracts: &Extracts<'_>) {
+    pub fn assert_conforms<C: Extractable>(&self, extracts: &Extracts<'_, C>) {
         if let Some(ru_block) = &self.ru_block {
             ru_block.assert_conforms(extracts);
         }
@@ -430,21 +418,17 @@ impl FromStr for HostBlockSpec {
         let chain: KnownChains = s.parse()?;
         match chain {
             KnownChains::Pecorino => Ok(Self::pecorino()),
-            #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
     }
 }
 
-fn to_receipt<T>(address: Address, t: &T) -> Receipt
+fn to_receipt<T>(address: Address, t: &T) -> ReceiptEnvelope
 where
     for<'a> &'a T: Into<LogData>,
 {
     let log = Log { address, data: t.into() };
-    Receipt {
-        tx_type: TxType::Eip1559,
-        success: true,
-        cumulative_gas_used: 30_000,
-        logs: vec![log],
-    }
+    ReceiptEnvelope::Eip1559(
+        Receipt { status: true.into(), cumulative_gas_used: 30_000, logs: vec![log] }.into(),
+    )
 }

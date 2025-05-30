@@ -1,11 +1,12 @@
-use crate::{Events, ExtractedEvent, Extracts};
-use alloy::primitives::{Log, LogData};
-use reth::{
-    primitives::{Block, Receipt, RecoveredBlock},
-    providers::Chain,
+use crate::{
+    r#trait::{Extractable, HasTxns},
+    Events, ExtractedEvent, Extracts,
+};
+use alloy::{
+    consensus::{BlockHeader, TxReceipt},
+    primitives::Log,
 };
 use signet_types::{constants::SignetSystemConstants, AggregateFills};
-use signet_zenith::Passage;
 use tracing::debug_span;
 
 /// Extracts Zenith events from a chain.
@@ -35,7 +36,7 @@ impl Extractor {
     }
 
     /// Extract a [`Events`] from a log, checking the chain ID.
-    fn extract_log(&self, log: &Log<LogData>) -> Option<Events> {
+    fn extract_log(&self, log: &Log) -> Option<Events> {
         if log.address == self.constants.host_zenith() {
             return Events::decode_zenith(log, self.constants.ru_chain_id());
         }
@@ -52,23 +53,23 @@ impl Extractor {
     }
 
     /// Extract Zenith events from a receipt.
-    fn extract_receipt<'a: 'c, 'b: 'c, 'c>(
+    fn extract_receipt<'a: 'c, 'b: 'c, 'c, R: TxReceipt<Log = Log>>(
         &'a self,
-        receipt: &'b Receipt,
+        receipt: &'b R,
     ) -> impl Iterator<Item = (usize, Events)> + 'c {
-        receipt.logs.iter().enumerate().filter_map(|(i, log)| {
+        receipt.logs().iter().enumerate().filter_map(|(i, log)| {
             let log = self.extract_log(log)?;
             Some((i, log))
         })
     }
 
     /// Extract blocks from a chain.
-    fn produce_event_extracts<'a: 'c, 'b: 'c, 'c>(
+    fn produce_event_extracts<'a: 'c, 'b: 'c, 'c, C: Extractable>(
         &'a self,
-        block: &'b RecoveredBlock<Block>,
-        receipts: &'b [Receipt],
-    ) -> impl Iterator<Item = ExtractedEvent<'c>> {
-        block.body().transactions.iter().zip(receipts.iter()).flat_map(|(tx, receipt)| {
+        block: &'b C::Block,
+        receipts: &'b [C::Receipt],
+    ) -> impl Iterator<Item = ExtractedEvent<'c, C::Receipt>> {
+        block.transactions().iter().zip(receipts.iter()).flat_map(|(tx, receipt)| {
             self.extract_receipt(receipt).map(move |(log_index, event)| ExtractedEvent {
                 tx,
                 receipt,
@@ -85,24 +86,24 @@ impl Extractor {
     ///     - Accumulate the fills.
     ///     - Associate each event with block, tx and receipt references.
     ///     - Yield the extracted block info.
-    pub fn extract_signet<'a: 'c, 'b: 'c, 'c>(
+    pub fn extract_signet<'a: 'c, 'b: 'c, 'c, C: Extractable>(
         &'a self,
-        chain: &'b Chain,
-    ) -> impl Iterator<Item = Extracts<'c>> {
+        chain: &'b C,
+    ) -> impl Iterator<Item = Extracts<'c, C>> {
         chain
             .blocks_and_receipts()
-            .filter(|(block, _)| block.number > self.constants.host_deploy_height())
+            .filter(|(block, _)| block.number() > self.constants.host_deploy_height())
             .map(move |(block, receipts)| {
-                let height = block.number;
+                let height = block.number();
                 let ru_height = self.constants.host_block_to_rollup_block_num(height).unwrap();
                 let host_block = block;
                 let mut context = AggregateFills::new();
                 let mut enters = vec![];
                 let mut transacts = vec![];
-                let mut enter_tokens: Vec<ExtractedEvent<'c, Passage::EnterToken>> = vec![];
+                let mut enter_tokens = vec![];
                 let mut submitted = None;
 
-                for event in self.produce_event_extracts(block, receipts) {
+                for event in self.produce_event_extracts::<C>(block, receipts) {
                     let _span = debug_span!(
                         "tx_loop",
                         height,
@@ -147,39 +148,5 @@ impl Extractor {
                     context,
                 }
             })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::test_utils::*;
-    use alloy::{
-        consensus::constants::GWEI_TO_WEI,
-        primitives::{Address, U256},
-    };
-    use signet_types::test_utils::*;
-
-    #[test]
-    fn extraction() {
-        let mut ru_block = RuBlockSpec::test()
-            .with_gas_limit(12345)
-            .with_reward_address(Address::repeat_byte(0x99));
-        ru_block.add_simple_send(&TEST_SIGNERS[0], TEST_USERS[1], U256::from(GWEI_TO_WEI), 0);
-
-        let hbs = HostBlockSpec::test()
-            .with_block_number(1)
-            .enter(TEST_USERS[0], (GWEI_TO_WEI * 4) as usize)
-            .enter(TEST_USERS[1], (GWEI_TO_WEI * 2) as usize)
-            .enter_token(TEST_USERS[2], 10_000_000, HOST_USDC)
-            .simple_transact(TEST_USERS[0], TEST_USERS[4], [1, 2, 3, 4], GWEI_TO_WEI as usize)
-            .fill(HOST_USDT, TEST_USERS[4], 10_000)
-            .submit_block(ru_block);
-        let (chain, _) = hbs.to_chain();
-
-        let extractor = Extractor::new(TEST_SYS);
-        let extracts = extractor.extract_signet(&chain).next().unwrap();
-
-        hbs.assert_conforms(&extracts);
     }
 }

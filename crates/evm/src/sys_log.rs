@@ -1,4 +1,4 @@
-use alloy::{primitives::Log, sol_types::SolEvent};
+use alloy::{consensus::TxReceipt, primitives::Log, sol_types::SolEvent};
 use signet_extract::ExtractedEvent;
 use signet_zenith::{Passage, Transactor, MINTER_ADDRESS};
 
@@ -28,8 +28,8 @@ alloy::sol! {
     );
 }
 
-impl From<&ExtractedEvent<'_, Passage::Enter>> for Enter {
-    fn from(event: &ExtractedEvent<'_, Passage::Enter>) -> Self {
+impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Passage::Enter>> for Enter {
+    fn from(event: &ExtractedEvent<'_, R, Passage::Enter>) -> Self {
         Enter {
             recipient: event.event.rollupRecipient,
             txHash: event.tx_hash(),
@@ -45,8 +45,8 @@ impl From<Enter> for Log {
     }
 }
 
-impl From<&ExtractedEvent<'_, Passage::EnterToken>> for EnterToken {
-    fn from(event: &ExtractedEvent<'_, Passage::EnterToken>) -> Self {
+impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Passage::EnterToken>> for EnterToken {
+    fn from(event: &ExtractedEvent<'_, R, Passage::EnterToken>) -> Self {
         EnterToken {
             recipient: event.event.rollupRecipient,
             txHash: event.tx_hash(),
@@ -63,8 +63,8 @@ impl From<EnterToken> for Log {
     }
 }
 
-impl From<&ExtractedEvent<'_, Transactor::Transact>> for Transact {
-    fn from(event: &ExtractedEvent<'_, Transactor::Transact>) -> Self {
+impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Transactor::Transact>> for Transact {
+    fn from(event: &ExtractedEvent<'_, R, Transactor::Transact>) -> Self {
         Transact {
             sender: event.event.sender,
             txHash: event.tx_hash(),

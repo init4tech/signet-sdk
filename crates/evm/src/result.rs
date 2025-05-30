@@ -1,9 +1,6 @@
-use crate::journal::HostJournal;
-use alloy::primitives::B256;
-use reth::{
-    primitives::{Block, RecoveredBlock},
-    providers::ExecutionOutcome,
-};
+use crate::{journal::HostJournal, ExecutionOutcome};
+use alloy::{consensus::Header, primitives::B256};
+use signet_types::primitives::{RecoveredBlock, TransactionSigned};
 use trevm::journal::BundleStateIndex;
 
 /// Output of a block execution.
@@ -11,26 +8,26 @@ use trevm::journal::BundleStateIndex;
 /// This is a convenience struct that combines the consensus block object with
 /// the result of its execution.
 #[derive(Debug, Default)]
-pub struct BlockResult {
+pub struct BlockResult<T = TransactionSigned, H = Header> {
     /// A reth [`RecoveredBlock`], containing the sealed block and a vec of
     /// transaction sender.
-    pub sealed_block: RecoveredBlock<Block>,
+    pub sealed_block: RecoveredBlock<T, H>,
     /// The reth [`ExecutionOutcome`] containing the net state changes and
     /// receipts.
     pub execution_outcome: ExecutionOutcome,
 }
 
-impl BlockResult {
+impl<T, H> BlockResult<T, H> {
     /// Create a new block result.
     pub const fn new(
-        sealed_block: RecoveredBlock<Block>,
+        sealed_block: RecoveredBlock<T, H>,
         execution_outcome: ExecutionOutcome,
     ) -> Self {
         Self { sealed_block, execution_outcome }
     }
 
     /// Get the sealed block.
-    pub const fn sealed_block(&self) -> &RecoveredBlock<Block> {
+    pub const fn sealed_block(&self) -> &RecoveredBlock<T, H> {
         &self.sealed_block
     }
 

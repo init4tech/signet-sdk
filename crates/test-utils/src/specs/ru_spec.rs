@@ -1,5 +1,3 @@
-use crate::Extracts;
-
 use super::{sign_tx_with_key_pair, simple_send};
 use alloy::{
     consensus::{BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEnvelope},
@@ -8,8 +6,12 @@ use alloy::{
     rlp::Encodable,
     signers::local::PrivateKeySigner,
 };
-use reth::primitives::TransactionSigned;
-use signet_types::constants::{KnownChains, ParseChainError, SignetSystemConstants};
+use signet_constants::test_utils::*;
+use signet_extract::{Extractable, Extracts};
+use signet_types::{
+    constants::{KnownChains, ParseChainError, SignetSystemConstants},
+    primitives::TransactionSigned,
+};
 use signet_zenith::Zenith::{self};
 use std::str::FromStr;
 
@@ -123,9 +125,7 @@ impl RuBlockSpec {
             sequencer: Address::repeat_byte(3),
             rollupChainId: U256::from(self.constants.ru_chain_id()),
             gasLimit: U256::from(self.gas_limit.unwrap_or(100_000_000)),
-            rewardAddress: self
-                .reward_address
-                .unwrap_or(signet_types::test_utils::DEFAULT_REWARD_ADDRESS),
+            rewardAddress: self.reward_address.unwrap_or(DEFAULT_REWARD_ADDRESS),
             blockDataHash: bdh,
         };
 
@@ -133,7 +133,7 @@ impl RuBlockSpec {
     }
 
     /// Assert that extracted data conforms to the block spec.
-    pub fn assert_conforms(&self, extracts: &Extracts<'_>) {
+    pub fn assert_conforms<C: Extractable>(&self, extracts: &Extracts<'_, C>) {
         let submitted = extracts.submitted.as_ref().unwrap();
 
         if let Some(gas_limit) = self.gas_limit {
@@ -153,7 +153,6 @@ impl FromStr for RuBlockSpec {
         let chain: KnownChains = s.parse()?;
         match chain {
             KnownChains::Pecorino => Ok(Self::pecorino()),
-            #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
     }

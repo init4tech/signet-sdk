@@ -1,5 +1,5 @@
-use crate::ExtractedEvent;
-use reth::primitives::{Block, RecoveredBlock};
+use crate::{Extractable, ExtractedEvent};
+use alloy::consensus::BlockHeader;
 use signet_types::AggregateFills;
 use signet_zenith::{Passage, Transactor, Zenith};
 
@@ -7,41 +7,26 @@ use signet_zenith::{Passage, Transactor, Zenith};
 /// from a block object, the extracted events, and a [`AggregateFills`]
 /// populated with the fills present in the host block.
 #[derive(Debug, Clone)]
-pub struct Extracts<'a> {
+pub struct Extracts<'a, C: Extractable> {
     /// The host block.
-    pub host_block: &'a RecoveredBlock<Block>,
+    pub host_block: &'a C::Block,
     /// The rollup chain ID.
     pub chain_id: u64,
     /// The rollup block number.
     pub ru_height: u64,
     /// The submitted event.
-    pub submitted: Option<ExtractedEvent<'a, Zenith::BlockSubmitted>>,
+    pub submitted: Option<ExtractedEvent<'a, C::Receipt, Zenith::BlockSubmitted>>,
     /// The enters.
-    pub enters: Vec<ExtractedEvent<'a, Passage::Enter>>,
+    pub enters: Vec<ExtractedEvent<'a, C::Receipt, Passage::Enter>>,
     /// The transacts.
-    pub transacts: Vec<ExtractedEvent<'a, Transactor::Transact>>,
+    pub transacts: Vec<ExtractedEvent<'a, C::Receipt, Transactor::Transact>>,
     /// The enter tokens.
-    pub enter_tokens: Vec<ExtractedEvent<'a, Passage::EnterToken>>,
+    pub enter_tokens: Vec<ExtractedEvent<'a, C::Receipt, Passage::EnterToken>>,
     /// The net fills extracted from the host block.
     pub(crate) context: AggregateFills,
 }
 
-impl Extracts<'_> {
-    /// Get the header of the block that was submitted (if any).
-    pub fn ru_header(&self) -> Option<Zenith::BlockHeader> {
-        self.submitted.as_ref().map(|s| s.ru_header(self.host_block_number()))
-    }
-
-    /// Get the host block number.
-    pub const fn host_block_number(&self) -> u64 {
-        self.host_block.sealed_block().header().number
-    }
-
-    /// Get the host block timestamp.
-    pub const fn host_block_timestamp(&self) -> u64 {
-        self.host_block.sealed_block().header().timestamp
-    }
-
+impl<C: Extractable> Extracts<'_, C> {
     /// True if the host block contains a [`BlockSubmitted`] event.
     ///
     /// [`BlockSubmitted`]: Zenith::BlockSubmitted
@@ -70,10 +55,27 @@ impl Extracts<'_> {
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
-impl<'a> Extracts<'a> {
+impl<C: Extractable> Extracts<'_, C> {
+    /// Get the host block number.
+    pub fn host_block_number(&self) -> u64 {
+        self.host_block.number()
+    }
+
+    /// Get the host block timestamp.
+    pub fn host_block_timestamp(&self) -> u64 {
+        self.host_block.timestamp()
+    }
+
+    /// Get the header of the block that was submitted (if any).
+    pub fn ru_header(&self) -> Option<Zenith::BlockHeader> {
+        self.submitted.as_ref().map(|s| s.ru_header(self.host_block_number()))
+    }
+}
+
+impl<'a, C: Extractable> Extracts<'a, C> {
     /// Used for testing.
-    pub fn empty(host_block: &'a RecoveredBlock<Block>) -> Self {
+    #[doc(hidden)]
+    pub fn empty(host_block: &'a C::Block) -> Self {
         Self {
             host_block,
             chain_id: 0,
