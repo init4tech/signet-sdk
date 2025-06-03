@@ -1,20 +1,21 @@
 use crate::{
-    convert::{Enter, EnterToken, Transact},
-    orders::SignetInspector,
-    BlockResult, EvmNeedsTx, EvmTransacted, RunTxResult, SignetLayered, ToRethPrimitive, BASE_GAS,
+    orders::SignetInspector, BlockResult, EvmNeedsTx, EvmTransacted, ExecutionOutcome, RunTxResult,
+    SignetLayered, BASE_GAS,
 };
 use alloy::{
-    consensus::{Header, ReceiptEnvelope, Transaction as _, TxType},
+    consensus::{
+        transaction::SignerRecoverable, BlockHeader, Header, ReceiptEnvelope, Transaction as _,
+        TxType,
+    },
     eips::eip1559::{BaseFeeParams, INITIAL_BASE_FEE as EIP1559_INITIAL_BASE_FEE},
     primitives::{Address, Bloom, U256},
 };
-use reth::{
-    core::primitives::SignerRecoverable,
-    primitives::{Block, BlockBody, Receipt, RecoveredBlock, SealedHeader, TransactionSigned},
-    providers::ExecutionOutcome,
+use signet_extract::{Extractable, ExtractedEvent, Extracts};
+use signet_types::{
+    constants::SignetSystemConstants,
+    primitives::{BlockBody, RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
+    AggregateFills, MarketError,
 };
-use signet_extract::{ExtractedEvent, Extracts};
-use signet_types::{constants::SignetSystemConstants, AggregateFills, MarketError};
 use signet_zenith::{Passage, Transactor, MINTER_ADDRESS};
 use std::collections::{HashSet, VecDeque};
 use tracing::{debug, debug_span, warn};
@@ -66,6 +67,41 @@ macro_rules! run_tx_early_return {
             ControlFlow::Keep(t) => t,
         }
     };
+}
+
+/// Shim to impl [`Tx`] for [`Passage::EnterToken`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EnterTokenFiller<'a, 'b, R> {
+    /// The extracted event for the enter token event.
+    pub enter_token: &'a ExtractedEvent<'b, R, Passage::EnterToken>,
+    /// The nonce of the transaction.
+    pub nonce: u64,
+    /// The address of the token being minted.
+    pub token: Address,
+}
+
+impl<R: Sync> Tx for EnterTokenFiller<'_, '_, R> {
+    fn fill_tx_env(&self, tx_env: &mut TxEnv) {
+        self.enter_token.event.fill_tx_env(tx_env);
+        tx_env.kind = TransactTo::Call(self.token);
+        tx_env.nonce = self.nonce;
+    }
+}
+
+/// Shim to impl [`Tx`] for [`Transactor::Transact`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TransactFiller<'a, 'b, R> {
+    /// The extracted event for the transact event.
+    pub transact: &'a ExtractedEvent<'b, R, Transactor::Transact>,
+    /// The nonce of the transaction.
+    pub nonce: u64,
+}
+
+impl<R: Sync> Tx for TransactFiller<'_, '_, R> {
+    fn fill_tx_env(&self, tx_env: &mut TxEnv) {
+        self.transact.event.fill_tx_env(tx_env);
+        tx_env.nonce = self.nonce;
+    }
 }
 
 /// Used internally to signal that the transaction should be discarded.
@@ -227,9 +263,9 @@ impl Tx for FillShim<'_> {
 
 /// A driver for the Signet EVM
 #[derive(Debug)]
-pub struct SignetDriver<'a, 'b> {
+pub struct SignetDriver<'a, 'b, C: Extractable> {
     /// The block extracts.
-    extracts: &'a Extracts<'b>,
+    extracts: &'a Extracts<'b, C>,
 
     /// Parent rollup block.
     parent: SealedHeader,
@@ -254,10 +290,10 @@ pub struct SignetDriver<'a, 'b> {
     payable_gas_used: u64,
 }
 
-impl<'a, 'b> SignetDriver<'a, 'b> {
+impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     /// Create a new driver.
     pub fn new(
-        extracts: &'a Extracts<'b>,
+        extracts: &'a Extracts<'b, C>,
         to_process: VecDeque<TransactionSigned>,
         parent: SealedHeader,
         constants: SignetSystemConstants,
@@ -279,7 +315,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Get the extracts being executed by the driver.
-    pub const fn extracts(&self) -> &Extracts<'b> {
+    pub const fn extracts(&self) -> &Extracts<'b, C> {
         self.extracts
     }
 
@@ -300,7 +336,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
     /// beneficiary of the current block.
     pub fn beneficiary(&self) -> Address {
-        self.extracts.ru_header().map(|h| h.rewardAddress).unwrap_or(self.parent.beneficiary)
+        self.extracts.ru_header().map(|h| h.rewardAddress).unwrap_or(self.parent.beneficiary())
     }
 
     /// Base fee beneficiary of the current block.
@@ -310,7 +346,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
 
     /// Gas limit of the current block.
     pub fn gas_limit(&self) -> u64 {
-        self.extracts.ru_header().map(|h| h.gas_limit()).unwrap_or(self.parent.gas_limit)
+        self.extracts.ru_header().map(|h| h.gas_limit()).unwrap_or(self.parent.gas_limit())
     }
 
     /// Base fee of the current block.
@@ -338,17 +374,13 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 
     /// Consume the driver, producing the sealed block and receipts.
-    pub fn finish(self) -> (RecoveredBlock<Block>, Vec<Receipt>) {
-        let (header, hash) = self.construct_sealed_header().split();
+    pub fn finish(self) -> (RecoveredBlock, Vec<ReceiptEnvelope>) {
+        let header = self.construct_sealed_header();
         let (receipts, senders, _) = self.output.into_parts();
 
-        let block = RecoveredBlock::new(
-            Block::new(header, BlockBody { transactions: self.processed, ..Default::default() }),
-            senders,
-            hash,
-        );
-
-        let receipts = receipts.into_iter().map(|re| re.to_reth()).collect();
+        let body = BlockBody { transactions: self.processed, ommers: vec![], withdrawals: None };
+        let block = SealedBlock { header, body };
+        let block = RecoveredBlock::new(block, senders);
 
         (block, receipts)
     }
@@ -363,12 +395,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let (sealed_block, receipts) = self.finish();
         BlockResult {
             sealed_block,
-            execution_outcome: ExecutionOutcome::new(
-                trevm.finish(),
-                vec![receipts],
-                ru_height,
-                vec![],
-            ),
+            execution_outcome: ExecutionOutcome::new(trevm.finish(), vec![receipts], ru_height),
         }
     }
 
@@ -390,7 +417,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// Make a receipt for an enter.
     fn make_enter_receipt(
         &self,
-        enter: &ExtractedEvent<'_, Passage::Enter>,
+        enter: &ExtractedEvent<'_, C::Receipt, Passage::Enter>,
     ) -> alloy::consensus::Receipt {
         let cumulative_gas_used = self.cumulative_gas_used().saturating_add(BASE_GAS as u64);
 
@@ -405,18 +432,18 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             parent_hash: self.parent.hash(),
             number: self.ru_height(),
             gas_limit: self.gas_limit(),
-            timestamp: self.extracts.host_block.timestamp,
+            timestamp: self.extracts.host_block.timestamp(),
             base_fee_per_gas: Some(self.base_fee()),
             beneficiary: self.beneficiary(),
 
             logs_bloom: self.logs_bloom(),
             gas_used: self.cumulative_gas_used(),
 
-            difficulty: self.extracts.host_block.difficulty,
+            difficulty: self.extracts.host_block.difficulty(),
 
-            mix_hash: self.extracts.host_block.mix_hash,
-            nonce: self.extracts.host_block.nonce,
-            parent_beacon_block_root: self.extracts.host_block.parent_beacon_block_root,
+            mix_hash: self.extracts.host_block.mix_hash().unwrap_or_default(),
+            nonce: self.extracts.host_block.nonce().unwrap_or_default(),
+            parent_beacon_block_root: self.extracts.host_block.parent_beacon_block_root(),
 
             ..Default::default()
         }
@@ -425,8 +452,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     /// Construct a sealed header for DB and evm execution.
     fn construct_sealed_header(&self) -> SealedHeader {
         let header = self.construct_header();
-        let hash = header.hash_slow();
-        SealedHeader::new(header, hash)
+        SealedHeader::new(header)
     }
 
     /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate
@@ -439,7 +465,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         &mut self,
         mut trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
-        extract: Option<&ExtractedEvent<'_, Transactor::Transact>>,
+        extract: Option<&ExtractedEvent<'_, C::Receipt, Transactor::Transact>>,
     ) -> RunTxResult<Self, Db, Insp>
     where
         Db: Database + DatabaseCommit,
@@ -597,7 +623,7 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             );
 
             // push receipt and transaction to the block
-            self.processed.push(Enter { enter, nonce }.to_reth());
+            self.processed.push(enter.make_transaction(nonce));
             self.output.push_result(
                 ReceiptEnvelope::Eip1559(self.make_enter_receipt(enter).into()),
                 MINTER_ADDRESS,
@@ -645,22 +671,20 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let nonce =
             trevm_try!(trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database), trevm);
 
-        let to_execute = EnterToken {
-            enter_token: &self.extracts.enter_tokens[idx],
-            nonce,
-            token: ru_token_addr,
-        };
+        let extract = &self.extracts.enter_tokens[idx];
 
-        let mut t = run_tx_early_return!(self, trevm, &to_execute, MINTER_ADDRESS);
+        let filler = EnterTokenFiller { enter_token: extract, nonce, token: ru_token_addr };
+        let mut t = run_tx_early_return!(self, trevm, &filler, MINTER_ADDRESS);
 
         // push a sys_log to the outcome
         if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
-            let sys_log = crate::sys_log::EnterToken::from(&self.extracts.enter_tokens[idx]).into();
+            let sys_log = crate::sys_log::EnterToken::from(extract).into();
             logs.push(sys_log)
         }
+        let tx = extract.make_transaction(nonce, ru_token_addr);
 
         // No need to check AggregateFills. This call cannot result in orders.
-        Ok(self.accept_tx(t, to_execute.to_reth()))
+        Ok(self.accept_tx(t, tx))
     }
 
     /// Execute all [`EnterToken`] events.
@@ -716,9 +740,10 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
         let sender = self.extracts.transacts[idx].event.sender;
         let nonce = trevm_try!(trevm.try_read_nonce(sender).map_err(EVMError::Database), trevm);
 
-        let to_execute = Transact { transact: &self.extracts.transacts[idx], nonce };
+        let transact = &self.extracts.transacts[idx];
+        let to_execute = TransactFiller { transact, nonce };
 
-        let mut t = run_tx_early_return!(self, trevm, &self.extracts.transacts[idx].event, sender);
+        let mut t = run_tx_early_return!(self, trevm, &to_execute, sender);
 
         {
             // NB: This is a little sensitive.
@@ -726,7 +751,6 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             // to ensure they can pay the full price, that check may be
             // invalidated by transaction execution. As a result, we have to
             // perform the same check here, again.
-            let transact = &self.extracts.transacts[idx].event;
             let gas_used = t.result().gas_used();
 
             // Set gas used to the transact gas limit
@@ -765,7 +789,10 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
             }
         }
 
-        self.check_fills_and_accept(t, to_execute.to_reth(), Some(&self.extracts.transacts[idx]))
+        // Convert the transact event into a transaction, and then check the
+        // aggregate fills
+        let tx = transact.make_transaction(nonce);
+        self.check_fills_and_accept(t, tx, Some(transact))
     }
 
     /// Execute all transact events.
@@ -840,13 +867,13 @@ impl<'a, 'b> SignetDriver<'a, 'b> {
     }
 }
 
-impl trevm::Cfg for SignetDriver<'_, '_> {
+impl<C: Extractable> trevm::Cfg for SignetDriver<'_, '_, C> {
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnv) {
         cfg_env.chain_id = self.extracts.chain_id;
     }
 }
 
-impl<Db, Insp> BlockDriver<Db, SignetLayered<Insp>> for SignetDriver<'_, '_>
+impl<Db, Insp, C: Extractable> BlockDriver<Db, SignetLayered<Insp>> for SignetDriver<'_, '_, C>
 where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
@@ -911,7 +938,7 @@ where
     }
 }
 
-impl trevm::Block for SignetDriver<'_, '_> {
+impl<C: Extractable> trevm::Block for SignetDriver<'_, '_, C> {
     fn fill_block_env(&self, block_env: &mut BlockEnv) {
         let BlockEnv {
             number,
@@ -925,345 +952,12 @@ impl trevm::Block for SignetDriver<'_, '_> {
         } = block_env;
         *number = self.ru_height();
         *beneficiary = self.beneficiary();
-        *timestamp = self.extracts.host_block.timestamp;
+        *timestamp = self.extracts.host_block.timestamp();
         *gas_limit = self.gas_limit();
         *basefee = self.base_fee();
-        *difficulty = self.extracts.host_block.difficulty;
-        *prevrandao = Some(self.extracts.host_block.mix_hash);
+        *difficulty = self.extracts.host_block.difficulty();
+        *prevrandao = self.extracts.host_block.mix_hash();
         *blob_excess_gas_and_price =
             Some(BlobExcessGasAndPrice { excess_blob_gas: 0, blob_gasprice: 0 });
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::test_utils::*;
-    use alloy::{
-        consensus::{
-            constants::{ETH_TO_WEI, GWEI_TO_WEI},
-            SignableTransaction, TxEip1559,
-        },
-        primitives::{Sealable, B256, B64},
-        signers::{local::PrivateKeySigner, Signature, SignerSync},
-    };
-    use reth::primitives::{Block, RecoveredBlock, Transaction};
-    use signet_extract::ExtractedEvent;
-    use signet_types::test_utils::*;
-    use trevm::revm::database::in_memory_db::InMemoryDB;
-
-    /// Make a fake block with a specific number.
-    pub(super) fn fake_block(number: u64) -> RecoveredBlock<Block> {
-        let header = Header {
-            difficulty: U256::from(0x4000_0000),
-            number,
-            mix_hash: B256::repeat_byte(0xed),
-            nonce: B64::repeat_byte(0xbe),
-            timestamp: 1716555586, // the time when i wrote this function lol
-            excess_blob_gas: Some(0),
-            ..Default::default()
-        };
-        let (header, hash) = header.seal_slow().into_parts();
-        RecoveredBlock::new(
-            Block::new(
-                header,
-                BlockBody { transactions: vec![], ommers: vec![], withdrawals: None },
-            ),
-            vec![],
-            hash,
-        )
-    }
-
-    /// Make a simple send transaction.
-    pub(super) fn simple_send(
-        to: Address,
-        amount: U256,
-        nonce: u64,
-    ) -> reth::primitives::Transaction {
-        TxEip1559 {
-            nonce,
-            gas_limit: 21_000,
-            to: alloy::primitives::TxKind::Call(to),
-            value: amount,
-            chain_id: RU_CHAIN_ID,
-            max_fee_per_gas: GWEI_TO_WEI as u128 * 100,
-            max_priority_fee_per_gas: GWEI_TO_WEI as u128,
-            ..Default::default()
-        }
-        .into()
-    }
-
-    /// Sign a transaction with a wallet.
-    pub(super) fn sign_tx_with_key_pair(
-        wallet: &PrivateKeySigner,
-        tx: Transaction,
-    ) -> TransactionSigned {
-        let signature = wallet.sign_hash_sync(&tx.signature_hash()).unwrap();
-        TransactionSigned::new_unhashed(tx, signature)
-    }
-
-    /// Make a wallet with a deterministic keypair.
-    pub(super) fn make_wallet(i: u8) -> PrivateKeySigner {
-        PrivateKeySigner::from_bytes(&B256::repeat_byte(i)).unwrap()
-    }
-
-    struct TestEnv {
-        pub wallets: Vec<PrivateKeySigner>,
-        pub nonces: [u64; 10],
-        pub sequence: u64,
-    }
-
-    impl TestEnv {
-        fn new() -> Self {
-            let wallets = (1..=10).map(make_wallet).collect::<Vec<_>>();
-
-            Self { wallets, nonces: [0; 10], sequence: 1 }
-        }
-
-        fn driver<'a, 'b>(
-            &self,
-            extracts: &'a mut Extracts<'b>,
-            txns: Vec<TransactionSigned>,
-        ) -> SignetDriver<'a, 'b> {
-            let (header, hash) =
-                Header { gas_limit: 30_000_000, ..Default::default() }.seal_slow().into_parts();
-            SignetDriver::new(
-                extracts,
-                txns.into(),
-                SealedHeader::new(header, hash),
-                SignetSystemConstants::test(),
-            )
-        }
-
-        fn trevm(&self) -> crate::EvmNeedsBlock<InMemoryDB> {
-            let mut trevm = test_signet_evm();
-            for wallet in &self.wallets {
-                let address = wallet.address();
-                trevm.test_set_balance(address, U256::from(ETH_TO_WEI * 100));
-            }
-            trevm
-        }
-
-        /// Get the next zenith header in the sequence
-        fn next_block(&mut self) -> RecoveredBlock<Block> {
-            let block = fake_block(self.sequence);
-            self.sequence += 1;
-            block
-        }
-
-        fn signed_simple_send(
-            &mut self,
-            from: usize,
-            to: Address,
-            amount: U256,
-        ) -> TransactionSigned {
-            let wallet = &self.wallets[from];
-            let tx = simple_send(to, amount, self.nonces[from]);
-            let tx = sign_tx_with_key_pair(wallet, tx);
-            self.nonces[from] += 1;
-            tx
-        }
-    }
-
-    #[test]
-    fn test_simple_send() {
-        let mut context = TestEnv::new();
-
-        // Set up a simple transfer
-        let to = Address::repeat_byte(2);
-        let tx = context.signed_simple_send(0, to, U256::from(100));
-
-        // Setup the driver
-        let block = context.next_block();
-        let mut extracts = Extracts::empty(&block);
-        let mut driver = context.driver(&mut extracts, vec![tx.clone()]);
-
-        // Run the EVM
-        let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
-        let (sealed_block, receipts) = driver.finish();
-
-        // Assert that the EVM balance increased
-        assert_eq!(sealed_block.senders().len(), 1);
-        assert_eq!(sealed_block.body().transactions().next(), Some(&tx));
-        assert_eq!(receipts.len(), 1);
-
-        assert_eq!(trevm.read_balance(to), U256::from(100));
-    }
-
-    #[test]
-    fn test_two_sends() {
-        let mut context = TestEnv::new();
-
-        // Set up a simple transfer
-        let to = Address::repeat_byte(2);
-        let tx1 = context.signed_simple_send(0, to, U256::from(100));
-
-        let to2 = Address::repeat_byte(3);
-        let tx2 = context.signed_simple_send(0, to2, U256::from(100));
-
-        // Setup the driver
-        let block = context.next_block();
-        let mut extracts = Extracts::empty(&block);
-        let mut driver = context.driver(&mut extracts, vec![tx1.clone(), tx2.clone()]);
-
-        // Run the EVM
-        let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
-        let (sealed_block, receipts) = driver.finish();
-
-        // Assert that the EVM balance increased
-        assert_eq!(sealed_block.senders().len(), 2);
-        assert_eq!(sealed_block.body().transactions().collect::<Vec<_>>(), vec![&tx1, &tx2]);
-        assert_eq!(receipts.len(), 2);
-
-        assert_eq!(trevm.read_balance(to), U256::from(100));
-        assert_eq!(trevm.read_balance(to2), U256::from(100));
-    }
-
-    #[test]
-    fn test_execute_two_blocks() {
-        let mut context = TestEnv::new();
-        let sender = context.wallets[0].address();
-
-        let to = Address::repeat_byte(2);
-        let tx = context.signed_simple_send(0, to, U256::from(100));
-
-        // Setup the driver
-        let block = context.next_block();
-        let mut extracts = Extracts::empty(&block);
-        let mut driver = context.driver(&mut extracts, vec![tx.clone()]);
-
-        // Run the EVM
-        let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
-        let (sealed_block, receipts) = driver.finish();
-
-        assert_eq!(sealed_block.senders().len(), 1);
-        assert_eq!(sealed_block.body().transactions().collect::<Vec<_>>(), vec![&tx]);
-        assert_eq!(receipts.len(), 1);
-        assert_eq!(trevm.read_balance(to), U256::from(100));
-        assert_eq!(trevm.read_nonce(sender), 1);
-
-        // Repeat the above for the next block
-        // same recipient
-        let tx = context.signed_simple_send(0, to, U256::from(100));
-
-        // Setup the driver
-        let block = context.next_block();
-        let mut extracts = Extracts::empty(&block);
-        let mut driver = context.driver(&mut extracts, vec![tx.clone()]);
-
-        // Run the EVM
-        let mut trevm = trevm.drive_block(&mut driver).unwrap();
-        let (sealed_block, receipts) = driver.finish();
-
-        assert_eq!(sealed_block.senders().len(), 1);
-        assert_eq!(sealed_block.body().transactions().collect::<Vec<_>>(), vec![&tx]);
-        assert_eq!(receipts.len(), 1);
-        assert_eq!(trevm.read_balance(to), U256::from(200));
-    }
-
-    #[test]
-    fn test_an_enter() {
-        let mut context = TestEnv::new();
-        let user = Address::repeat_byte(2);
-
-        // Set up a fake event
-        let fake_tx = fake_tx();
-        let fake_receipt: reth::primitives::Receipt = Default::default();
-
-        let enter = signet_zenith::Passage::Enter {
-            rollupChainId: U256::from(RU_CHAIN_ID),
-            rollupRecipient: user,
-            amount: U256::from(100),
-        };
-
-        // Setup the driver
-        let block = context.next_block();
-        let mut extracts = Extracts::empty(&block);
-        extracts.enters.push(ExtractedEvent {
-            tx: &fake_tx,
-            receipt: &fake_receipt,
-            log_index: 0,
-            event: enter,
-        });
-        let mut driver = context.driver(&mut extracts, vec![]);
-
-        // Run the EVM
-        let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
-        let (sealed_block, receipts) = driver.finish();
-
-        assert_eq!(sealed_block.senders().len(), 1);
-        assert_eq!(
-            sealed_block.body().transactions().collect::<Vec<_>>(),
-            vec![&Enter { enter: &extracts.enters[0], nonce: 0 }.to_reth()]
-        );
-        assert_eq!(receipts.len(), 1);
-        assert_eq!(trevm.read_balance(user), U256::from(100));
-        assert_eq!(trevm.read_nonce(user), 0);
-    }
-
-    #[test]
-    fn test_a_transact() {
-        let mut context = TestEnv::new();
-        let sender = Address::repeat_byte(1);
-        let recipient = Address::repeat_byte(2);
-
-        // Set up a couple fake events
-        let fake_tx = fake_tx();
-        let fake_receipt: reth::primitives::Receipt = Default::default();
-
-        let enter = signet_zenith::Passage::Enter {
-            rollupChainId: U256::from(RU_CHAIN_ID),
-            rollupRecipient: sender,
-            amount: U256::from(ETH_TO_WEI),
-        };
-
-        let transact = signet_zenith::Transactor::Transact {
-            rollupChainId: U256::from(RU_CHAIN_ID),
-            sender,
-            to: recipient,
-            data: Default::default(),
-            value: U256::from(100),
-            gas: U256::from(21_000),
-            maxFeePerGas: U256::from(GWEI_TO_WEI),
-        };
-
-        // Setup the driver
-        let block = context.next_block();
-        let mut extracts = Extracts::empty(&block);
-        extracts.enters.push(ExtractedEvent {
-            tx: &fake_tx,
-            receipt: &fake_receipt,
-            log_index: 0,
-            event: enter,
-        });
-        extracts.transacts.push(ExtractedEvent {
-            tx: &fake_tx,
-            receipt: &fake_receipt,
-            log_index: 0,
-            event: transact,
-        });
-
-        let mut driver = context.driver(&mut extracts, vec![]);
-
-        // Run the EVM
-        let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
-        let (sealed_block, receipts) = driver.finish();
-
-        assert_eq!(sealed_block.senders(), vec![MINTER_ADDRESS, sender]);
-        assert_eq!(
-            sealed_block.body().transactions().collect::<Vec<_>>(),
-            vec![
-                &Enter { enter: &extracts.enters[0], nonce: 0 }.to_reth(),
-                &Transact { transact: &extracts.transacts[0], nonce: 0 }.to_reth()
-            ]
-        );
-        assert_eq!(receipts.len(), 2);
-        assert_eq!(trevm.read_balance(recipient), U256::from(100));
-    }
-
-    fn fake_tx() -> TransactionSigned {
-        let tx = TxEip1559::default();
-        let signature = Signature::test_signature();
-        TransactionSigned::new_unhashed(tx.into(), signature)
     }
 }

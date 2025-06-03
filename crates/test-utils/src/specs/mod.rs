@@ -12,7 +12,7 @@ use alloy::{
     primitives::{Address, TxKind, B256, U256},
     signers::{local::PrivateKeySigner, SignerSync},
 };
-use reth::primitives::{Transaction, TransactionSigned};
+use signet_types::primitives::{Transaction, TransactionSigned};
 
 /// Sign a transaction with a wallet.
 pub fn sign_tx_with_key_pair(wallet: &PrivateKeySigner, tx: Transaction) -> TransactionSigned {

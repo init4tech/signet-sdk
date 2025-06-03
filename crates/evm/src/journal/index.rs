@@ -1,14 +1,12 @@
 use alloy::primitives::{Address, B256, U256};
-use reth::{
-    providers::ExecutionOutcome,
-    revm::{
-        db::{states::StorageSlot, AccountStatus, BundleAccount, BundleState},
-        primitives::{AccountInfo, Bytecode},
-    },
-};
+use reth::providers::ExecutionOutcome;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
+};
+use trevm::revm::{
+    db::{states::StorageSlot, AccountStatus, BundleAccount, BundleState},
+    primitives::{AccountInfo, Bytecode},
 };
 
 /// Outcome of an account info after block execution. Post-6780, accounts
