@@ -1,5 +1,6 @@
 [package]
 name = "signet-sim"
+description = "Signet simulation utilities."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

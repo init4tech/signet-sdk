@@ -1,5 +1,6 @@
 [package]
 name = "signet-constants"
+description = "A collection of constants used in Signet."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

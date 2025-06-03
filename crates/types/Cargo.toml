@@ -1,5 +1,6 @@
 [package]
 name = "signet-types"
+description = "A collection of types used in Signet."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,4 +22,3 @@ chrono.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 tokio = { version = "1.37.0", features = ["macros"] }
-
