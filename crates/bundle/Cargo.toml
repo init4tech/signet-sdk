@@ -1,5 +1,6 @@
 [package]
 name = "signet-bundle"
+description = "Signet bundle library for creating and simulating Signet bundles."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

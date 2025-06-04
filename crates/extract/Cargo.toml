@@ -1,5 +1,6 @@
 [package]
 name = "signet-extract"
+description = "Logic for extracting events and other data from host chain blocks, used in Signet."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,4 +17,3 @@ signet-zenith.workspace = true
 alloy.workspace = true
 
 tracing.workspace = true
-

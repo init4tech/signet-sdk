@@ -1,5 +1,6 @@
 [package]
 name = "signet-evm"
+description = "EVM Signet Utilities"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
