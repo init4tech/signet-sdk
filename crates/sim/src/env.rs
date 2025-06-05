@@ -316,9 +316,10 @@ where
                 Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
             }
             Err(e) => {
-                error!(?e, "Simulation failed");
-                Err(SignetEthBundleError::from(e.into_error()))
-            },
+                let err = e.into_error();
+                error!(?err, "Simulation failed");
+                Err(SignetEthBundleError::from(err))
+            }
         }
     }
 
