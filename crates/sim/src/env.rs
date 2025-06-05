@@ -317,8 +317,7 @@ where
             }
             Err(e) => {
                 let err = e.into_error();
-                let str = err.to_string();
-                error!(?err, str, "Simulation failed");
+                error!(?err, message = err.to_string(), "Simulation failed");
                 Err(SignetEthBundleError::from(err))
             }
         }
