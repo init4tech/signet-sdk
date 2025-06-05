@@ -9,7 +9,7 @@ use tokio::{
     select,
     sync::{mpsc, watch},
 };
-use tracing::{instrument, trace, trace_span};
+use tracing::{debug, error, instrument, trace, trace_span};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
@@ -271,6 +271,7 @@ where
         transaction: &TxEnvelope,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
         let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
+        debug!(tx_hash = ?transaction.hash(), "initialized trevm env for transaction");
 
         // Get the initial beneficiary balance
         let beneficiary = trevm.beneficiary();
@@ -314,7 +315,10 @@ where
                 // Create the outcome
                 Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
             }
-            Err(e) => Err(SignetEthBundleError::from(e.into_error())),
+            Err(e) => {
+                error!(?e, "Simulation failed");
+                Err(SignetEthBundleError::from(e.into_error()))
+            },
         }
     }
 
