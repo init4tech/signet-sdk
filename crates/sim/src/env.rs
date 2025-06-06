@@ -408,7 +408,8 @@ where
                             trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
                         }
                         Err(e) => {
-                            trace!(?identifier, ?e, "Simulation failed");
+                            let err = e.to_string();
+                            debug!(?e, err, "Simulation failed");
                         }
                     };
                     // fall through applies to all errors, occurs if
