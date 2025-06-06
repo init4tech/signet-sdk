@@ -78,6 +78,33 @@ impl TxCache {
             .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
     }
 
+    async fn forward_inner_silent<T: Serialize + Send>(
+        &self,
+        join: &'static str,
+        obj: T,
+    ) -> Result<(), Error> {
+        // Append the path to the URL.
+        let url = self
+            .url
+            .join(join)
+            .inspect_err(|e| warn!(%e, "Failed to join URL. Not forwarding transaction."))?;
+
+        // Send the object and check for success.
+        let response = self
+            .client
+            .post(url)
+            .json(&obj)
+            .send()
+            .await
+            .inspect_err(|e| warn!(%e, "Failed to forward object"))?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(eyre::eyre!("Request failed with status: {}", response.status()))
+        }
+    }
+
     async fn get_inner<T>(&self, join: &'static str) -> Result<T, Error>
     where
         T: DeserializeOwned,
@@ -120,7 +147,7 @@ impl TxCache {
     /// Forward an order to the URL.
     #[instrument(skip_all)]
     pub async fn forward_order(&self, order: SignedOrder) -> Result<(), Error> {
-        self.forward_inner(ORDERS, order).await
+        self.forward_inner_silent(ORDERS, order).await
     }
 
     /// Get transactions from the URL.
