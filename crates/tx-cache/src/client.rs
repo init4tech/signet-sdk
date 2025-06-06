@@ -59,23 +59,27 @@ impl TxCache {
         join: &'static str,
         obj: T,
     ) -> Result<R, Error> {
+        self.forward_inner_raw(join, obj)
+            .await?
+            .json::<R>()
+            .await
+            .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
+            .map_err(Into::into)
+    }
+
+    async fn forward_inner_raw<T: Serialize + Send>(
+        &self,
+        join: &'static str,
+        obj: T,
+    ) -> Result<reqwest::Response, Error> {
         // Append the path to the URL.
         let url = self
             .url
             .join(join)
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not forwarding transaction."))?;
 
-        // Send the object.
-        self.client
-            .post(url)
-            .json(&obj)
-            .send()
-            .await
-            .inspect_err(|e| warn!(%e, "Failed to forward object"))?
-            .json::<R>()
-            .await
-            .map_err(Into::into)
-            .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
+        // Send the object and check for success.
+        self.client.post(url).json(&obj).send().await?.error_for_status().map_err(Into::into)
     }
 
     async fn get_inner<T>(&self, join: &'static str) -> Result<T, Error>
@@ -120,7 +124,7 @@ impl TxCache {
     /// Forward an order to the URL.
     #[instrument(skip_all)]
     pub async fn forward_order(&self, order: SignedOrder) -> Result<(), Error> {
-        self.forward_inner(ORDERS, order).await
+        self.forward_inner_raw(ORDERS, order).await.map(drop)
     }
 
     /// Get transactions from the URL.
