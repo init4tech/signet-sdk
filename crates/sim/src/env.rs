@@ -317,7 +317,7 @@ where
             }
             Err(e) => {
                 let err = e.into_error();
-                error!(?err, message = err.to_string(), "Simulation failed");
+                error!(?err, message = err.to_string(), "trevm simulation error");
                 Err(SignetEthBundleError::from(err))
             }
         }
@@ -409,7 +409,7 @@ where
                         }
                         Err(e) => {
                             let err = e.to_string();
-                            debug!(?e, err, "Simulation failed");
+                            debug!(?e, err, "simulation error");
                         }
                     };
                     // fall through applies to all errors, occurs if
