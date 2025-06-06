@@ -78,7 +78,7 @@ impl TxCache {
             .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
     }
 
-    async fn forward_inner_silent<T: Serialize + Send>(
+    async fn forward_inner_no_response<T: Serialize + Send>(
         &self,
         join: &'static str,
         obj: T,
@@ -147,7 +147,7 @@ impl TxCache {
     /// Forward an order to the URL.
     #[instrument(skip_all)]
     pub async fn forward_order(&self, order: SignedOrder) -> Result<(), Error> {
-        self.forward_inner_silent(ORDERS, order).await
+        self.forward_inner_no_response(ORDERS, order).await
     }
 
     /// Get transactions from the URL.
