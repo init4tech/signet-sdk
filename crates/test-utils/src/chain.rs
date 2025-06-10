@@ -47,7 +47,7 @@ impl Extractable for Chain {
     type Receipt = ReceiptEnvelope;
 
     fn blocks_and_receipts(&self) -> impl Iterator<Item = (&Self::Block, &Vec<Self::Receipt>)> {
-        self.blocks.iter().zip(self.execution_outcome.receipts.iter())
+        self.blocks.iter().zip(self.execution_outcome.receipts().iter())
     }
 }
 

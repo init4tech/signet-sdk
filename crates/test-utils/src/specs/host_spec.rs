@@ -348,7 +348,7 @@ impl HostBlockSpec {
             receipts.first_mut().unwrap().push(receipt);
         }
 
-        ExecutionOutcome { bundle: Default::default(), receipts, first_block: self.block_number() }
+        ExecutionOutcome::new(Default::default(), receipts, self.block_number())
     }
 
     /// Make a chain

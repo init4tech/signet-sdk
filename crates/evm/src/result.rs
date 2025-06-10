@@ -41,7 +41,7 @@ impl<T, H> BlockResult<T, H> {
         HostJournal::new(
             host_block,
             prev_journal_hash,
-            BundleStateIndex::from(&self.execution_outcome.bundle),
+            BundleStateIndex::from(self.execution_outcome.bundle()),
         )
     }
 }
