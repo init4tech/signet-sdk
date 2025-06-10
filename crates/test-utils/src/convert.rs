@@ -87,10 +87,12 @@ impl ToRethPrimitive for ExecutionOutcome {
     type RethPrimitive = reth::providers::ExecutionOutcome;
 
     fn to_reth(self) -> Self::RethPrimitive {
+        let (bundle, receipts, first_block) = self.into_parts();
+
         reth::providers::ExecutionOutcome {
-            bundle: self.bundle,
-            receipts: self.receipts.into_iter().map(ToRethPrimitive::to_reth).collect(),
-            first_block: self.first_block,
+            bundle,
+            receipts: receipts.into_iter().map(ToRethPrimitive::to_reth).collect(),
+            first_block,
             requests: vec![],
         }
     }
