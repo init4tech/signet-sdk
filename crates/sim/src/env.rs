@@ -403,7 +403,7 @@ where
                             trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
                         }
                         Err(e) => {
-                            trace!(?identifier, ?e, "Simulation failed");
+                            trace!(?identifier, %e, "Simulation failed");
                         }
                     };
                     // fall through applies to all errors, occurs if
