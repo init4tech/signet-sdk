@@ -1,6 +1,7 @@
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
+    primitives::TxHash,
 };
 use signet_bundle::SignetEthBundle;
 
@@ -94,5 +95,37 @@ impl SimItem {
             Default::default(),
         ));
         tx.into()
+    }
+
+    /// Returns a unique identifier for this item, which can be used to
+    /// distinguish it from other items.
+    pub fn identifier(&self) -> SimIdentifier {
+        match self {
+            Self::Bundle(bundle) => {
+                SimIdentifier::bundle(bundle.bundle.replacement_uuid.clone().unwrap_or_default())
+            }
+            Self::Tx(tx) => SimIdentifier::tx(*tx.hash()),
+        }
+    }
+}
+
+/// A simulation cache item identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SimIdentifier {
+    /// A bundle identifier.
+    Bundle(String),
+    /// A transaction identifier.
+    Tx(TxHash),
+}
+
+impl SimIdentifier {
+    /// Create a new [`SimIdentifier::Bundle`].
+    pub const fn bundle(id: String) -> Self {
+        Self::Bundle(id)
+    }
+
+    /// Create a new [`SimIdentifier::Tx`].
+    pub const fn tx(id: TxHash) -> Self {
+        Self::Tx(id)
     }
 }

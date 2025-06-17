@@ -1,4 +1,6 @@
-use crate::SimItem;
+use dashmap::DashSet;
+
+use crate::{item::SimIdentifier, SimItem};
 use core::fmt;
 use std::{
     collections::BTreeMap,
@@ -10,7 +12,8 @@ use std::{
 /// This cache is used to store the items that are being simulated.
 #[derive(Clone)]
 pub struct SimCache {
-    inner: Arc<RwLock<BTreeMap<u128, SimItem>>>,
+    inner: Arc<RwLock<BTreeMap<u128, (SimItem, SimIdentifier)>>>,
+    seen: Arc<DashSet<SimIdentifier>>,
     capacity: usize,
 }
 
@@ -27,19 +30,27 @@ impl Default for SimCache {
 }
 
 impl SimCache {
-    /// Create a new `SimCache` instance.
+    /// Create a new `SimCache` instance, with a default capacity of `100`.
     pub fn new() -> Self {
-        Self { inner: Arc::new(RwLock::new(BTreeMap::new())), capacity: 100 }
+        Self {
+            inner: Arc::new(RwLock::new(BTreeMap::new())),
+            seen: Arc::new(DashSet::new()),
+            capacity: 100,
+        }
     }
 
     /// Create a new `SimCache` instance with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { inner: Arc::new(RwLock::new(BTreeMap::new())), capacity }
+        Self {
+            inner: Arc::new(RwLock::new(BTreeMap::new())),
+            seen: Arc::new(DashSet::new()),
+            capacity,
+        }
     }
 
     /// Get an iterator over the best items in the cache.
     pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
-        self.inner.read().unwrap().iter().rev().take(n).map(|(k, v)| (*k, v.clone())).collect()
+        self.inner.read().unwrap().iter().rev().take(n).map(|(k, (v, _))| (*k, v.clone())).collect()
     }
 
     /// Get the number of items in the cache.
@@ -54,18 +65,19 @@ impl SimCache {
 
     /// Get an item by key.
     pub fn get(&self, key: u128) -> Option<SimItem> {
-        self.inner.read().unwrap().get(&key).cloned()
+        self.inner.read().unwrap().get(&key).map(|(item, _)| item.clone())
     }
 
     /// Remove an item by key.
     pub fn remove(&self, key: u128) -> Option<SimItem> {
-        self.inner.write().unwrap().remove(&key)
+        self.inner.write().unwrap().remove(&key).map(|(item, _)| item)
     }
 
     fn add_inner(
-        guard: &mut RwLockWriteGuard<'_, BTreeMap<u128, SimItem>>,
+        guard: &mut RwLockWriteGuard<'_, BTreeMap<u128, (SimItem, SimIdentifier)>>,
         mut score: u128,
         item: SimItem,
+        identifier: SimIdentifier,
         capacity: usize,
     ) {
         // If it has the same score, we decrement (prioritizing earlier items)
@@ -78,7 +90,7 @@ impl SimCache {
             guard.pop_first();
         }
 
-        guard.entry(score).or_insert(item);
+        guard.entry(score).or_insert((item, identifier));
     }
 
     /// Add an item to the cache.
@@ -87,12 +99,17 @@ impl SimCache {
     pub fn add_item(&self, item: impl Into<SimItem>, basefee: u64) {
         let item = item.into();
 
-        // Calculate the total fee for the item.
-        let score = item.calculate_total_fee(basefee);
+        let identifier = item.identifier();
 
-        let mut inner = self.inner.write().unwrap();
+        // Check if the item has already been seen.
+        if self.seen.insert(identifier.clone()) {
+            // Calculate the total fee for the item.
+            let score = item.calculate_total_fee(basefee);
 
-        Self::add_inner(&mut inner, score, item, self.capacity);
+            let mut inner = self.inner.write().unwrap();
+
+            Self::add_inner(&mut inner, score, item, identifier, self.capacity);
+        }
     }
 
     /// Add an iterator of items to the cache. This locks the cache only once
@@ -101,16 +118,17 @@ impl SimCache {
         I: IntoIterator<Item = Item>,
         Item: Into<SimItem>,
     {
-        let iter = item.into_iter().map(|item| {
-            let item = item.into();
-            let score = item.calculate_total_fee(basefee);
-            (score, item)
-        });
-
         let mut inner = self.inner.write().unwrap();
 
-        for (score, item) in iter {
-            Self::add_inner(&mut inner, score, item, self.capacity);
+        for item in item.into_iter() {
+            let item = item.into();
+            let identifier = item.identifier();
+
+            // Check if the item has already been seen.
+            if self.seen.insert(identifier.clone()) {
+                let score = item.calculate_total_fee(basefee);
+                Self::add_inner(&mut inner, score, item, identifier, self.capacity);
+            }
         }
     }
 
@@ -121,23 +139,29 @@ impl SimCache {
 
         // Trim to capacity by dropping lower fees.
         while inner.len() > self.capacity {
-            inner.pop_first();
+            if let Some((_, (_, id))) = inner.pop_first() {
+                // Drop the identifier from the seen cache as well.
+                self.seen.remove(&id);
+            }
         }
 
-        inner.retain(|_, value| {
+        inner.retain(|_, (value, id)| {
             let SimItem::Bundle(bundle) = value else {
                 return true;
             };
             if bundle.bundle.block_number != block_number {
+                self.seen.remove(id);
                 return false;
             }
             if let Some(timestamp) = bundle.min_timestamp() {
                 if timestamp > block_timestamp {
+                    self.seen.remove(id);
                     return false;
                 }
             }
             if let Some(timestamp) = bundle.max_timestamp() {
                 if timestamp < block_timestamp {
+                    self.seen.remove(id);
                     return false;
                 }
             }
@@ -149,6 +173,7 @@ impl SimCache {
     pub fn clear(&self) {
         let mut inner = self.inner.write().unwrap();
         inner.clear();
+        self.seen.clear();
     }
 }
 
@@ -168,10 +193,11 @@ mod test {
         let cache = SimCache::with_capacity(2);
         cache.add_items(items, 0);
 
-        assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(300), Some(SimItem::invalid_item_with_score(100, 3)));
-        assert_eq!(cache.get(200), Some(SimItem::invalid_item_with_score(100, 2)));
-        assert_eq!(cache.get(100), None);
+        // All items have the same identifier (hash=0), so only the first one is stored
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.get(100), Some(SimItem::invalid_item_with_score(100, 1)));
+        assert_eq!(cache.get(200), None);
+        assert_eq!(cache.get(300), None);
     }
 
     #[test]
@@ -187,9 +213,10 @@ mod test {
 
         dbg!(&*cache.inner.read().unwrap());
 
-        assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(0), Some(SimItem::invalid_item_with_score(1, 1)));
+        // All items have the same identifier (hash=0), so only the first one is stored
+        assert_eq!(cache.len(), 1);
         assert_eq!(cache.get(1), Some(SimItem::invalid_item_with_score(1, 1)));
+        assert_eq!(cache.get(0), None);
         assert_eq!(cache.get(2), None);
     }
 }

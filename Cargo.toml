@@ -85,6 +85,7 @@ foundry-blob-explorers = "0.10"
 # Async
 tokio = { version = "1.43.0", features = ["macros"] }
 async-trait = "0.1.87"
+dashmap = "6.1.0"
 
 # Pinned for compatibility with reth
 parking_lot = "0.12"
