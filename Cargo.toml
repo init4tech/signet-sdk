@@ -58,6 +58,7 @@ alloy = { version = "=1.0.5", features = [
     "genesis",
     "arbitrary",
 ] }
+alloy-rpc-types-mev = { version = "=1.0.5" }
 alloy-contract = { version = "=1.0.5", features = ["pubsub"] }
 
 # Reth
