@@ -114,4 +114,4 @@ hex = { package = "const-hex", version = "1.10", default-features = false, featu
 uuid = "1.16.0"
 
 # Test Utils
-alloy-rlp = "=0.3.11"
+alloy-rlp = "0.3.11"
