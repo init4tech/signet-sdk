@@ -148,6 +148,7 @@ mod test {
                 max_timestamp: Some(3),
                 reverting_tx_hashes: vec![B256::repeat_byte(4), B256::repeat_byte(5)],
                 replacement_uuid: Some("uuid".to_owned()),
+                ..Default::default()
             },
             host_fills: Some(SignedFill {
                 permit: Permit2Batch {
