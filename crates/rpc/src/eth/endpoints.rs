@@ -570,6 +570,8 @@ where
 
         let (estimate, _) = response_tri!(trevm.estimate_gas().map_err(EvmErrored::into_error));
 
+        tracing::span::Span::current().record("estimate", format!("{:?}", &estimate));
+
         match estimate {
             trevm::EstimationResult::Success { estimation, .. } => {
                 ResponsePayload::Success(U64::from(estimation))
