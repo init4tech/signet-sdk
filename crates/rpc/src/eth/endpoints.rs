@@ -527,10 +527,6 @@ where
 {
     let id = block.unwrap_or(BlockId::pending());
 
-    // Stateless gas normalization.
-    let max_gas = ctx.signet().config().rpc_gas_cap;
-    normalize_gas_stateless(&mut request, max_gas);
-
     // this span is verbose yo.
     let span = trace_span!(
         "estimate_gas",
@@ -540,6 +536,12 @@ where
         block_overrides = ?block_overrides.is_some(),
         block_cfg = tracing::field::Empty,
     );
+
+    // Stateless gas normalization.
+    let max_gas = ctx.signet().config().rpc_gas_cap;
+    normalize_gas_stateless(&mut request, max_gas);
+
+    tracing::span::Span::current().record("normalized_gas", format!("{:?}", request.gas));
 
     let task = async move {
         // Get the block cfg from backend, erroring if it fails
@@ -567,6 +569,8 @@ where
         // trevm
 
         let (estimate, _) = response_tri!(trevm.estimate_gas().map_err(EvmErrored::into_error));
+
+        tracing::span::Span::current().record("estimate", format!("{:?}", &estimate));
 
         match estimate {
             trevm::EstimationResult::Success { estimation, .. } => {
