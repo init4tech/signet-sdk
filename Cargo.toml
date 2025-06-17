@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 rust-version = "1.81"
 authors = ["init4"]
@@ -49,17 +49,16 @@ signet-zenith = { version = "0.2.0", path = "crates/zenith" }
 ajj = { version = "0.3.4" }
 
 # trevm
-trevm = { version = "=0.23.4", features = ["full_env_cfg"] }
+trevm = { version = "0.23.4", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
-alloy = { version = "=1.0.5", features = [
+alloy = { version = "=1.0.11", features = [
     "full",
     "rpc-types-mev",
     "genesis",
     "arbitrary",
 ] }
-alloy-rpc-types-mev = { version = "=1.0.5" }
-alloy-contract = { version = "=1.0.5", features = ["pubsub"] }
+alloy-contract = { version = "=1.0.11", features = ["pubsub"] }
 
 # Reth
 reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
@@ -81,7 +80,7 @@ reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1
 reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
 
 # Foundry periphery
-foundry-blob-explorers = "=0.10"
+foundry-blob-explorers = "0.10"
 
 # Async
 tokio = { version = "1.43.0", features = ["macros"] }
@@ -115,4 +114,4 @@ hex = { package = "const-hex", version = "1.10", default-features = false, featu
 uuid = "1.16.0"
 
 # Test Utils
-alloy-rlp = "=0.3.11"
+alloy-rlp = "0.3.11"
