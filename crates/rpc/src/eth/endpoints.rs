@@ -29,7 +29,7 @@ use reth_rpc_eth_api::{RpcBlock, RpcHeader, RpcReceipt, RpcTransaction};
 use serde::Deserialize;
 use signet_evm::EvmErrored;
 use std::borrow::Cow;
-use tracing::{field::Empty, span::Span, trace, trace_span, Instrument};
+use tracing::{field::Empty, span::Span, trace_span, Instrument};
 use trevm::revm::context::result::ExecutionResult;
 
 /// Args for `eth_estimateGas` and `eth_call`.
@@ -527,7 +527,6 @@ where
 {
     let id = block.unwrap_or(BlockId::pending());
 
-    trace!(initial_gas = request.gas, "request received for estimate_gas");
     // this span is verbose yo.
     let span = trace_span!(
         "estimate_gas",
@@ -544,9 +543,9 @@ where
     let max_gas = ctx.signet().config().rpc_gas_cap;
     normalize_gas_stateless(&mut request, max_gas);
 
-    trace!(normalized_gas = request.gas, "gas normalized for estimate_gas");
-    Span::current().record("normalized_gas", format!("{:?}", request.gas));
+    span.record("normalized_gas", format!("{:?}", request.gas));
 
+    let span_for_task = span.clone();
     let task = async move {
         // Get the block cfg from backend, erroring if it fails
         let block_cfg = match ctx.signet().block_cfg(id).await {
@@ -559,7 +558,7 @@ where
             }
         };
 
-        Span::current().record("block_cfg", format!("{:?}", &block_cfg));
+        span.record("block_cfg", format!("{:?}", &block_cfg));
 
         let trevm = response_tri!(ctx.trevm(id, &block_cfg));
 
@@ -574,8 +573,7 @@ where
 
         let (estimate, _) = response_tri!(trevm.estimate_gas().map_err(EvmErrored::into_error));
 
-        trace!(?estimate, "estimate done for estimate_gas");
-        Span::current().record("estimate", format!("{:?}", &estimate));
+        span.record("estimate", format!("{:?}", &estimate));
 
         match estimate {
             trevm::EstimationResult::Success { estimation, .. } => {
@@ -595,7 +593,7 @@ where
             }
         }
     }
-    .instrument(span);
+    .instrument(span_for_task);
 
     await_jh_option_response!(hctx.spawn_blocking(task))
 }
