@@ -29,7 +29,7 @@ use reth_rpc_eth_api::{RpcBlock, RpcHeader, RpcReceipt, RpcTransaction};
 use serde::Deserialize;
 use signet_evm::EvmErrored;
 use std::borrow::Cow;
-use tracing::{trace_span, Instrument};
+use tracing::{field::Empty, span::Span, trace_span, Instrument};
 use trevm::revm::context::result::ExecutionResult;
 
 /// Args for `eth_estimateGas` and `eth_call`.
@@ -433,7 +433,7 @@ where
         block_id = %id,
         state_overrides = ?state_overrides.as_ref().map(StateOverride::len).unwrap_or_default(),
         block_overrides = ?block_overrides.is_some(),
-        block_cfg = tracing::field::Empty,
+        block_cfg = Empty,
     );
 
     let task = async move {
@@ -447,7 +447,7 @@ where
             }
         };
 
-        tracing::span::Span::current().record("block_cfg", format!("{:?}", &block_cfg));
+        Span::current().record("block_cfg", format!("{:?}", &block_cfg));
 
         // Set up trevm
 
@@ -461,7 +461,7 @@ where
         // modify the gas cap.
         let new_gas = response_tri!(trevm.cap_tx_gas());
         if Some(new_gas) != request.gas {
-            tracing::span::Span::current().record("request", format!("{:?}", &request));
+            Span::current().record("request", format!("{:?}", &request));
         }
 
         let execution_result = response_tri!(trevm.call().map_err(EvmErrored::into_error)).0;
@@ -534,14 +534,16 @@ where
         block_id = %id,
         state_overrides = ?state_overrides.as_ref().map(StateOverride::len).unwrap_or_default(),
         block_overrides = ?block_overrides.is_some(),
-        block_cfg = tracing::field::Empty,
+        block_cfg = Empty,
+        normalized_gas = Empty,
+        estimate = Empty,
     );
 
     // Stateless gas normalization.
     let max_gas = ctx.signet().config().rpc_gas_cap;
     normalize_gas_stateless(&mut request, max_gas);
 
-    tracing::span::Span::current().record("normalized_gas", format!("{:?}", request.gas));
+    Span::current().record("normalized_gas", format!("{:?}", request.gas));
 
     let task = async move {
         // Get the block cfg from backend, erroring if it fails
@@ -555,7 +557,7 @@ where
             }
         };
 
-        tracing::span::Span::current().record("block_cfg", format!("{:?}", &block_cfg));
+        Span::current().record("block_cfg", format!("{:?}", &block_cfg));
 
         let trevm = response_tri!(ctx.trevm(id, &block_cfg));
 
@@ -570,7 +572,7 @@ where
 
         let (estimate, _) = response_tri!(trevm.estimate_gas().map_err(EvmErrored::into_error));
 
-        tracing::span::Span::current().record("estimate", format!("{:?}", &estimate));
+        Span::current().record("estimate", format!("{:?}", &estimate));
 
         match estimate {
             trevm::EstimationResult::Success { estimation, .. } => {
