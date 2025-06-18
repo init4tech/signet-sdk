@@ -568,8 +568,8 @@ where
         let (estimate, _) = response_tri!(trevm.estimate_gas().map_err(EvmErrored::into_error));
 
         match estimate {
-            trevm::EstimationResult::Success { estimation, .. } => {
-                ResponsePayload::Success(U64::from(estimation))
+            trevm::EstimationResult::Success { limit, .. } => {
+                ResponsePayload::Success(U64::from(limit))
             }
             trevm::EstimationResult::Revert { reason, .. } => {
                 ResponsePayload::internal_error_with_message_and_obj(
