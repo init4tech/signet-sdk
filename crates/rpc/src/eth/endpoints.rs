@@ -29,7 +29,7 @@ use reth_rpc_eth_api::{RpcBlock, RpcHeader, RpcReceipt, RpcTransaction};
 use serde::Deserialize;
 use signet_evm::EvmErrored;
 use std::borrow::Cow;
-use tracing::{field::Empty, span::Span, trace_span, Instrument};
+use tracing::{field::Empty, trace_span, Instrument};
 use trevm::revm::context::result::ExecutionResult;
 
 /// Args for `eth_estimateGas` and `eth_call`.
@@ -436,6 +436,7 @@ where
         block_cfg = Empty,
     );
 
+    let span_for_instr = span.clone();
     let task = async move {
         let block_cfg = match ctx.signet().block_cfg(id).await {
             Ok(block_cfg) => block_cfg,
@@ -447,7 +448,7 @@ where
             }
         };
 
-        Span::current().record("block_cfg", format!("{:?}", &block_cfg));
+        span.record("block_cfg", format!("{:?}", &block_cfg));
 
         // Set up trevm
 
@@ -461,14 +462,14 @@ where
         // modify the gas cap.
         let new_gas = response_tri!(trevm.cap_tx_gas());
         if Some(new_gas) != request.gas {
-            Span::current().record("request", format!("{:?}", &request));
+            span.record("request", format!("{:?}", &request));
         }
 
         let execution_result = response_tri!(trevm.call().map_err(EvmErrored::into_error)).0;
 
         ResponsePayload::Success(execution_result)
     }
-    .instrument(span);
+    .instrument(span_for_instr);
 
     await_jh_option_response!(hctx.spawn_blocking(task))
 }
@@ -545,7 +546,7 @@ where
 
     span.record("normalized_gas", format!("{:?}", request.gas));
 
-    let span_for_task = span.clone();
+    let span_for_instr = span.clone();
     let task = async move {
         // Get the block cfg from backend, erroring if it fails
         let block_cfg = match ctx.signet().block_cfg(id).await {
@@ -593,7 +594,7 @@ where
             }
         }
     }
-    .instrument(span_for_task);
+    .instrument(span_for_instr);
 
     await_jh_option_response!(hctx.spawn_blocking(task))
 }
