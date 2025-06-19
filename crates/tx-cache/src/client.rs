@@ -54,6 +54,11 @@ impl TxCache {
         Self::new_with_client(url, client)
     }
 
+    /// Get the client used to send requests
+    pub fn client(&self) -> &reqwest::Client {
+        &self.client
+    }
+
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
         &self,
         join: &'static str,
