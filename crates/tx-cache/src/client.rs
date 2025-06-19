@@ -55,7 +55,7 @@ impl TxCache {
     }
 
     /// Get the client used to send requests
-    pub fn client(&self) -> &reqwest::Client {
+    pub const fn client(&self) -> &reqwest::Client {
         &self.client
     }
 
