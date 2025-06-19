@@ -1,6 +1,6 @@
 use crate::types::{
-    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse,
-    TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse,
+    TxCacheOrdersResponse, TxCacheSendBundleResponse, TxCacheSendTransactionResponse,
+    TxCacheTransactionsResponse,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -133,22 +133,6 @@ impl TxCache {
         let response: TxCacheTransactionsResponse =
             self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await?;
         Ok(response.transactions)
-    }
-
-    /// Get bundles from the URL.
-    #[instrument(skip_all)]
-    pub async fn get_bundles(&self) -> Result<Vec<TxCacheBundle>, Error> {
-        let response: TxCacheBundlesResponse =
-            self.get_inner::<TxCacheBundlesResponse>(BUNDLES).await?;
-        Ok(response.bundles)
-    }
-
-    /// Get a bundle from the URL.
-    #[instrument(skip_all)]
-    pub async fn get_bundle(&self) -> Result<TxCacheBundle, Error> {
-        let response: TxCacheBundleResponse =
-            self.get_inner::<TxCacheBundleResponse>(BUNDLES).await?;
-        Ok(response.bundle)
     }
 
     /// Get signed orders from the URL.

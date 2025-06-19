@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.4"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.81"
 authors = ["init4"]
@@ -34,16 +34,16 @@ debug = false
 incremental = false
 
 [workspace.dependencies]
-signet-bundle = { version = "0.2.0", path = "crates/bundle" }
-signet-constants = { version = "0.2.0", path = "crates/constants" }
-signet-evm = { version = "0.2.0", path = "crates/evm" }
-signet-extract = { version = "0.2.0", path = "crates/extract" }
-signet-node = { version = "0.2.0", path = "crates/node" }
-signet-rpc = { version = "0.2.0", path = "crates/rpc" }
-signet-sim = { version = "0.2.0", path = "crates/sim" }
-signet-types = { version = "0.2.0", path = "crates/types" }
-signet-tx-cache = { version = "0.2.0", path = "crates/tx-cache" }
-signet-zenith = { version = "0.2.0", path = "crates/zenith" }
+signet-bundle = { version = "0.3.0", path = "crates/bundle" }
+signet-constants = { version = "0.3.0", path = "crates/constants" }
+signet-evm = { version = "0.3.0", path = "crates/evm" }
+signet-extract = { version = "0.3.0", path = "crates/extract" }
+signet-node = { version = "0.3.0", path = "crates/node" }
+signet-rpc = { version = "0.3.0", path = "crates/rpc" }
+signet-sim = { version = "0.3.0", path = "crates/sim" }
+signet-types = { version = "0.3.0", path = "crates/types" }
+signet-tx-cache = { version = "0.3.0", path = "crates/tx-cache" }
+signet-zenith = { version = "0.3.0", path = "crates/zenith" }
 
 # ajj
 ajj = { version = "0.3.4" }
