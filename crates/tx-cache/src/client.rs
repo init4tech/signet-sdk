@@ -59,6 +59,11 @@ impl TxCache {
         &self.client
     }
 
+    /// Get the URL of the transaction cache.
+    pub const fn url(&self) -> &reqwest::Url {
+        &self.url
+    }
+
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
         &self,
         join: &'static str,
