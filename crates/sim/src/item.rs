@@ -104,6 +104,8 @@ impl SimItem {
     #[doc(hidden)]
     #[cfg(test)]
     pub fn invalid_item_with_score_and_hash(gas_limit: u64, mpfpg: u128) -> Self {
+        use alloy::primitives::B256;
+
         let tx = alloy::consensus::TxEip1559 {
             gas_limit,
             max_priority_fee_per_gas: mpfpg,
