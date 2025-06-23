@@ -1,8 +1,9 @@
 use crate::{item::SimIdentifier, SimItem};
 use core::fmt;
+use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashSet},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 /// Internal cache data protected by RwLock
@@ -52,35 +53,27 @@ impl SimCache {
 
     /// Get an iterator over the best items in the cache.
     pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
-        self.inner
-            .read()
-            .unwrap()
-            .items
-            .iter()
-            .rev()
-            .take(n)
-            .map(|(k, (v, _))| (*k, v.clone()))
-            .collect()
+        self.inner.read().items.iter().rev().take(n).map(|(k, (v, _))| (*k, v.clone())).collect()
     }
 
     /// Get the number of items in the cache.
     pub fn len(&self) -> usize {
-        self.inner.read().unwrap().items.len()
+        self.inner.read().items.len()
     }
 
     /// True if the cache is empty.
     pub fn is_empty(&self) -> bool {
-        self.inner.read().unwrap().items.is_empty()
+        self.inner.read().items.is_empty()
     }
 
     /// Get an item by key.
     pub fn get(&self, key: u128) -> Option<SimItem> {
-        self.inner.read().unwrap().items.get(&key).map(|(item, _)| item.clone())
+        self.inner.read().items.get(&key).map(|(item, _)| item.clone())
     }
 
     /// Remove an item by key.
     pub fn remove(&self, key: u128) -> Option<SimItem> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         if let Some((item, identifier)) = inner.items.remove(&key) {
             inner.seen.remove(&identifier);
             Some(item)
@@ -124,7 +117,7 @@ impl SimCache {
         let identifier = item.identifier();
         let score = item.calculate_total_fee(basefee);
 
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         Self::add_inner(&mut inner, score, item, identifier, self.capacity);
     }
 
@@ -134,7 +127,7 @@ impl SimCache {
         I: IntoIterator<Item = Item>,
         Item: Into<SimItem>,
     {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
 
         for item in item.into_iter() {
             let item = item.into();
@@ -147,7 +140,7 @@ impl SimCache {
     /// Clean the cache by removing bundles that are not valid in the current
     /// block.
     pub fn clean(&self, block_number: u64, block_timestamp: u64) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
 
         // Trim to capacity by dropping lower fees.
         while inner.items.len() > self.capacity {
@@ -183,7 +176,7 @@ impl SimCache {
 
     /// Clear the cache.
     pub fn clear(&self) {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         inner.items.clear();
         inner.seen.clear();
     }
@@ -222,7 +215,7 @@ mod test {
         let cache = SimCache::with_capacity(2);
         cache.add_items(items.clone(), 0);
 
-        dbg!(&*cache.inner.read().unwrap());
+        dbg!(&*cache.inner.read());
 
         assert_eq!(cache.len(), 2);
         assert_eq!(cache.get(0), Some(items[2].clone()));
