@@ -1,19 +1,29 @@
-use dashmap::DashSet;
-
 use crate::{item::SimIdentifier, SimItem};
 use core::fmt;
 use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock, RwLockWriteGuard},
+    collections::{BTreeMap, HashSet},
+    sync::{Arc, RwLock},
 };
+
+/// Internal cache data protected by RwLock
+#[derive(Debug)]
+struct CacheInner {
+    items: BTreeMap<u128, (SimItem, SimIdentifier)>,
+    seen: HashSet<SimIdentifier>,
+}
+
+impl CacheInner {
+    fn new() -> Self {
+        Self { items: BTreeMap::new(), seen: HashSet::new() }
+    }
+}
 
 /// A cache for the simulator.
 ///
 /// This cache is used to store the items that are being simulated.
 #[derive(Clone)]
 pub struct SimCache {
-    inner: Arc<RwLock<BTreeMap<u128, (SimItem, SimIdentifier)>>>,
-    seen: Arc<DashSet<SimIdentifier>>,
+    inner: Arc<RwLock<CacheInner>>,
     capacity: usize,
 }
 
@@ -32,65 +42,78 @@ impl Default for SimCache {
 impl SimCache {
     /// Create a new `SimCache` instance, with a default capacity of `100`.
     pub fn new() -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(BTreeMap::new())),
-            seen: Arc::new(DashSet::new()),
-            capacity: 100,
-        }
+        Self { inner: Arc::new(RwLock::new(CacheInner::new())), capacity: 100 }
     }
 
     /// Create a new `SimCache` instance with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(BTreeMap::new())),
-            seen: Arc::new(DashSet::new()),
-            capacity,
-        }
+        Self { inner: Arc::new(RwLock::new(CacheInner::new())), capacity }
     }
 
     /// Get an iterator over the best items in the cache.
     pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
-        self.inner.read().unwrap().iter().rev().take(n).map(|(k, (v, _))| (*k, v.clone())).collect()
+        self.inner
+            .read()
+            .unwrap()
+            .items
+            .iter()
+            .rev()
+            .take(n)
+            .map(|(k, (v, _))| (*k, v.clone()))
+            .collect()
     }
 
     /// Get the number of items in the cache.
     pub fn len(&self) -> usize {
-        self.inner.read().unwrap().len()
+        self.inner.read().unwrap().items.len()
     }
 
     /// True if the cache is empty.
     pub fn is_empty(&self) -> bool {
-        self.inner.read().unwrap().is_empty()
+        self.inner.read().unwrap().items.is_empty()
     }
 
     /// Get an item by key.
     pub fn get(&self, key: u128) -> Option<SimItem> {
-        self.inner.read().unwrap().get(&key).map(|(item, _)| item.clone())
+        self.inner.read().unwrap().items.get(&key).map(|(item, _)| item.clone())
     }
 
     /// Remove an item by key.
     pub fn remove(&self, key: u128) -> Option<SimItem> {
-        self.inner.write().unwrap().remove(&key).map(|(item, _)| item)
+        let mut inner = self.inner.write().unwrap();
+        if let Some((item, identifier)) = inner.items.remove(&key) {
+            inner.seen.remove(&identifier);
+            Some(item)
+        } else {
+            None
+        }
     }
 
     fn add_inner(
-        guard: &mut RwLockWriteGuard<'_, BTreeMap<u128, (SimItem, SimIdentifier)>>,
+        inner: &mut CacheInner,
         mut score: u128,
         item: SimItem,
         identifier: SimIdentifier,
         capacity: usize,
     ) {
+        // Check if we've already seen this item - if so, don't add it
+        if !inner.seen.insert(identifier.clone()) {
+            return;
+        }
+
         // If it has the same score, we decrement (prioritizing earlier items)
-        while guard.contains_key(&score) && score != 0 {
+        while inner.items.contains_key(&score) && score != 0 {
             score = score.saturating_sub(1);
         }
 
-        if guard.len() >= capacity {
+        if inner.items.len() >= capacity {
             // If we are at capacity, we need to remove the lowest score
-            guard.pop_first();
+            if let Some((_, (_, removed_id))) = inner.items.pop_first() {
+                inner.seen.remove(&removed_id);
+            }
         }
 
-        guard.entry(score).or_insert((item, identifier));
+        inner.items.insert(score, (item, identifier));
     }
 
     /// Add an item to the cache.
@@ -98,17 +121,11 @@ impl SimCache {
     /// The basefee is used to calculate an estimated fee for the item.
     pub fn add_item(&self, item: impl Into<SimItem>, basefee: u64) {
         let item = item.into();
-
         let identifier = item.identifier();
+        let score = item.calculate_total_fee(basefee);
 
-        if self.seen.insert(identifier.clone()) {
-            // Calculate the total fee for the item.
-            let score = item.calculate_total_fee(basefee);
-
-            let mut inner = self.inner.write().unwrap();
-
-            Self::add_inner(&mut inner, score, item, identifier, self.capacity);
-        }
+        let mut inner = self.inner.write().unwrap();
+        Self::add_inner(&mut inner, score, item, identifier, self.capacity);
     }
 
     /// Add an iterator of items to the cache. This locks the cache only once
@@ -122,12 +139,8 @@ impl SimCache {
         for item in item.into_iter() {
             let item = item.into();
             let identifier = item.identifier();
-
-            // Check if the item has already been seen.
-            if self.seen.insert(identifier.clone()) {
-                let score = item.calculate_total_fee(basefee);
-                Self::add_inner(&mut inner, score, item, identifier, self.capacity);
-            }
+            let score = item.calculate_total_fee(basefee);
+            Self::add_inner(&mut inner, score, item, identifier, self.capacity);
         }
     }
 
@@ -137,42 +150,42 @@ impl SimCache {
         let mut inner = self.inner.write().unwrap();
 
         // Trim to capacity by dropping lower fees.
-        while inner.len() > self.capacity {
-            if let Some((_, (_, id))) = inner.pop_first() {
+        while inner.items.len() > self.capacity {
+            if let Some((_, (_, id))) = inner.items.pop_first() {
                 // Drop the identifier from the seen cache as well.
-                self.seen.remove(&id);
+                inner.seen.remove(&id);
             }
         }
 
-        inner.retain(|_, (value, id)| {
+        // Collect items to remove to avoid borrow checker issues
+        let mut items_to_remove = Vec::new();
+
+        for (score, (value, id)) in &inner.items {
             let SimItem::Bundle(bundle) = value else {
-                return true;
+                continue;
             };
-            if bundle.bundle.block_number != block_number {
-                self.seen.remove(id);
-                return false;
+
+            let should_remove = bundle.bundle.block_number != block_number
+                || bundle.min_timestamp().is_some_and(|ts| ts > block_timestamp)
+                || bundle.max_timestamp().is_some_and(|ts| ts < block_timestamp);
+
+            if should_remove {
+                items_to_remove.push((*score, id.clone()));
             }
-            if let Some(timestamp) = bundle.min_timestamp() {
-                if timestamp > block_timestamp {
-                    self.seen.remove(id);
-                    return false;
-                }
-            }
-            if let Some(timestamp) = bundle.max_timestamp() {
-                if timestamp < block_timestamp {
-                    self.seen.remove(id);
-                    return false;
-                }
-            }
-            true
-        })
+        }
+
+        // Remove the collected items
+        for (score, id) in items_to_remove {
+            inner.items.remove(&score);
+            inner.seen.remove(&id);
+        }
     }
 
     /// Clear the cache.
     pub fn clear(&self) {
         let mut inner = self.inner.write().unwrap();
-        inner.clear();
-        self.seen.clear();
+        inner.items.clear();
+        inner.seen.clear();
     }
 }
 

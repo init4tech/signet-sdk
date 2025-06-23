@@ -145,8 +145,8 @@ pub enum SimIdentifier {
 
 impl SimIdentifier {
     /// Create a new [`SimIdentifier::Bundle`].
-    pub const fn bundle(id: String) -> Self {
-        Self::Bundle(id)
+    pub fn bundle(id: impl Into<String>) -> Self {
+        Self::Bundle(id.into())
     }
 
     /// Create a new [`SimIdentifier::Tx`].
