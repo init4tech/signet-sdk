@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
@@ -9,21 +11,31 @@ use signet_bundle::SignetEthBundle;
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimItem {
     /// A bundle to be simulated.
-    Bundle(SignetEthBundle),
+    Bundle {
+        /// The bundle to be simulated.
+        bundle: SignetEthBundle,
+        /// The identifier for the bundle.
+        identifier: OnceLock<SimIdentifier>,
+    },
 
     /// A transaction to be simulated.
-    Tx(TxEnvelope),
+    Tx {
+        /// The transaction to be simulated.
+        tx: TxEnvelope,
+        /// The identifier for the transaction.
+        identifier: OnceLock<SimIdentifier>,
+    },
 }
 
 impl From<SignetEthBundle> for SimItem {
     fn from(bundle: SignetEthBundle) -> Self {
-        Self::Bundle(bundle)
+        Self::Bundle { bundle, identifier: OnceLock::new() }
     }
 }
 
 impl From<TxEnvelope> for SimItem {
     fn from(tx: TxEnvelope) -> Self {
-        Self::Tx(tx)
+        Self::Tx { tx, identifier: OnceLock::new() }
     }
 }
 
@@ -31,16 +43,16 @@ impl SimItem {
     /// Get the bundle if it is a bundle.
     pub const fn as_bundle(&self) -> Option<&SignetEthBundle> {
         match self {
-            Self::Bundle(bundle) => Some(bundle),
-            Self::Tx(_) => None,
+            Self::Bundle { bundle, .. } => Some(bundle),
+            Self::Tx { .. } => None,
         }
     }
 
     /// Get the transaction if it is a transaction.
     pub const fn as_tx(&self) -> Option<&TxEnvelope> {
         match self {
-            Self::Bundle(_) => None,
-            Self::Tx(tx) => Some(tx),
+            Self::Bundle { .. } => None,
+            Self::Tx { tx, .. } => Some(tx),
         }
     }
 
@@ -48,7 +60,7 @@ impl SimItem {
     /// to determine simulation order.
     pub fn calculate_total_fee(&self, basefee: u64) -> u128 {
         match self {
-            Self::Bundle(bundle) => {
+            Self::Bundle { bundle, .. } => {
                 let mut total_tx_fee = 0;
                 for tx in bundle.bundle.txs.iter() {
                     let Ok(tx) = TxEnvelope::decode_2718(&mut tx.as_ref()) else {
@@ -58,7 +70,7 @@ impl SimItem {
                 }
                 total_tx_fee
             }
-            Self::Tx(tx) => tx.effective_gas_price(Some(basefee)) * tx.gas_limit() as u128,
+            Self::Tx { tx, .. } => tx.effective_gas_price(Some(basefee)) * tx.gas_limit() as u128,
         }
     }
 }
@@ -124,12 +136,12 @@ impl SimItem {
 
     /// Returns a unique identifier for this item, which can be used to
     /// distinguish it from other items.
-    pub fn identifier(&self) -> SimIdentifier {
+    pub fn identifier(&self) -> &SimIdentifier {
         match self {
-            Self::Bundle(bundle) => {
+            Self::Bundle { bundle, identifier } => identifier.get_or_init(|| {
                 SimIdentifier::bundle(bundle.bundle.replacement_uuid.clone().unwrap_or_default())
-            }
-            Self::Tx(tx) => SimIdentifier::tx(*tx.hash()),
+            }),
+            Self::Tx { tx, identifier } => identifier.get_or_init(|| SimIdentifier::tx(*tx.hash())),
         }
     }
 }
@@ -143,6 +155,12 @@ pub enum SimIdentifier {
     Tx(TxHash),
 }
 
+impl From<TxHash> for SimIdentifier {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::Tx(tx_hash)
+    }
+}
+
 impl SimIdentifier {
     /// Create a new [`SimIdentifier::Bundle`].
     pub fn bundle(id: impl Into<String>) -> Self {
@@ -152,5 +170,13 @@ impl SimIdentifier {
     /// Create a new [`SimIdentifier::Tx`].
     pub const fn tx(id: TxHash) -> Self {
         Self::Tx(id)
+    }
+
+    pub const fn is_bundle(&self) -> bool {
+        matches!(self, Self::Bundle(_))
+    }
+
+    pub const fn is_tx(&self) -> bool {
+        matches!(self, Self::Tx(_))
     }
 }

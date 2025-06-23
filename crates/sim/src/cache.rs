@@ -8,7 +8,7 @@ use std::{
 
 /// Internal cache data, meant to be protected by a lock.
 struct CacheInner {
-    items: BTreeMap<u128, (SimItem, SimIdentifier)>,
+    items: BTreeMap<u128, SimItem>,
     seen: HashSet<SimIdentifier>,
 }
 
@@ -58,7 +58,7 @@ impl SimCache {
 
     /// Get an iterator over the best items in the cache.
     pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
-        self.inner.read().items.iter().rev().take(n).map(|(k, (v, _))| (*k, v.clone())).collect()
+        self.inner.read().items.iter().rev().take(n).map(|(k, item)| (*k, item.clone())).collect()
     }
 
     /// Get the number of items in the cache.
@@ -73,29 +73,23 @@ impl SimCache {
 
     /// Get an item by key.
     pub fn get(&self, key: u128) -> Option<SimItem> {
-        self.inner.read().items.get(&key).map(|(item, _)| item.clone())
+        self.inner.read().items.get(&key).cloned()
     }
 
     /// Remove an item by key.
     pub fn remove(&self, key: u128) -> Option<SimItem> {
         let mut inner = self.inner.write();
-        if let Some((item, identifier)) = inner.items.remove(&key) {
-            inner.seen.remove(&identifier);
+        if let Some(item) = inner.items.remove(&key) {
+            inner.seen.remove(item.identifier());
             Some(item)
         } else {
             None
         }
     }
 
-    fn add_inner(
-        inner: &mut CacheInner,
-        mut score: u128,
-        item: SimItem,
-        identifier: SimIdentifier,
-        capacity: usize,
-    ) {
+    fn add_inner(inner: &mut CacheInner, mut score: u128, item: SimItem, capacity: usize) {
         // Check if we've already seen this item - if so, don't add it
-        if !inner.seen.insert(identifier.clone()) {
+        if !inner.seen.insert(item.identifier().clone()) {
             return;
         }
 
@@ -106,12 +100,12 @@ impl SimCache {
 
         if inner.items.len() >= capacity {
             // If we are at capacity, we need to remove the lowest score
-            if let Some((_, (_, removed_id))) = inner.items.pop_first() {
-                inner.seen.remove(&removed_id);
+            if let Some((_, item)) = inner.items.pop_first() {
+                inner.seen.remove(item.identifier());
             }
         }
 
-        inner.items.insert(score, (item, identifier));
+        inner.items.insert(score, item);
     }
 
     /// Add an item to the cache.
@@ -119,11 +113,10 @@ impl SimCache {
     /// The basefee is used to calculate an estimated fee for the item.
     pub fn add_item(&self, item: impl Into<SimItem>, basefee: u64) {
         let item = item.into();
-        let identifier = item.identifier();
         let score = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
-        Self::add_inner(&mut inner, score, item, identifier, self.capacity);
+        Self::add_inner(&mut inner, score, item, self.capacity);
     }
 
     /// Add an iterator of items to the cache. This locks the cache only once
@@ -136,9 +129,8 @@ impl SimCache {
 
         for item in item.into_iter() {
             let item = item.into();
-            let identifier = item.identifier();
             let score = item.calculate_total_fee(basefee);
-            Self::add_inner(&mut inner, score, item, identifier, self.capacity);
+            Self::add_inner(&mut inner, score, item, self.capacity);
         }
     }
 
@@ -149,34 +141,33 @@ impl SimCache {
 
         // Trim to capacity by dropping lower fees.
         while inner.items.len() > self.capacity {
-            if let Some((_, (_, id))) = inner.items.pop_first() {
+            if let Some((_, item)) = inner.items.pop_first() {
                 // Drop the identifier from the seen cache as well.
-                inner.seen.remove(&id);
+                inner.seen.remove(item.identifier());
             }
         }
 
-        // Collect items to remove to avoid borrow checker issues
-        let mut items_to_remove = Vec::new();
+        let CacheInner { ref mut items, ref mut seen } = *inner;
 
-        for (score, (value, id)) in &inner.items {
-            let SimItem::Bundle(bundle) = value else {
-                continue;
-            };
+        items.retain(|_, item| {
+            // Retain only items that are not bundles or are valid in the current block.
+            if let SimItem::Bundle { bundle, identifier } = item {
+                let should_remove = bundle.bundle.block_number == block_number
+                    && bundle.min_timestamp().is_some_and(|ts| ts <= block_timestamp)
+                    && bundle.max_timestamp().is_some_and(|ts| ts >= block_timestamp);
 
-            let should_remove = bundle.bundle.block_number != block_number
-                || bundle.min_timestamp().is_some_and(|ts| ts > block_timestamp)
-                || bundle.max_timestamp().is_some_and(|ts| ts < block_timestamp);
+                let retain = !should_remove;
 
-            if should_remove {
-                items_to_remove.push((*score, id.clone()));
+                if should_remove {
+                    seen.remove(
+                        identifier.get().expect("Identifier should be already be set on insertion"),
+                    );
+                }
+                retain
+            } else {
+                true // Non-bundle items are retained
             }
-        }
-
-        // Remove the collected items
-        for (score, id) in items_to_remove {
-            inner.items.remove(&score);
-            inner.seen.remove(&id);
-        }
+        });
     }
 
     /// Clear the cache.

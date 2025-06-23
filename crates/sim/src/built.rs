@@ -138,8 +138,8 @@ impl BuiltBlock {
         self.gas_used += item.gas_used;
 
         match item.item {
-            SimItem::Bundle(bundle) => self.ingest_bundle(bundle),
-            SimItem::Tx(tx) => self.ingest_tx(tx),
+            SimItem::Bundle { bundle, .. } => self.ingest_bundle(bundle),
+            SimItem::Tx { tx, .. } => self.ingest_tx(tx),
         }
     }
 
