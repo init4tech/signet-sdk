@@ -135,6 +135,7 @@ where
                 min_timestamp: None, // sufficiently covered by pinning to next block number
                 max_timestamp: None, // sufficiently covered by pinning to next block number
                 replacement_uuid: None, // optional if implementing strategies that replace or cancel bundles
+                ..Default::default()    // all other options are not used.
             },
         };
 

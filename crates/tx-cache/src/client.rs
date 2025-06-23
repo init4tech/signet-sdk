@@ -1,6 +1,6 @@
 use crate::types::{
-    TxCacheBundle, TxCacheBundleResponse, TxCacheBundlesResponse, TxCacheOrdersResponse,
-    TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse,
+    TxCacheOrdersResponse, TxCacheSendBundleResponse, TxCacheSendTransactionResponse,
+    TxCacheTransactionsResponse,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -52,6 +52,16 @@ impl TxCache {
         let url =
             reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
         Self::new_with_client(url, client)
+    }
+
+    /// Get the client used to send requests
+    pub const fn client(&self) -> &reqwest::Client {
+        &self.client
+    }
+
+    /// Get the URL of the transaction cache.
+    pub const fn url(&self) -> &reqwest::Url {
+        &self.url
     }
 
     async fn forward_inner<T: Serialize + Send, R: DeserializeOwned>(
@@ -133,22 +143,6 @@ impl TxCache {
         let response: TxCacheTransactionsResponse =
             self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await?;
         Ok(response.transactions)
-    }
-
-    /// Get bundles from the URL.
-    #[instrument(skip_all)]
-    pub async fn get_bundles(&self) -> Result<Vec<TxCacheBundle>, Error> {
-        let response: TxCacheBundlesResponse =
-            self.get_inner::<TxCacheBundlesResponse>(BUNDLES).await?;
-        Ok(response.bundles)
-    }
-
-    /// Get a bundle from the URL.
-    #[instrument(skip_all)]
-    pub async fn get_bundle(&self) -> Result<TxCacheBundle, Error> {
-        let response: TxCacheBundleResponse =
-            self.get_inner::<TxCacheBundleResponse>(BUNDLES).await?;
-        Ok(response.bundle)
     }
 
     /// Get signed orders from the URL.

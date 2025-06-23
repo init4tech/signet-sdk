@@ -29,7 +29,7 @@ use reth_rpc_eth_api::{RpcBlock, RpcHeader, RpcReceipt, RpcTransaction};
 use serde::Deserialize;
 use signet_evm::EvmErrored;
 use std::borrow::Cow;
-use tracing::{trace_span, Instrument};
+use tracing::{debug, trace_span, Instrument};
 use trevm::revm::context::result::ExecutionResult;
 
 /// Args for `eth_estimateGas` and `eth_call`.
@@ -447,10 +447,7 @@ where
             }
         };
 
-        tracing::span::Span::current().record("block_cfg", format!("{:?}", &block_cfg));
-
         // Set up trevm
-
         let trevm = response_tri!(ctx.trevm(id, &block_cfg));
 
         let mut trevm = response_tri!(trevm.maybe_apply_state_overrides(state_overrides.as_ref()))
@@ -461,7 +458,11 @@ where
         // modify the gas cap.
         let new_gas = response_tri!(trevm.cap_tx_gas());
         if Some(new_gas) != request.gas {
-            tracing::span::Span::current().record("request", format!("{:?}", &request));
+            debug!(
+                req_gas = ?request.gas,
+                new_gas,
+                "capping gas for call",
+            );
         }
 
         let execution_result = response_tri!(trevm.call().map_err(EvmErrored::into_error)).0;
@@ -527,10 +528,6 @@ where
 {
     let id = block.unwrap_or(BlockId::pending());
 
-    // Stateless gas normalization.
-    let max_gas = ctx.signet().config().rpc_gas_cap;
-    normalize_gas_stateless(&mut request, max_gas);
-
     // this span is verbose yo.
     let span = trace_span!(
         "estimate_gas",
@@ -540,6 +537,10 @@ where
         block_overrides = ?block_overrides.is_some(),
         block_cfg = tracing::field::Empty,
     );
+
+    // Stateless gas normalization.
+    let max_gas = ctx.signet().config().rpc_gas_cap;
+    normalize_gas_stateless(&mut request, max_gas);
 
     let task = async move {
         // Get the block cfg from backend, erroring if it fails
@@ -552,8 +553,6 @@ where
                 )
             }
         };
-
-        tracing::span::Span::current().record("block_cfg", format!("{:?}", &block_cfg));
 
         let trevm = response_tri!(ctx.trevm(id, &block_cfg));
 
@@ -569,8 +568,8 @@ where
         let (estimate, _) = response_tri!(trevm.estimate_gas().map_err(EvmErrored::into_error));
 
         match estimate {
-            trevm::EstimationResult::Success { estimation, .. } => {
-                ResponsePayload::Success(U64::from(estimation))
+            trevm::EstimationResult::Success { limit, .. } => {
+                ResponsePayload::Success(U64::from(limit))
             }
             trevm::EstimationResult::Revert { reason, .. } => {
                 ResponsePayload::internal_error_with_message_and_obj(
