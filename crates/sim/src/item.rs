@@ -96,7 +96,7 @@ impl SimItem {
         ));
         tx.into()
     }
-    
+
     /// Create an invalid test item with a given gas limit and max priority fee
     /// per gas, and a random tx hash. As [`Self::invalid_test_item`] but with
     /// a custom gas limit and `max_priority_fee_per_gas`, and a random hash
