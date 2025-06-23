@@ -18,13 +18,13 @@ mod built;
 pub use built::BuiltBlock;
 
 mod cache;
-pub use cache::SimCache;
+pub use cache::{CacheError, SimCache};
 
 mod env;
 pub use env::{SharedSimEnv, SimEnv};
 
 mod item;
-pub use item::SimItem;
+pub use item::{SimIdentifier, SimItem};
 
 mod outcome;
 pub use outcome::SimOutcomeWithCache;

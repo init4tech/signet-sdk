@@ -1,10 +1,20 @@
 use crate::{item::SimIdentifier, SimItem};
+use alloy::consensus::TxEnvelope;
 use core::fmt;
 use parking_lot::RwLock;
+use signet_bundle::SignetEthBundle;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
+
+/// Possible errors that can occur when using the cache.
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+pub enum CacheError {
+    /// The bundle does not have a replacement UUID, which is required for caching.
+    #[error("bundle has no replacement UUID")]
+    BundleWithoutReplacementUuid,
+}
 
 /// Internal cache data, meant to be protected by a lock.
 struct CacheInner {
@@ -108,27 +118,62 @@ impl SimCache {
         inner.items.insert(score, item);
     }
 
-    /// Add an item to the cache.
-    ///
-    /// The basefee is used to calculate an estimated fee for the item.
-    pub fn add_item(&self, item: impl Into<SimItem>, basefee: u64) {
-        let item = item.into();
+    /// Add a bundle to the cache.
+    pub fn add_bundle(&self, bundle: SignetEthBundle, basefee: u64) -> Result<(), CacheError> {
+        if bundle.replacement_uuid().is_none() {
+            // If the bundle does not have a replacement UUID, we cannot add it to the cache.
+            return Err(CacheError::BundleWithoutReplacementUuid);
+        }
+
+        let item = SimItem::from(bundle);
+        let score = item.calculate_total_fee(basefee);
+
+        let mut inner = self.inner.write();
+        Self::add_inner(&mut inner, score, item, self.capacity);
+
+        Ok(())
+    }
+
+    /// Add an iterator of bundles to the cache. This locks the cache only once
+    pub fn add_bundles<I, Item>(&self, item: I, basefee: u64) -> Result<(), CacheError>
+    where
+        I: IntoIterator<Item = Item>,
+        Item: Into<SignetEthBundle>,
+    {
+        let mut inner = self.inner.write();
+
+        for item in item.into_iter() {
+            let item = item.into();
+            if item.replacement_uuid().is_none() {
+                // If the bundle does not have a replacement UUID, we cannot add it to the cache.
+                return Err(CacheError::BundleWithoutReplacementUuid);
+            }
+            let item = SimItem::from(item);
+            let score = item.calculate_total_fee(basefee);
+            Self::add_inner(&mut inner, score, item, self.capacity);
+        }
+
+        Ok(())
+    }
+
+    /// Add a transaction to the cache.
+    pub fn add_tx(&self, tx: TxEnvelope, basefee: u64) {
+        let item = SimItem::from(tx);
         let score = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
         Self::add_inner(&mut inner, score, item, self.capacity);
     }
 
-    /// Add an iterator of items to the cache. This locks the cache only once
-    pub fn add_items<I, Item>(&self, item: I, basefee: u64)
+    /// Add an iterator of transactions to the cache. This locks the cache only once
+    pub fn add_txs<I>(&self, item: I, basefee: u64)
     where
-        I: IntoIterator<Item = Item>,
-        Item: Into<SimItem>,
+        I: IntoIterator<Item = TxEnvelope>,
     {
         let mut inner = self.inner.write();
 
         for item in item.into_iter() {
-            let item = item.into();
+            let item = SimItem::from(item);
             let score = item.calculate_total_fee(basefee);
             Self::add_inner(&mut inner, score, item, self.capacity);
         }
@@ -181,39 +226,38 @@ mod test {
     use alloy::primitives::b256;
 
     use super::*;
-    use crate::SimItem;
 
     #[test]
     fn test_cache() {
         let items = vec![
-            SimItem::invalid_item_with_score(100, 1),
-            SimItem::invalid_item_with_score(100, 2),
-            SimItem::invalid_item_with_score(100, 3),
+            invalid_tx_with_score(100, 1),
+            invalid_tx_with_score(100, 2),
+            invalid_tx_with_score(100, 3),
         ];
 
         let cache = SimCache::with_capacity(2);
-        cache.add_items(items.clone(), 0);
+        cache.add_txs(items.clone(), 0);
 
         assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(300), Some(items[2].clone()));
-        assert_eq!(cache.get(200), Some(items[1].clone()));
+        assert_eq!(cache.get(300), Some(items[2].clone().into()));
+        assert_eq!(cache.get(200), Some(items[1].clone().into()));
         assert_eq!(cache.get(100), None);
     }
 
     #[test]
     fn overlap_at_zero() {
         let items = vec![
-            SimItem::invalid_item_with_score_and_hash(
+            invalid_tx_with_score_and_hash(
                 1,
                 1,
                 b256!("0xb36a5a0066980e8477d5d5cebf023728d3cfb837c719dc7f3aadb73d1a39f11f"),
             ),
-            SimItem::invalid_item_with_score_and_hash(
+            invalid_tx_with_score_and_hash(
                 1,
                 1,
                 b256!("0x04d3629f341cdcc5f72969af3c7638e106b4b5620594e6831d86f03ea048e68a"),
             ),
-            SimItem::invalid_item_with_score_and_hash(
+            invalid_tx_with_score_and_hash(
                 1,
                 1,
                 b256!("0x0f0b6a85c1ef6811bf86e92a3efc09f61feb1deca9da671119aaca040021598a"),
@@ -221,13 +265,45 @@ mod test {
         ];
 
         let cache = SimCache::with_capacity(2);
-        cache.add_items(items.clone(), 0);
+        cache.add_txs(items.clone(), 0);
 
         dbg!(&*cache.inner.read());
 
         assert_eq!(cache.len(), 2);
-        assert_eq!(cache.get(0), Some(items[2].clone()));
-        assert_eq!(cache.get(1), Some(items[0].clone()));
+        assert_eq!(cache.get(0), Some(items[2].clone().into()));
+        assert_eq!(cache.get(1), Some(items[0].clone().into()));
         assert_eq!(cache.get(2), None);
+    }
+
+    fn invalid_tx_with_score(gas_limit: u64, mpfpg: u128) -> alloy::consensus::TxEnvelope {
+        let tx = build_alloy_tx(gas_limit, mpfpg);
+
+        TxEnvelope::Eip1559(alloy::consensus::Signed::new_unhashed(
+            tx,
+            alloy::signers::Signature::test_signature(),
+        ))
+    }
+
+    fn invalid_tx_with_score_and_hash(
+        gas_limit: u64,
+        mpfpg: u128,
+        hash: alloy::primitives::B256,
+    ) -> alloy::consensus::TxEnvelope {
+        let tx = build_alloy_tx(gas_limit, mpfpg);
+
+        TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
+            tx,
+            alloy::signers::Signature::test_signature(),
+            hash,
+        ))
+    }
+
+    fn build_alloy_tx(gas_limit: u64, mpfpg: u128) -> alloy::consensus::TxEip1559 {
+        alloy::consensus::TxEip1559 {
+            gas_limit,
+            max_priority_fee_per_gas: mpfpg,
+            max_fee_per_gas: alloy::consensus::constants::GWEI_TO_WEI as u128,
+            ..Default::default()
+        }
     }
 }
