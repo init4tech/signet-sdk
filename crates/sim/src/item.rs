@@ -1,7 +1,7 @@
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
-    primitives::{TxHash, B256},
+    primitives::TxHash,
 };
 use signet_bundle::SignetEthBundle;
 
