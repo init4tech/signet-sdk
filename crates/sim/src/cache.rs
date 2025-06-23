@@ -6,11 +6,16 @@ use std::{
     sync::Arc,
 };
 
-/// Internal cache data protected by RwLock
-#[derive(Debug)]
+/// Internal cache data, meant to be protected by a lock.
 struct CacheInner {
     items: BTreeMap<u128, (SimItem, SimIdentifier)>,
     seen: HashSet<SimIdentifier>,
+}
+
+impl fmt::Debug for CacheInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CacheInner").finish()
+    }
 }
 
 impl CacheInner {
