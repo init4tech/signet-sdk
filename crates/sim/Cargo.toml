@@ -25,3 +25,4 @@ dashmap.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
+alloy = { workspace = true, features = ["getrandom"] }

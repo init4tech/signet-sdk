@@ -1,7 +1,7 @@
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
-    primitives::TxHash,
+    primitives::{TxHash, B256},
 };
 use signet_bundle::SignetEthBundle;
 
@@ -94,6 +94,29 @@ impl SimItem {
             alloy::signers::Signature::test_signature(),
             Default::default(),
         ));
+        tx.into()
+    }
+    
+    /// Create an invalid test item with a given gas limit and max priority fee
+    /// per gas, and a random tx hash. As [`Self::invalid_test_item`] but with
+    /// a custom gas limit and `max_priority_fee_per_gas`, and a random hash
+    /// to avoid getting deduped by the seen items cache.
+    #[doc(hidden)]
+    #[cfg(test)]
+    pub fn invalid_item_with_score_and_hash(gas_limit: u64, mpfpg: u128) -> Self {
+        let tx = alloy::consensus::TxEip1559 {
+            gas_limit,
+            max_priority_fee_per_gas: mpfpg,
+            max_fee_per_gas: alloy::consensus::constants::GWEI_TO_WEI as u128,
+            ..Default::default()
+        };
+
+        let tx = TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
+            tx,
+            alloy::signers::Signature::test_signature(),
+            B256::random(),
+        ));
+
         tx.into()
     }
 

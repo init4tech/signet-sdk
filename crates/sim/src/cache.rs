@@ -101,7 +101,6 @@ impl SimCache {
 
         let identifier = item.identifier();
 
-        // Check if the item has already been seen.
         if self.seen.insert(identifier.clone()) {
             // Calculate the total fee for the item.
             let score = item.calculate_total_fee(basefee);
@@ -185,38 +184,36 @@ mod test {
     #[test]
     fn test_cache() {
         let items = vec![
-            SimItem::invalid_item_with_score(100, 1),
-            SimItem::invalid_item_with_score(100, 2),
-            SimItem::invalid_item_with_score(100, 3),
+            SimItem::invalid_item_with_score_and_hash(100, 1),
+            SimItem::invalid_item_with_score_and_hash(100, 2),
+            SimItem::invalid_item_with_score_and_hash(100, 3),
         ];
 
         let cache = SimCache::with_capacity(2);
-        cache.add_items(items, 0);
+        cache.add_items(items.clone(), 0);
 
-        // All items have the same identifier (hash=0), so only the first one is stored
-        assert_eq!(cache.len(), 1);
-        assert_eq!(cache.get(100), Some(SimItem::invalid_item_with_score(100, 1)));
-        assert_eq!(cache.get(200), None);
-        assert_eq!(cache.get(300), None);
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(300), Some(items[2].clone()));
+        assert_eq!(cache.get(200), Some(items[1].clone()));
+        assert_eq!(cache.get(100), None);
     }
 
     #[test]
     fn overlap_at_zero() {
         let items = vec![
-            SimItem::invalid_item_with_score(1, 1),
-            SimItem::invalid_item_with_score(1, 1),
-            SimItem::invalid_item_with_score(1, 1),
+            SimItem::invalid_item_with_score_and_hash(1, 1),
+            SimItem::invalid_item_with_score_and_hash(1, 1),
+            SimItem::invalid_item_with_score_and_hash(1, 1),
         ];
 
         let cache = SimCache::with_capacity(2);
-        cache.add_items(items, 0);
+        cache.add_items(items.clone(), 0);
 
         dbg!(&*cache.inner.read().unwrap());
 
-        // All items have the same identifier (hash=0), so only the first one is stored
-        assert_eq!(cache.len(), 1);
-        assert_eq!(cache.get(1), Some(SimItem::invalid_item_with_score(1, 1)));
-        assert_eq!(cache.get(0), None);
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(0), Some(items[2].clone()));
+        assert_eq!(cache.get(1), Some(items[0].clone()));
         assert_eq!(cache.get(2), None);
     }
 }
