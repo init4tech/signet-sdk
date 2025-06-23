@@ -159,9 +159,7 @@ impl SimCache {
                 let retain = !should_remove;
 
                 if should_remove {
-                    seen.remove(
-                        identifier.get().expect("Identifier should be already be set on insertion"),
-                    );
+                    seen.remove(identifier);
                 }
                 retain
             } else {
@@ -180,15 +178,17 @@ impl SimCache {
 
 #[cfg(test)]
 mod test {
+    use alloy::primitives::b256;
+
     use super::*;
     use crate::SimItem;
 
     #[test]
     fn test_cache() {
         let items = vec![
-            SimItem::invalid_item_with_score_and_hash(100, 1),
-            SimItem::invalid_item_with_score_and_hash(100, 2),
-            SimItem::invalid_item_with_score_and_hash(100, 3),
+            SimItem::invalid_item_with_score(100, 1),
+            SimItem::invalid_item_with_score(100, 2),
+            SimItem::invalid_item_with_score(100, 3),
         ];
 
         let cache = SimCache::with_capacity(2);
@@ -203,9 +203,21 @@ mod test {
     #[test]
     fn overlap_at_zero() {
         let items = vec![
-            SimItem::invalid_item_with_score_and_hash(1, 1),
-            SimItem::invalid_item_with_score_and_hash(1, 1),
-            SimItem::invalid_item_with_score_and_hash(1, 1),
+            SimItem::invalid_item_with_score_and_hash(
+                1,
+                1,
+                b256!("0xb36a5a0066980e8477d5d5cebf023728d3cfb837c719dc7f3aadb73d1a39f11f"),
+            ),
+            SimItem::invalid_item_with_score_and_hash(
+                1,
+                1,
+                b256!("0x04d3629f341cdcc5f72969af3c7638e106b4b5620594e6831d86f03ea048e68a"),
+            ),
+            SimItem::invalid_item_with_score_and_hash(
+                1,
+                1,
+                b256!("0x0f0b6a85c1ef6811bf86e92a3efc09f61feb1deca9da671119aaca040021598a"),
+            ),
         ];
 
         let cache = SimCache::with_capacity(2);

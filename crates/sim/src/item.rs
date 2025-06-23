@@ -1,11 +1,12 @@
-use std::sync::OnceLock;
-
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
     primitives::TxHash,
 };
 use signet_bundle::SignetEthBundle;
+
+#[cfg(test)]
+use alloy::primitives::B256;
 
 /// An item that can be simulated.
 #[derive(Debug, Clone, PartialEq)]
@@ -15,7 +16,7 @@ pub enum SimItem {
         /// The bundle to be simulated.
         bundle: SignetEthBundle,
         /// The identifier for the bundle.
-        identifier: OnceLock<SimIdentifier>,
+        identifier: SimIdentifier,
     },
 
     /// A transaction to be simulated.
@@ -23,19 +24,21 @@ pub enum SimItem {
         /// The transaction to be simulated.
         tx: TxEnvelope,
         /// The identifier for the transaction.
-        identifier: OnceLock<SimIdentifier>,
+        identifier: SimIdentifier,
     },
 }
 
 impl From<SignetEthBundle> for SimItem {
     fn from(bundle: SignetEthBundle) -> Self {
-        Self::Bundle { bundle, identifier: OnceLock::new() }
+        let id = bundle.replacement_uuid().unwrap_or_default().to_owned();
+        Self::Bundle { bundle, identifier: SimIdentifier::Bundle(id) }
     }
 }
 
 impl From<TxEnvelope> for SimItem {
     fn from(tx: TxEnvelope) -> Self {
-        Self::Tx { tx, identifier: OnceLock::new() }
+        let id = *tx.hash();
+        Self::Tx { tx, identifier: SimIdentifier::Tx(id) }
     }
 }
 
@@ -94,17 +97,11 @@ impl SimItem {
     /// `max_priority_fee_per_gas`.
     #[doc(hidden)]
     pub fn invalid_item_with_score(gas_limit: u64, mpfpg: u128) -> Self {
-        let tx = alloy::consensus::TxEip1559 {
-            gas_limit,
-            max_priority_fee_per_gas: mpfpg,
-            max_fee_per_gas: alloy::consensus::constants::GWEI_TO_WEI as u128,
-            ..Default::default()
-        };
+        let tx = Self::build_alloy_tx(gas_limit, mpfpg);
 
-        let tx = TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
+        let tx = TxEnvelope::Eip1559(alloy::consensus::Signed::new_unhashed(
             tx,
             alloy::signers::Signature::test_signature(),
-            Default::default(),
         ));
         tx.into()
     }
@@ -115,33 +112,33 @@ impl SimItem {
     /// to avoid getting deduped by the seen items cache.
     #[doc(hidden)]
     #[cfg(test)]
-    pub fn invalid_item_with_score_and_hash(gas_limit: u64, mpfpg: u128) -> Self {
-        use alloy::primitives::B256;
-
-        let tx = alloy::consensus::TxEip1559 {
-            gas_limit,
-            max_priority_fee_per_gas: mpfpg,
-            max_fee_per_gas: alloy::consensus::constants::GWEI_TO_WEI as u128,
-            ..Default::default()
-        };
+    pub fn invalid_item_with_score_and_hash(gas_limit: u64, mpfpg: u128, hash: B256) -> Self {
+        let tx = Self::build_alloy_tx(gas_limit, mpfpg);
 
         let tx = TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
             tx,
             alloy::signers::Signature::test_signature(),
-            B256::random(),
+            hash,
         ));
-
         tx.into()
+    }
+
+    #[doc(hidden)]
+    fn build_alloy_tx(gas_limit: u64, mpfpg: u128) -> alloy::consensus::TxEip1559 {
+        alloy::consensus::TxEip1559 {
+            gas_limit,
+            max_priority_fee_per_gas: mpfpg,
+            max_fee_per_gas: alloy::consensus::constants::GWEI_TO_WEI as u128,
+            ..Default::default()
+        }
     }
 
     /// Returns a unique identifier for this item, which can be used to
     /// distinguish it from other items.
-    pub fn identifier(&self) -> &SimIdentifier {
+    pub const fn identifier(&self) -> &SimIdentifier {
         match self {
-            Self::Bundle { bundle, identifier } => identifier.get_or_init(|| {
-                SimIdentifier::bundle(bundle.bundle.replacement_uuid.clone().unwrap_or_default())
-            }),
-            Self::Tx { tx, identifier } => identifier.get_or_init(|| SimIdentifier::tx(*tx.hash())),
+            Self::Bundle { identifier, .. } => identifier,
+            Self::Tx { identifier, .. } => identifier,
         }
     }
 }
