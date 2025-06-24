@@ -1,4 +1,7 @@
-use std::borrow::{Borrow, Cow};
+use std::{
+    borrow::{Borrow, Cow},
+    hash::Hash,
+};
 
 use alloy::{
     consensus::{Transaction, TxEnvelope},
@@ -95,12 +98,32 @@ impl SimItem {
 }
 
 /// A simulation cache item identifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum SimIdentifier<'a> {
     /// A bundle identifier.
     Bundle(Cow<'a, str>),
     /// A transaction identifier.
     Tx(TxHash),
+}
+
+impl PartialEq for SimIdentifier<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes().eq(other.as_bytes())
+    }
+}
+
+impl Eq for SimIdentifier<'_> {}
+
+impl Hash for SimIdentifier<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state);
+    }
+}
+
+impl Borrow<[u8]> for SimIdentifier<'_> {
+    fn borrow(&self) -> &[u8] {
+        self.as_bytes()
+    }
 }
 
 impl From<TxHash> for SimIdentifier<'_> {
@@ -136,11 +159,5 @@ impl SimIdentifier<'_> {
             Self::Bundle(id) => id.as_bytes(),
             Self::Tx(id) => id.as_ref(),
         }
-    }
-}
-
-impl Borrow<[u8]> for SimIdentifier<'_> {
-    fn borrow(&self) -> &[u8] {
-        self.as_bytes()
     }
 }
