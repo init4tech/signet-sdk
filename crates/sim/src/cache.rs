@@ -1,4 +1,4 @@
-use crate::{item::SimIdentifier, SimItem};
+use crate::{item::SimIdentifier, CacheError, SimItem};
 use alloy::consensus::TxEnvelope;
 use core::fmt;
 use parking_lot::RwLock;
@@ -7,32 +7,6 @@ use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
 };
-
-/// Possible errors that can occur when using the cache.
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-pub enum CacheError {
-    /// The bundle does not have a replacement UUID, which is required for caching.
-    #[error("bundle has no replacement UUID")]
-    BundleWithoutReplacementUuid,
-}
-
-/// Internal cache data, meant to be protected by a lock.
-struct CacheInner {
-    items: BTreeMap<u128, SimItem>,
-    seen: HashSet<SimIdentifier>,
-}
-
-impl fmt::Debug for CacheInner {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CacheInner").finish()
-    }
-}
-
-impl CacheInner {
-    fn new() -> Self {
-        Self { items: BTreeMap::new(), seen: HashSet::new() }
-    }
-}
 
 /// A cache for the simulator.
 ///
@@ -218,6 +192,24 @@ impl SimCache {
         let mut inner = self.inner.write();
         inner.items.clear();
         inner.seen.clear();
+    }
+}
+
+/// Internal cache data, meant to be protected by a lock.
+struct CacheInner {
+    items: BTreeMap<u128, SimItem>,
+    seen: HashSet<SimIdentifier>,
+}
+
+impl fmt::Debug for CacheInner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CacheInner").finish()
+    }
+}
+
+impl CacheInner {
+    fn new() -> Self {
+        Self { items: BTreeMap::new(), seen: HashSet::new() }
     }
 }
 
