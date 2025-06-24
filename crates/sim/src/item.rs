@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 
 use alloy::{
     consensus::{Transaction, TxEnvelope},
@@ -82,6 +82,16 @@ impl SimItem {
             Self::Tx(tx) => SimIdentifier::Tx(*tx.hash()),
         }
     }
+
+    /// Returns an unique, owned identifier for this item.
+    pub fn identifier_owned(&self) -> SimIdentifier<'static> {
+        match self {
+            Self::Bundle(bundle) => {
+                SimIdentifier::Bundle(Cow::Owned(bundle.replacement_uuid().unwrap().to_string()))
+            }
+            Self::Tx(tx) => SimIdentifier::Tx(*tx.hash()),
+        }
+    }
 }
 
 /// A simulation cache item identifier.
@@ -120,11 +130,17 @@ impl SimIdentifier<'_> {
         matches!(self, Self::Tx(_))
     }
 
-    /// Convert this identifier into a static one.
-    pub fn into_static(self) -> SimIdentifier<'static> {
+    /// Get the identifier as a byte slice.
+    pub fn as_bytes(&self) -> &[u8] {
         match self {
-            Self::Bundle(id) => SimIdentifier::Bundle(Cow::Owned(id.into_owned())),
-            Self::Tx(id) => SimIdentifier::Tx(id),
+            Self::Bundle(id) => id.as_bytes(),
+            Self::Tx(id) => id.as_ref(),
         }
+    }
+}
+
+impl Borrow<[u8]> for SimIdentifier<'_> {
+    fn borrow(&self) -> &[u8] {
+        self.as_bytes()
     }
 }

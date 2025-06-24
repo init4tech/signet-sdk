@@ -64,7 +64,7 @@ impl SimCache {
     pub fn remove(&self, key: u128) -> Option<SimItem> {
         let mut inner = self.inner.write();
         if let Some(item) = inner.items.remove(&key) {
-            inner.seen.remove(&item.identifier().into_static());
+            inner.seen.remove(item.identifier().as_bytes());
             Some(item)
         } else {
             None
@@ -73,7 +73,7 @@ impl SimCache {
 
     fn add_inner(inner: &mut CacheInner, mut score: u128, item: SimItem, capacity: usize) {
         // Check if we've already seen this item - if so, don't add it
-        if !inner.seen.insert(item.identifier().into_static()) {
+        if !inner.seen.insert(item.identifier_owned()) {
             return;
         }
 
@@ -85,7 +85,7 @@ impl SimCache {
         if inner.items.len() >= capacity {
             // If we are at capacity, we need to remove the lowest score
             if let Some((_, item)) = inner.items.pop_first() {
-                inner.seen.remove(&item.identifier().into_static());
+                inner.seen.remove(&item.identifier_owned());
             }
         }
 
@@ -162,7 +162,7 @@ impl SimCache {
         while inner.items.len() > self.capacity {
             if let Some((_, item)) = inner.items.pop_first() {
                 // Drop the identifier from the seen cache as well.
-                inner.seen.remove(&item.identifier().into_static());
+                inner.seen.remove(item.identifier().as_bytes());
             }
         }
 
@@ -178,7 +178,7 @@ impl SimCache {
                 let retain = !should_remove;
 
                 if should_remove {
-                    seen.remove(&item.identifier().into_static());
+                    seen.remove(item.identifier().as_bytes());
                 }
                 retain
             } else {
