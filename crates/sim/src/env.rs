@@ -358,8 +358,8 @@ where
         item: &SimItem,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
         match item {
-            SimItem::Bundle { bundle, .. } => self.simulate_bundle(identifier, bundle),
-            SimItem::Tx { tx, .. } => self.simulate_tx(identifier, tx),
+            SimItem::Bundle(bundle) => self.simulate_bundle(identifier, bundle),
+            SimItem::Tx(tx) => self.simulate_tx(identifier, tx),
         }
     }
 

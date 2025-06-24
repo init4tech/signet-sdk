@@ -64,7 +64,7 @@ impl SimCache {
     pub fn remove(&self, key: u128) -> Option<SimItem> {
         let mut inner = self.inner.write();
         if let Some(item) = inner.items.remove(&key) {
-            inner.seen.remove(item.identifier());
+            inner.seen.remove(&item.identifier().into_static());
             Some(item)
         } else {
             None
@@ -73,7 +73,7 @@ impl SimCache {
 
     fn add_inner(inner: &mut CacheInner, mut score: u128, item: SimItem, capacity: usize) {
         // Check if we've already seen this item - if so, don't add it
-        if !inner.seen.insert(item.identifier().clone()) {
+        if !inner.seen.insert(item.identifier().into_static()) {
             return;
         }
 
@@ -85,11 +85,11 @@ impl SimCache {
         if inner.items.len() >= capacity {
             // If we are at capacity, we need to remove the lowest score
             if let Some((_, item)) = inner.items.pop_first() {
-                inner.seen.remove(item.identifier());
+                inner.seen.remove(&item.identifier().into_static());
             }
         }
 
-        inner.items.insert(score, item);
+        inner.items.insert(score, item.clone());
     }
 
     /// Add a bundle to the cache.
@@ -99,7 +99,7 @@ impl SimCache {
             return Err(CacheError::BundleWithoutReplacementUuid);
         }
 
-        let item = SimItem::from(bundle);
+        let item = SimItem::try_from(bundle)?;
         let score = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
@@ -122,7 +122,7 @@ impl SimCache {
                 // If the bundle does not have a replacement UUID, we cannot add it to the cache.
                 return Err(CacheError::BundleWithoutReplacementUuid);
             }
-            let item = SimItem::from(item);
+            let item = SimItem::try_from(item)?;
             let score = item.calculate_total_fee(basefee);
             Self::add_inner(&mut inner, score, item, self.capacity);
         }
@@ -162,7 +162,7 @@ impl SimCache {
         while inner.items.len() > self.capacity {
             if let Some((_, item)) = inner.items.pop_first() {
                 // Drop the identifier from the seen cache as well.
-                inner.seen.remove(item.identifier());
+                inner.seen.remove(&item.identifier().into_static());
             }
         }
 
@@ -170,7 +170,7 @@ impl SimCache {
 
         items.retain(|_, item| {
             // Retain only items that are not bundles or are valid in the current block.
-            if let SimItem::Bundle { bundle, identifier } = item {
+            if let SimItem::Bundle(bundle) = item {
                 let should_remove = bundle.bundle.block_number == block_number
                     && bundle.min_timestamp().is_some_and(|ts| ts <= block_timestamp)
                     && bundle.max_timestamp().is_some_and(|ts| ts >= block_timestamp);
@@ -178,7 +178,7 @@ impl SimCache {
                 let retain = !should_remove;
 
                 if should_remove {
-                    seen.remove(identifier);
+                    seen.remove(&item.identifier().into_static());
                 }
                 retain
             } else {
@@ -198,7 +198,7 @@ impl SimCache {
 /// Internal cache data, meant to be protected by a lock.
 struct CacheInner {
     items: BTreeMap<u128, SimItem>,
-    seen: HashSet<SimIdentifier>,
+    seen: HashSet<SimIdentifier<'static>>,
 }
 
 impl fmt::Debug for CacheInner {
