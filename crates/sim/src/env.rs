@@ -302,6 +302,7 @@ where
                 let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
 
                 trace!(
+                    ?identifier,
                     gas_used = gas_used,
                     score = %score,
                     reverted = !success,
@@ -343,6 +344,7 @@ where
         let cache = trevm.into_db().into_cache();
 
         trace!(
+            ?identifier,
             gas_used = gas_used,
             score = %score,
             "Bundle simulation successful"
