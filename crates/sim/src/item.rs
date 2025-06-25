@@ -1,14 +1,13 @@
-use std::{
-    borrow::{Borrow, Cow},
-    hash::Hash,
-};
-
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
     primitives::TxHash,
 };
 use signet_bundle::SignetEthBundle;
+use std::{
+    borrow::{Borrow, Cow},
+    hash::Hash,
+};
 
 /// An item that can be simulated.
 #[derive(Debug, Clone, PartialEq)]
