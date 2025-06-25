@@ -109,6 +109,8 @@ impl SimCache {
     }
 
     /// Add an iterator of bundles to the cache. This locks the cache only once
+    ///
+    /// Bundles added should have a valid replacement UUID. Bundles without a replacement UUID will be skipped.
     pub fn add_bundles<I, Item>(&self, item: I, basefee: u64) -> Result<(), CacheError>
     where
         I: IntoIterator<Item = Item>,
@@ -118,11 +120,10 @@ impl SimCache {
 
         for item in item.into_iter() {
             let item = item.into();
-            if item.replacement_uuid().is_none() {
-                // If the bundle does not have a replacement UUID, we cannot add it to the cache.
-                return Err(CacheError::BundleWithoutReplacementUuid);
-            }
-            let item = SimItem::try_from(item)?;
+            let Ok(item) = SimItem::try_from(item) else {
+                // Skip invalid bundles
+                continue;
+            };
             let score = item.calculate_total_fee(basefee);
             Self::add_inner(&mut inner, score, item, self.capacity);
         }
