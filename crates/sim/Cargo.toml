@@ -20,6 +20,10 @@ alloy.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 trevm.workspace = true
+thiserror.workspace = true
+
+parking_lot.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
+alloy = { workspace = true, features = ["getrandom"] }

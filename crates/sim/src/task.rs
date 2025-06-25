@@ -64,7 +64,7 @@ where
         let gas_allowed = self.max_gas - self.block.gas_used();
 
         if let Some(simulated) = self.env.sim_round(gas_allowed).await {
-            tracing::debug!(score = %simulated.score, gas_used = simulated.gas_used, "Adding item to block");
+            tracing::debug!(score = %simulated.score, gas_used = simulated.gas_used, identifier = %simulated.item.identifier(), "Adding item to block");
             self.block.ingest(simulated);
         }
     }

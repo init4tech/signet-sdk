@@ -44,7 +44,7 @@ pub async fn test_simulator() {
     // Set up 10 simple sends with escalating priority fee
     let sim_cache = SimCache::new();
     for (i, sender) in TEST_SIGNERS.iter().enumerate() {
-        sim_cache.add_item(
+        sim_cache.add_tx(
             signed_simple_send(
                 sender,
                 TEST_USERS[i],

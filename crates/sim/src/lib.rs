@@ -23,8 +23,11 @@ pub use cache::SimCache;
 mod env;
 pub use env::{SharedSimEnv, SimEnv};
 
+mod error;
+pub use error::CacheError;
+
 mod item;
-pub use item::SimItem;
+pub use item::{SimIdentifier, SimItem};
 
 mod outcome;
 pub use outcome::SimOutcomeWithCache;

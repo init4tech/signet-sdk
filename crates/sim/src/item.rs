@@ -1,22 +1,32 @@
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::Decodable2718,
+    primitives::TxHash,
 };
 use signet_bundle::SignetEthBundle;
+use std::{
+    borrow::{Borrow, Cow},
+    hash::Hash,
+};
 
 /// An item that can be simulated.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimItem {
     /// A bundle to be simulated.
     Bundle(SignetEthBundle),
-
     /// A transaction to be simulated.
     Tx(TxEnvelope),
 }
 
-impl From<SignetEthBundle> for SimItem {
-    fn from(bundle: SignetEthBundle) -> Self {
-        Self::Bundle(bundle)
+impl TryFrom<SignetEthBundle> for SimItem {
+    type Error = crate::CacheError;
+
+    fn try_from(bundle: SignetEthBundle) -> Result<Self, Self::Error> {
+        if bundle.replacement_uuid().is_some() {
+            Ok(Self::Bundle(bundle))
+        } else {
+            Err(crate::CacheError::BundleWithoutReplacementUuid)
+        }
     }
 }
 
@@ -64,35 +74,98 @@ impl SimItem {
 
 // Testing functions
 impl SimItem {
-    /// Create an invalid test item. This will be a [`TxEnvelope`] containing
-    /// an EIP-1559 transaction with an invalid signature and hash.
-    #[doc(hidden)]
-    pub fn invalid_item() -> Self {
-        TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
-            alloy::consensus::TxEip1559::default(),
-            alloy::signers::Signature::test_signature(),
-            Default::default(),
-        ))
-        .into()
+    /// Returns a unique identifier for this item, which can be used to
+    /// distinguish it from other items.
+    pub fn identifier(&self) -> SimIdentifier<'_> {
+        match self {
+            Self::Bundle(bundle) => {
+                SimIdentifier::Bundle(Cow::Borrowed(bundle.replacement_uuid().unwrap()))
+            }
+            Self::Tx(tx) => SimIdentifier::Tx(*tx.hash()),
+        }
     }
 
-    /// Create an invalid test item with a given gas limit and max priority fee
-    /// per gas. As [`Self::invalid_test_item`] but with a custom gas limit and
-    /// `max_priority_fee_per_gas`.
-    #[doc(hidden)]
-    pub fn invalid_item_with_score(gas_limit: u64, mpfpg: u128) -> Self {
-        let tx = alloy::consensus::TxEip1559 {
-            gas_limit,
-            max_priority_fee_per_gas: mpfpg,
-            max_fee_per_gas: alloy::consensus::constants::GWEI_TO_WEI as u128,
-            ..Default::default()
-        };
+    /// Returns an unique, owned identifier for this item.
+    pub fn identifier_owned(&self) -> SimIdentifier<'static> {
+        match self {
+            Self::Bundle(bundle) => {
+                SimIdentifier::Bundle(Cow::Owned(bundle.replacement_uuid().unwrap().to_string()))
+            }
+            Self::Tx(tx) => SimIdentifier::Tx(*tx.hash()),
+        }
+    }
+}
 
-        let tx = TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
-            tx,
-            alloy::signers::Signature::test_signature(),
-            Default::default(),
-        ));
-        tx.into()
+/// A simulation cache item identifier.
+#[derive(Debug, Clone)]
+pub enum SimIdentifier<'a> {
+    /// A bundle identifier.
+    Bundle(Cow<'a, str>),
+    /// A transaction identifier.
+    Tx(TxHash),
+}
+
+impl core::fmt::Display for SimIdentifier<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Bundle(id) => write!(f, "{}", id),
+            Self::Tx(id) => write!(f, "{}", id),
+        }
+    }
+}
+
+impl PartialEq for SimIdentifier<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes().eq(other.as_bytes())
+    }
+}
+
+impl Eq for SimIdentifier<'_> {}
+
+impl Hash for SimIdentifier<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state);
+    }
+}
+
+impl Borrow<[u8]> for SimIdentifier<'_> {
+    fn borrow(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl From<TxHash> for SimIdentifier<'_> {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::Tx(tx_hash)
+    }
+}
+
+impl SimIdentifier<'_> {
+    /// Create a new [`SimIdentifier::Bundle`].
+    pub const fn bundle<'a>(id: Cow<'a, str>) -> SimIdentifier<'a> {
+        SimIdentifier::Bundle(id)
+    }
+
+    /// Create a new [`SimIdentifier::Tx`].
+    pub const fn tx(id: TxHash) -> Self {
+        Self::Tx(id)
+    }
+
+    /// Check if this identifier is a bundle.
+    pub const fn is_bundle(&self) -> bool {
+        matches!(self, Self::Bundle(_))
+    }
+
+    /// Check if this identifier is a transaction.
+    pub const fn is_tx(&self) -> bool {
+        matches!(self, Self::Tx(_))
+    }
+
+    /// Get the identifier as a byte slice.
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Bundle(id) => id.as_bytes(),
+            Self::Tx(id) => id.as_ref(),
+        }
     }
 }
