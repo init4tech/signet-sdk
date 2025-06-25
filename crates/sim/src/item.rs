@@ -105,6 +105,15 @@ pub enum SimIdentifier<'a> {
     Tx(TxHash),
 }
 
+impl core::fmt::Display for SimIdentifier<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Bundle(id) => write!(f, "{}", id),
+            Self::Tx(id) => write!(f, "{}", id),
+        }
+    }
+}
+
 impl PartialEq for SimIdentifier<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.as_bytes().eq(other.as_bytes())
