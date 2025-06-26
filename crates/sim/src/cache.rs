@@ -173,8 +173,12 @@ impl SimCache {
             // Retain only items that are not bundles or are valid in the current block.
             if let SimItem::Bundle(bundle) = item {
                 let should_keep = bundle.bundle.block_number == block_number
-                    && bundle.min_timestamp().is_some_and(|min_timestamp| block_timestamp >= min_timestamp)
-                    && bundle.max_timestamp().is_some_and(|max_timestamp| block_timestamp <= max_timestamp);
+                    && bundle
+                        .min_timestamp()
+                        .is_some_and(|min_timestamp| block_timestamp >= min_timestamp)
+                    && bundle
+                        .max_timestamp()
+                        .is_some_and(|max_timestamp| block_timestamp <= max_timestamp);
 
                 if !should_keep {
                     seen.remove(item.identifier().as_bytes());
