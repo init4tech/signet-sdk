@@ -85,13 +85,13 @@ where
     /// Run a simulation round, returning the best item.
     #[instrument(skip(self))]
     pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
-        let (best_tx_channel, mut best_tx_watcher) = watch::channel(None);
+        let (best_tx_sender, mut best_tx_receiver) = watch::channel(None);
 
         let this = self.inner.clone();
 
         // Spawn a blocking task to run the simulations.
         let sim_task =
-            tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx_channel));
+            tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx_sender));
 
         // Either simulation is done, or we time out
         select! {
@@ -104,7 +104,7 @@ where
         }
 
         // Check what the current best outcome is.
-        let best = best_tx_watcher.borrow_and_update();
+        let best = best_tx_receiver.borrow_and_update();
         trace!(score = %best.as_ref().map(|candidate| candidate.score).unwrap_or_default(), "Read outcome from channel");
         let outcome = best.as_ref()?;
 
@@ -371,7 +371,7 @@ where
     fn sim_round(
         self: Arc<Self>,
         max_gas: u64,
-        best_tx_channel: watch::Sender<Option<SimOutcomeWithCache>>,
+        best_tx_sender: watch::Sender<Option<SimOutcomeWithCache>>,
     ) {
         // Pull the `n` best items from the cache.
         let active_sim = self.sim_items.read_best(self.concurrency_limit);
@@ -422,7 +422,7 @@ where
             // Wait for each thread to finish. Find the best outcome.
             while let Some(candidate) = candidates_rx.blocking_recv() {
                 // Update the best score and send it to the channel.
-                let _ = best_tx_channel.send_if_modified(|current| {
+                let _ = best_tx_sender.send_if_modified(|current| {
                     let current_best_score = current.as_ref().map(|c| c.score).unwrap_or_default();
                     let current_fee_score = current.as_ref().map(|c| c.identifier);
 
