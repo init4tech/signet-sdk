@@ -346,6 +346,7 @@ where
 
         trace!(
             ?cache_rank,
+            uuid = %bundle.replacement_uuid().unwrap_or_default(),
             gas_used = gas_used,
             score = %score,
             "Bundle simulation successful"
