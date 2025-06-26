@@ -42,7 +42,14 @@ impl SimCache {
 
     /// Get an iterator over the best items in the cache.
     pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
-        self.inner.read().items.iter().rev().take(n).map(|(k, item)| (*k, item.clone())).collect()
+        self.inner
+            .read()
+            .items
+            .iter()
+            .rev()
+            .take(n)
+            .map(|(fee_score, item)| (*fee_score, item.clone()))
+            .collect()
     }
 
     /// Get the number of items in the cache.
@@ -56,14 +63,14 @@ impl SimCache {
     }
 
     /// Get an item by key.
-    pub fn get(&self, key: u128) -> Option<SimItem> {
-        self.inner.read().items.get(&key).cloned()
+    pub fn get(&self, fee_score: u128) -> Option<SimItem> {
+        self.inner.read().items.get(&fee_score).cloned()
     }
 
     /// Remove an item by key.
-    pub fn remove(&self, key: u128) -> Option<SimItem> {
+    pub fn remove(&self, fee_score: u128) -> Option<SimItem> {
         let mut inner = self.inner.write();
-        if let Some(item) = inner.items.remove(&key) {
+        if let Some(item) = inner.items.remove(&fee_score) {
             inner.seen.remove(item.identifier().as_bytes());
             Some(item)
         } else {
@@ -71,15 +78,15 @@ impl SimCache {
         }
     }
 
-    fn add_inner(inner: &mut CacheInner, mut score: u128, item: SimItem, capacity: usize) {
+    fn add_inner(inner: &mut CacheInner, mut fee_score: u128, item: SimItem, capacity: usize) {
         // Check if we've already seen this item - if so, don't add it
         if !inner.seen.insert(item.identifier_owned()) {
             return;
         }
 
-        // If it has the same score, we decrement (prioritizing earlier items)
-        while inner.items.contains_key(&score) && score != 0 {
-            score = score.saturating_sub(1);
+        // If it has the same fee_score, we decrement (prioritizing earlier items)
+        while inner.items.contains_key(&fee_score) && fee_score != 0 {
+            fee_score = fee_score.saturating_sub(1);
         }
 
         if inner.items.len() >= capacity {
@@ -89,7 +96,7 @@ impl SimCache {
             }
         }
 
-        inner.items.insert(score, item.clone());
+        inner.items.insert(fee_score, item.clone());
     }
 
     /// Add a bundle to the cache.
@@ -100,10 +107,10 @@ impl SimCache {
         }
 
         let item = SimItem::try_from(bundle)?;
-        let score = item.calculate_total_fee(basefee);
+        let fee_score = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
-        Self::add_inner(&mut inner, score, item, self.capacity);
+        Self::add_inner(&mut inner, fee_score, item, self.capacity);
 
         Ok(())
     }
@@ -124,8 +131,8 @@ impl SimCache {
                 // Skip invalid bundles
                 continue;
             };
-            let score = item.calculate_total_fee(basefee);
-            Self::add_inner(&mut inner, score, item, self.capacity);
+            let fee_score = item.calculate_total_fee(basefee);
+            Self::add_inner(&mut inner, fee_score, item, self.capacity);
         }
 
         Ok(())
@@ -134,10 +141,10 @@ impl SimCache {
     /// Add a transaction to the cache.
     pub fn add_tx(&self, tx: TxEnvelope, basefee: u64) {
         let item = SimItem::from(tx);
-        let score = item.calculate_total_fee(basefee);
+        let fee_score = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
-        Self::add_inner(&mut inner, score, item, self.capacity);
+        Self::add_inner(&mut inner, fee_score, item, self.capacity);
     }
 
     /// Add an iterator of transactions to the cache. This locks the cache only once
@@ -149,8 +156,8 @@ impl SimCache {
 
         for item in item.into_iter() {
             let item = SimItem::from(item);
-            let score = item.calculate_total_fee(basefee);
-            Self::add_inner(&mut inner, score, item, self.capacity);
+            let fee_score = item.calculate_total_fee(basefee);
+            Self::add_inner(&mut inner, fee_score, item, self.capacity);
         }
     }
 
@@ -196,7 +203,9 @@ impl SimCache {
 
 /// Internal cache data, meant to be protected by a lock.
 struct CacheInner {
+    /// Key is the fee_score, the calculated gas fees from the transaction. Value is SimItem itself.
     items: BTreeMap<u128, SimItem>,
+    /// Key is the unique identifier for the SimItem. UUID for bundles, tx hash for transactions.
     seen: HashSet<SimIdentifier<'static>>,
 }
 

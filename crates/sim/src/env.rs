@@ -85,12 +85,13 @@ where
     /// Run a simulation round, returning the best item.
     #[instrument(skip(self))]
     pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
-        let (best_tx, mut best_watcher) = watch::channel(None);
+        let (best_tx_channel, mut best_tx_watcher) = watch::channel(None);
 
         let this = self.inner.clone();
 
         // Spawn a blocking task to run the simulations.
-        let sim_task = tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx));
+        let sim_task =
+            tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx_channel));
 
         // Either simulation is done, or we time out
         select! {
@@ -103,7 +104,7 @@ where
         }
 
         // Check what the current best outcome is.
-        let best = best_watcher.borrow_and_update();
+        let best = best_tx_watcher.borrow_and_update();
         trace!(score = %best.as_ref().map(|candidate| candidate.score).unwrap_or_default(), "Read outcome from channel");
         let outcome = best.as_ref()?;
 
@@ -264,10 +265,10 @@ where
     ///
     /// This function runs the simulation in a separate thread and waits for
     /// the result or the deadline to expire.
-    #[instrument(skip_all, fields(identifier, tx_hash = %transaction.hash()))]
+    #[instrument(skip_all, fields(fee_score, tx_hash = %transaction.hash()))]
     fn simulate_tx(
         &self,
-        identifier: u128,
+        fee_score: u128,
         transaction: &TxEnvelope,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
         let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
@@ -302,7 +303,8 @@ where
                 let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
 
                 trace!(
-                    ?identifier,
+                    ?fee_score,
+                    tx_hash = %transaction.hash(),
                     gas_used = gas_used,
                     score = %score,
                     reverted = !success,
@@ -313,17 +315,17 @@ where
                 );
 
                 // Create the outcome
-                Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
+                Ok(SimOutcomeWithCache { identifier: fee_score, score, cache, gas_used })
             }
             Err(e) => Err(SignetEthBundleError::from(e.into_error())),
         }
     }
 
     /// Simulates a bundle on the current environment.
-    #[instrument(skip_all, fields(identifier, uuid = bundle.replacement_uuid()))]
+    #[instrument(skip_all, fields(fee_score, uuid = bundle.replacement_uuid()))]
     fn simulate_bundle(
         &self,
-        identifier: u128,
+        fee_score: u128,
         bundle: &SignetEthBundle,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>>
     where
@@ -344,24 +346,24 @@ where
         let cache = trevm.into_db().into_cache();
 
         trace!(
-            ?identifier,
+            ?fee_score,
             gas_used = gas_used,
             score = %score,
             "Bundle simulation successful"
         );
 
-        Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
+        Ok(SimOutcomeWithCache { identifier: fee_score, score, cache, gas_used })
     }
 
     /// Simulates a transaction or bundle in the context of a block.
     fn simulate(
         &self,
-        identifier: u128,
+        fee_score: u128,
         item: &SimItem,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
         match item {
-            SimItem::Bundle(bundle) => self.simulate_bundle(identifier, bundle),
-            SimItem::Tx(tx) => self.simulate_tx(identifier, tx),
+            SimItem::Bundle(bundle) => self.simulate_bundle(fee_score, bundle),
+            SimItem::Tx(tx) => self.simulate_tx(fee_score, tx),
         }
     }
 
@@ -369,7 +371,7 @@ where
     fn sim_round(
         self: Arc<Self>,
         max_gas: u64,
-        best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
+        best_tx_channel: watch::Sender<Option<SimOutcomeWithCache>>,
     ) {
         // Pull the `n` best items from the cache.
         let active_sim = self.sim_items.read_best(self.concurrency_limit);
@@ -386,16 +388,16 @@ where
 
         std::thread::scope(move |scope| {
             // Spawn a thread per bundle to simulate.
-            for (identifier, item) in active_sim.into_iter() {
+            for (fee_score, item) in active_sim.into_iter() {
                 let c = candidates.clone();
 
                 scope.spawn(move || {
-                    let _ig = trace_span!(parent: outer_ref, "sim_task", identifier = %identifier)
-                        .entered();
+                    let identifier = item.identifier();
+                    let _ig = trace_span!(parent: outer_ref, "sim_task", %identifier).entered();
 
                     // If simulation is succesful, send the outcome via the
                     // channel.
-                    match this_ref.simulate(identifier, &item) {
+                    match this_ref.simulate(fee_score, &item) {
                         Ok(candidate) => {
                             if candidate.gas_used <= max_gas {
                                 // shortcut return on success
@@ -410,7 +412,7 @@ where
                     };
                     // fall through applies to all errors, occurs if
                     // the simulation fails or the gas limit is exceeded.
-                    this_ref.sim_items.remove(identifier);
+                    this_ref.sim_items.remove(fee_score);
                 });
             }
             // Drop the TX so that the channel is closed when all threads
@@ -420,17 +422,17 @@ where
             // Wait for each thread to finish. Find the best outcome.
             while let Some(candidate) = candidates_rx.blocking_recv() {
                 // Update the best score and send it to the channel.
-                let _ = best_tx.send_if_modified(|current| {
-                    let best_score = current.as_ref().map(|c| c.score).unwrap_or_default();
-                    let current_id = current.as_ref().map(|c| c.identifier);
+                let _ = best_tx_channel.send_if_modified(|current| {
+                    let current_best_score = current.as_ref().map(|c| c.score).unwrap_or_default();
+                    let current_fee_score = current.as_ref().map(|c| c.identifier);
 
-                    let changed = candidate.score > best_score;
+                    let changed = candidate.score > current_best_score;
                     if changed {
                         trace!(
-                            old_best = ?best_score,
-                            old_identifier = current_id,
+                            old_best = ?current_best_score,
+                            old_fee_score = current_fee_score,
                             new_best = %candidate.score,
-                            identifier = candidate.identifier,
+                            new_fee_score = candidate.identifier,
                             "Found better candidate"
                         );
                         *current = Some(candidate);
