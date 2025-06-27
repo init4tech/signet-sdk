@@ -108,7 +108,7 @@ where
         let outcome = best.as_ref()?;
 
         // Remove the item from the cache.
-        let item = self.sim_items.remove(outcome.identifier)?;
+        let item = self.sim_items.remove(outcome.cache_rank)?;
         // Accept the cache from the simulation.
         Arc::get_mut(&mut self.inner)
             .expect("sims dropped already")
@@ -264,10 +264,10 @@ where
     ///
     /// This function runs the simulation in a separate thread and waits for
     /// the result or the deadline to expire.
-    #[instrument(skip_all, fields(identifier, tx_hash = %transaction.hash()))]
+    #[instrument(skip_all, fields(cache_rank, tx_hash = %transaction.hash()))]
     fn simulate_tx(
         &self,
-        identifier: u128,
+        cache_rank: u128,
         transaction: &TxEnvelope,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
         let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
@@ -302,28 +302,29 @@ where
                 let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
 
                 trace!(
-                    ?identifier,
+                    ?cache_rank,
+                    tx_hash = %transaction.hash(),
                     gas_used = gas_used,
                     score = %score,
                     reverted = !success,
                     halted,
                     halt_reason = ?if halted { halt_reason } else { None },
                     revert_reason = if !success { reason } else { None },
-                    "Simulation complete"
+                    "Transaction simulation complete"
                 );
 
                 // Create the outcome
-                Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
+                Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used })
             }
             Err(e) => Err(SignetEthBundleError::from(e.into_error())),
         }
     }
 
     /// Simulates a bundle on the current environment.
-    #[instrument(skip_all, fields(identifier, uuid = bundle.replacement_uuid()))]
+    #[instrument(skip_all, fields(cache_rank, uuid = bundle.replacement_uuid()))]
     fn simulate_bundle(
         &self,
-        identifier: u128,
+        cache_rank: u128,
         bundle: &SignetEthBundle,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>>
     where
@@ -344,24 +345,25 @@ where
         let cache = trevm.into_db().into_cache();
 
         trace!(
-            ?identifier,
+            ?cache_rank,
+            uuid = %bundle.replacement_uuid().expect("Bundle must have a replacement UUID"),
             gas_used = gas_used,
             score = %score,
             "Bundle simulation successful"
         );
 
-        Ok(SimOutcomeWithCache { identifier, score, cache, gas_used })
+        Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used })
     }
 
     /// Simulates a transaction or bundle in the context of a block.
     fn simulate(
         &self,
-        identifier: u128,
+        cache_rank: u128,
         item: &SimItem,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
         match item {
-            SimItem::Bundle(bundle) => self.simulate_bundle(identifier, bundle),
-            SimItem::Tx(tx) => self.simulate_tx(identifier, tx),
+            SimItem::Bundle(bundle) => self.simulate_bundle(cache_rank, bundle),
+            SimItem::Tx(tx) => self.simulate_tx(cache_rank, tx),
         }
     }
 
@@ -386,23 +388,23 @@ where
 
         std::thread::scope(move |scope| {
             // Spawn a thread per bundle to simulate.
-            for (identifier, item) in active_sim.into_iter() {
+            for (cache_rank, item) in active_sim.into_iter() {
                 let c = candidates.clone();
 
                 scope.spawn(move || {
-                    let _ig = trace_span!(parent: outer_ref, "sim_task", identifier = %identifier)
-                        .entered();
+                    let identifier = item.identifier();
+                    let _ig = trace_span!(parent: outer_ref, "sim_task", %identifier).entered();
 
                     // If simulation is succesful, send the outcome via the
                     // channel.
-                    match this_ref.simulate(identifier, &item) {
+                    match this_ref.simulate(cache_rank, &item) {
                         Ok(candidate) => {
                             if candidate.gas_used <= max_gas {
                                 // shortcut return on success
                                 let _ = c.blocking_send(candidate);
                                 return;
                             }
-                            trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
+                            trace!(gas_used = candidate.gas_used, max_gas, %identifier, "Gas limit exceeded");
                         }
                         Err(e) => {
                             trace!(?identifier, %e, "Simulation failed");
@@ -410,7 +412,7 @@ where
                     };
                     // fall through applies to all errors, occurs if
                     // the simulation fails or the gas limit is exceeded.
-                    this_ref.sim_items.remove(identifier);
+                    this_ref.sim_items.remove(cache_rank);
                 });
             }
             // Drop the TX so that the channel is closed when all threads
@@ -422,15 +424,15 @@ where
                 // Update the best score and send it to the channel.
                 let _ = best_tx.send_if_modified(|current| {
                     let best_score = current.as_ref().map(|c| c.score).unwrap_or_default();
-                    let current_id = current.as_ref().map(|c| c.identifier);
+                    let current_cache_rank = current.as_ref().map(|c| c.cache_rank);
 
                     let changed = candidate.score > best_score;
                     if changed {
                         trace!(
                             old_best = ?best_score,
-                            old_identifier = current_id,
+                            old_cache_rank = current_cache_rank,
                             new_best = %candidate.score,
-                            identifier = candidate.identifier,
+                            new_cache_rank = candidate.cache_rank,
                             "Found better candidate"
                         );
                         *current = Some(candidate);

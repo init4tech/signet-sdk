@@ -7,8 +7,8 @@ use crate::SimItem;
 /// state changes.
 #[derive(Debug, Clone)]
 pub struct SimOutcomeWithCache {
-    /// The transaction or bundle that was simulated, as in the cache.
-    pub identifier: u128,
+    /// The key for the item in the [`SimCache`].
+    pub cache_rank: u128,
 
     /// The score of the simulation, a [`U256`] value that represents the
     /// increase in the beneficiary's balance.
