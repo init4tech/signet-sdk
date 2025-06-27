@@ -214,7 +214,7 @@ impl CacheInner {
 
 #[cfg(test)]
 mod test {
-    use alloy::primitives::b256;
+    use alloy::{eips::Encodable2718, primitives::b256};
 
     use super::*;
 
@@ -264,6 +264,43 @@ mod test {
         assert_eq!(cache.get(0), Some(items[2].clone().into()));
         assert_eq!(cache.get(1), Some(items[0].clone().into()));
         assert_eq!(cache.get(2), None);
+    }
+
+    #[test]
+    fn test_cache_with_bundles() {
+        let items = vec![
+            invalid_bundle_with_score(100, 1, "fbcbb9ce-2bef-4587-9c5f-61f606ca0a1a".to_string()),
+            invalid_bundle_with_score(100, 2, "39637ce4-5f33-4eb6-8893-8cc325a6cca3".to_string()),
+            invalid_bundle_with_score(100, 3, "1c008717-b187-4e53-9601-25435f5fe8b7".to_string()),
+        ];
+
+        let cache = SimCache::with_capacity(2);
+
+        cache.add_bundles(items.clone(), 0).unwrap();
+
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(300), Some(items[2].clone().try_into().unwrap()));
+        assert_eq!(cache.get(200), Some(items[1].clone().try_into().unwrap()));
+        assert_eq!(cache.get(100), None);
+    }
+
+    fn invalid_bundle_with_score(
+        gas_limit: u64,
+        mpfpg: u128,
+        replacement_uuid: String,
+    ) -> signet_bundle::SignetEthBundle {
+        let tx = invalid_tx_with_score(gas_limit, mpfpg);
+        signet_bundle::SignetEthBundle {
+            bundle: alloy::rpc::types::mev::EthSendBundle {
+                txs: vec![tx.encoded_2718().into()],
+                block_number: 1,
+                min_timestamp: Some(2),
+                max_timestamp: Some(3),
+                replacement_uuid: Some(replacement_uuid),
+                ..Default::default()
+            },
+            host_fills: None,
+        }
     }
 
     fn invalid_tx_with_score(gas_limit: u64, mpfpg: u128) -> alloy::consensus::TxEnvelope {
