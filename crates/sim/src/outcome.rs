@@ -7,7 +7,7 @@ use crate::SimItem;
 /// state changes.
 #[derive(Debug, Clone)]
 pub struct SimOutcomeWithCache {
-    /// The key for the item in the SimCache.
+    /// The key for the item in the [`SimCache`].
     pub cache_rank: u128,
 
     /// The score of the simulation, a [`U256`] value that represents the
