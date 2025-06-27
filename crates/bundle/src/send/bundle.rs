@@ -68,6 +68,18 @@ impl SignetEthBundle {
         self.bundle.replacement_uuid.as_deref()
     }
 
+    /// Checks if the bundle is valid at a given timestamp.
+    pub fn is_valid_at_timestamp(&self, timestamp: u64) -> bool {
+        let min_timestamp = self.bundle.min_timestamp.unwrap_or(0);
+        let max_timestamp = self.bundle.max_timestamp.unwrap_or(u64::MAX);
+        timestamp >= min_timestamp && timestamp <= max_timestamp
+    }
+
+    /// Checks if the bundle is valid at a given block number.
+    pub const fn is_valid_at_block_number(&self, block_number: u64) -> bool {
+        self.bundle.block_number == block_number
+    }
+
     /// Decode and validate the transactions in the bundle.
     pub fn decode_and_validate_txs<Db: Database>(
         &self,
