@@ -310,7 +310,7 @@ where
                     halted,
                     halt_reason = ?if halted { halt_reason } else { None },
                     revert_reason = if !success { reason } else { None },
-                    "Simulation complete"
+                    "Transaction simulation successful"
                 );
 
                 // Create the outcome
@@ -346,7 +346,7 @@ where
 
         trace!(
             ?cache_rank,
-            uuid = %bundle.replacement_uuid().unwrap_or_default(),
+            uuid = %bundle.replacement_uuid().expect("Bundle must have a replacement UUID"),
             gas_used = gas_used,
             score = %score,
             "Bundle simulation successful"
@@ -404,7 +404,7 @@ where
                                 let _ = c.blocking_send(candidate);
                                 return;
                             }
-                            trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
+                            trace!(gas_used = candidate.gas_used, max_gas, %identifier, "Gas limit exceeded");
                         }
                         Err(e) => {
                             trace!(?identifier, %e, "Simulation failed");
