@@ -118,7 +118,7 @@ impl SimCache {
     /// Add an iterator of bundles to the cache. This locks the cache only once
     ///
     /// Bundles added should have a valid replacement UUID. Bundles without a replacement UUID will be skipped.
-    pub fn add_bundles<I, Item>(&self, item: I, basefee: u64) -> Result<(), CacheError>
+    pub fn add_bundles<I, Item>(&self, item: I, basefee: u64)
     where
         I: IntoIterator<Item = Item>,
         Item: Into<SignetEthBundle>,
@@ -134,8 +134,6 @@ impl SimCache {
             let cache_rank = item.calculate_total_fee(basefee);
             Self::add_inner(&mut inner, cache_rank, item, self.capacity);
         }
-
-        Ok(())
     }
 
     /// Add a transaction to the cache.
@@ -285,7 +283,7 @@ mod test {
 
         let cache = SimCache::with_capacity(2);
 
-        cache.add_bundles(items.clone(), 0).unwrap();
+        cache.add_bundles(items.clone(), 0);
 
         assert_eq!(cache.len(), 2);
         assert_eq!(cache.get(300), Some(items[2].clone().try_into().unwrap()));
