@@ -203,9 +203,9 @@ impl SimCache {
 
 /// Internal cache data, meant to be protected by a lock.
 struct CacheInner {
-    /// Key is the cache_rank, unique ID within the cache && the item's order in the cache. Value is SimItem itself.
+    /// Key is the cache_rank, unique ID within the cache && the item's order in the cache. Value is [`SimItem`] itself.
     items: BTreeMap<u128, SimItem>,
-    /// Key is the unique identifier for the SimItem - the UUID for bundles, tx hash for transactions.
+    /// Key is the unique identifier for the [`SimItem`] - the UUID for bundles, tx hash for transactions.
     seen: HashSet<SimIdentifier<'static>>,
 }
 
