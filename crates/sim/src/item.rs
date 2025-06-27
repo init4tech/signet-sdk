@@ -108,8 +108,8 @@ pub enum SimIdentifier<'a> {
 impl core::fmt::Display for SimIdentifier<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Bundle(id) => write!(f, "{}", id),
-            Self::Tx(id) => write!(f, "{}", id),
+            Self::Bundle(id) => write!(f, "{id}"),
+            Self::Tx(id) => write!(f, "{id}"),
         }
     }
 }

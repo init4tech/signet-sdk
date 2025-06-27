@@ -21,6 +21,10 @@ pub use chains::pecorino;
 #[cfg(any(test, feature = "test-utils"))]
 pub use chains::test_utils;
 
+use alloy_consensus as _;
+use alloy_genesis as _;
+use alloy_trie as _;
+
 mod types;
 pub use types::{
     ConfigError, HostConstants, KnownChains, PairedHeights, ParseChainError, PermissionedToken,
