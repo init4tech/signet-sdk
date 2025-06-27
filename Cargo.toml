@@ -59,6 +59,7 @@ alloy = { version = "=1.0.11", features = [
     "arbitrary",
 ] }
 alloy-contract = { version = "=1.0.11", features = ["pubsub"] }
+alloy-trie = { version = "=0.8.0" }
 
 # Reth
 reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
