@@ -11,6 +11,10 @@ repository.workspace = true
 
 [dependencies]
 alloy.workspace = true
+alloy-trie.workspace = true
+alloy-genesis.workspace = true
+alloy-consensus.workspace = true
+
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
