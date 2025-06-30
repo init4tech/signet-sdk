@@ -12,10 +12,14 @@
 
 //! Signet EVM
 
+#[macro_use]
+mod macros;
+
 mod aliases;
 pub use aliases::*;
 
 mod driver;
+pub(crate) use driver::ControlFlow;
 pub use driver::SignetDriver;
 
 mod journal;
@@ -41,9 +45,8 @@ use trevm::{
     TrevmBuilder,
 };
 
-mod sys_log;
-
-pub(crate) const BASE_GAS: usize = 21_000;
+/// System structs and types.
+pub mod sys;
 
 /// Create a new EVM with the given database.
 pub fn signet_evm<Db: Database + DatabaseCommit>(

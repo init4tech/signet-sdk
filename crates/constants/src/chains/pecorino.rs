@@ -28,6 +28,8 @@ pub const HOST_USDC: Address = address!("0x885F8DB528dC8a38aA3DDad9D3F619746B4a6
 pub const HOST_USDT: Address = address!("0x7970D259D4a96764Fa9B23FF0715A35f06f52D1A");
 /// WBTC token for the Pecorino testnet host chain.
 pub const HOST_WBTC: Address = address!("0x9aeDED4224f3dD31aD8A0B1FcD05E2d7829283a7");
+/// WETH token for the Pecorino testnet host chain.
+pub const HOST_WETH: Address = Address::ZERO;
 
 /// USDC token for the Pecorino testnet RU chain.
 pub const RU_USDC: Address = address!("0x0B8BC5e60EE10957E0d1A0d95598fA63E65605e2");
@@ -35,6 +37,8 @@ pub const RU_USDC: Address = address!("0x0B8BC5e60EE10957E0d1A0d95598fA63E65605e
 pub const RU_USDT: Address = address!("0xF34326d3521F1b07d1aa63729cB14A372f8A737C");
 /// WBTC token for the Pecorino testnet RU chain.
 pub const RU_WBTC: Address = address!("0xE3d7066115f7d6b65F88Dff86288dB4756a7D733");
+/// WETH token for the Pecorino testnet RU chain.
+pub const RU_WETH: Address = Address::ZERO;
 
 /// Name for the network.
 pub const RU_NAME: &str = "Pecorino";
@@ -50,10 +54,11 @@ pub const BASE_FEE_RECIPIENT: Address = address!("0xe0eDA3701D44511ce419344A4CeD
 
 /// Host system tokens for Pecorino.
 pub const HOST_TOKENS: PredeployTokens =
-    crate::PredeployTokens::new(HOST_USDC, HOST_USDT, HOST_WBTC);
+    crate::PredeployTokens::new(HOST_USDC, HOST_USDT, HOST_WBTC, HOST_WETH);
 
 /// RU system tokens for Pecorino.
-pub const RU_TOKENS: PredeployTokens = crate::PredeployTokens::new(RU_USDC, RU_USDT, RU_WBTC);
+pub const RU_TOKENS: PredeployTokens =
+    crate::PredeployTokens::new(RU_USDC, RU_USDT, RU_WBTC, HOST_WETH);
 
 /// The URL of the Transaction Cache endpoint.
 pub const TX_CACHE_URL: &str = "https://transactions.pecorino.signet.sh";

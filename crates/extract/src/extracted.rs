@@ -1,17 +1,13 @@
 use crate::Events;
 use alloy::{
     consensus::{TxEip1559, TxReceipt},
-    primitives::{Address, Log, TxHash, U256},
-    sol_types::SolCall,
+    primitives::{Log, TxHash, U256},
 };
 use signet_types::{
     primitives::{Transaction, TransactionSigned},
     MagicSig, MagicSigInfo,
 };
 use signet_zenith::{Passage, RollupOrders, Transactor, Zenith};
-
-/// Basic gas cost for a transaction.
-const BASE_TX_GAS_COST: u64 = 21_000;
 
 /// A single event extracted from the host chain.
 ///
@@ -242,65 +238,12 @@ impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Passage::Enter> {
     pub fn magic_sig(&self) -> MagicSig {
         MagicSig { ty: MagicSigInfo::Enter, txid: self.tx_hash(), event_idx: self.log_index }
     }
-
-    /// Get the reth transaction signature for the enter event.
-    fn signature(&self) -> alloy::primitives::Signature {
-        self.magic_sig().into()
-    }
-
-    /// Make the transaction that corresponds to this enter event, using the
-    /// provided nonce.
-    pub fn make_transaction(&self, nonce: u64) -> TransactionSigned {
-        TransactionSigned::new_unhashed(
-            Transaction::Eip1559(TxEip1559 {
-                chain_id: self.rollup_chain_id(),
-                nonce,
-                gas_limit: BASE_TX_GAS_COST,
-                max_fee_per_gas: 0,
-                max_priority_fee_per_gas: 0,
-                to: self.rollupRecipient.into(),
-                value: self.amount,
-                access_list: Default::default(),
-                input: Default::default(),
-            }),
-            self.signature(),
-        )
-    }
 }
 
 impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Passage::EnterToken> {
     /// Get the magic signature for the enter token event.
     pub fn magic_sig(&self) -> MagicSig {
         MagicSig { ty: MagicSigInfo::EnterToken, txid: self.tx_hash(), event_idx: self.log_index }
-    }
-
-    /// Get the reth transaction signature for the enter token event.
-    fn signature(&self) -> alloy::primitives::Signature {
-        self.magic_sig().into()
-    }
-
-    /// Make the transaction that corresponds to this enter token event,
-    /// using the provided nonce.
-    pub fn make_transaction(&self, nonce: u64, token: Address) -> TransactionSigned {
-        let input = signet_zenith::mintCall { amount: self.amount(), to: self.rollupRecipient }
-            .abi_encode()
-            .into();
-
-        TransactionSigned::new_unhashed(
-            Transaction::Eip1559(TxEip1559 {
-                chain_id: self.rollup_chain_id(),
-                nonce,
-                gas_limit: BASE_TX_GAS_COST,
-                max_fee_per_gas: 0,
-                max_priority_fee_per_gas: 0,
-                // NB: set to the address of the token contract.
-                to: token.into(),
-                value: U256::ZERO,
-                access_list: Default::default(),
-                input, // NB: set to the ABI-encoded input for the `mint` function, which dictates the amount and recipient.
-            }),
-            self.signature(),
-        )
     }
 }
 
