@@ -124,6 +124,11 @@ impl HostConstants {
     pub const fn tokens(&self) -> PredeployTokens {
         self.tokens
     }
+
+    /// Return true if the address is an approved USD token.
+    pub const fn is_usd(&self, address: Address) -> bool {
+        address.const_eq(&self.tokens.usdc())
+    }
 }
 
 impl FromStr for HostConstants {

@@ -27,3 +27,6 @@ pub use types::{
     PredeployTokens, RollupConstants, SignetConstants, SignetEnvironmentConstants,
     SignetSystemConstants, MINTER_ADDRESS,
 };
+
+/// Placeholder address for ETH.
+pub const ETH_ADDRESS: alloy::primitives::Address = alloy::primitives::Address::repeat_byte(0xee);
