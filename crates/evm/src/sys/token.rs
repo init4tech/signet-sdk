@@ -112,12 +112,12 @@ impl MintToken {
     }
 
     /// Create the ABI-encoded call for the mint operation.
-    fn mint_call(&self) -> signet_zenith::mintCall {
+    const fn mint_call(&self) -> signet_zenith::mintCall {
         signet_zenith::mintCall { amount: self.amount, to: self.recipient }
     }
 
     /// Create a new [`Log`] for the [`MintToken`] operation.
-    fn to_log(&self) -> MintTokenSysLog {
+    const fn to_log(self) -> MintTokenSysLog {
         MintTokenSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -128,7 +128,7 @@ impl MintToken {
     }
 
     /// Convert the [`MintToken`] instance into a [`TransactionSigned`].
-    pub fn to_transaction(&self) -> TransactionSigned {
+    pub fn to_transaction(self) -> TransactionSigned {
         let input = self.mint_call().abi_encode().into();
 
         TransactionSigned::new_unhashed(

@@ -533,7 +533,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         let eth_token = self.constants.rollup().tokens().weth();
 
         for (i, e) in self.extracts.enters.iter().enumerate() {
-            let mint = MintToken::from_enter(minter_nonce + i as u64, eth_token, &e);
+            let mint = MintToken::from_enter(minter_nonce + i as u64, eth_token, e);
             trevm = self.execute_mint_token(trevm, &mint)?;
             eth_minted += e.event.amount;
             eth_accts.insert(e.event.recipient());

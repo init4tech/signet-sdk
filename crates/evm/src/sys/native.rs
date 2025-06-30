@@ -50,7 +50,7 @@ impl MintNative {
     }
 
     /// Create a new [`Log`] for the [`MintNative`] operation.
-    pub fn to_log(&self) -> MintNativeSysLog {
+    pub const fn to_log(&self) -> MintNativeSysLog {
         MintNativeSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -84,7 +84,7 @@ where
 {
     fn mint_native_receipt(&self, mint: &MintNative) -> ReceiptEnvelope {
         let cumulative_gas_used =
-            self.cumulative_gas_used().saturating_add(MIN_TRANSACTION_GAS as u64);
+            self.cumulative_gas_used().saturating_add(MIN_TRANSACTION_GAS);
 
         ReceiptEnvelope::Eip1559(
             alloy::consensus::Receipt {
@@ -115,7 +115,7 @@ where
 
         // push receipt and transaction to the block
         self.processed.push(mint.to_transaction());
-        self.output.push_result(self.mint_native_receipt(mint).into(), MINTER_ADDRESS);
+        self.output.push_result(self.mint_native_receipt(mint), MINTER_ADDRESS);
 
         Ok(trevm)
     }

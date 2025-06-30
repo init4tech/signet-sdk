@@ -199,7 +199,7 @@ fn test_an_enter() {
     let mut driver = context.driver(&mut extracts, vec![]);
 
     // Run the EVM
-    let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
+    let _trevm = context.trevm().drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
     let expected_tx = MintToken::from_enter(0, RU_WETH, &extracts.enters[0]).to_transaction();
