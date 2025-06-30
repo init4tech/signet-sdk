@@ -94,6 +94,12 @@ impl SignetSystemConstants {
         self.host.is_system_contract(address)
     }
 
+    /// True if the address is a host USD that can be used to mint rollup
+    /// native asset.
+    pub const fn is_host_usd(&self, address: Address) -> bool {
+        self.host.is_usd(address)
+    }
+
     /// Get the Order contract address for the given chain id.
     pub const fn orders_for(&self, chain_id: u64) -> Option<Address> {
         if chain_id == self.host_chain_id() {

@@ -5,12 +5,16 @@ use alloy::{
     },
     primitives::{Address, U256},
     signers::{local::PrivateKeySigner, Signature},
+    sol_types::SolEvent,
 };
 use signet_constants::SignetSystemConstants;
-use signet_evm::SignetDriver;
+use signet_evm::{
+    sys::{MintToken, MintTokenSysLog},
+    SignetDriver,
+};
 use signet_extract::{Extractable, ExtractedEvent, Extracts};
 use signet_test_utils::{
-    chain::{fake_block, Chain, RU_CHAIN_ID},
+    chain::{fake_block, Chain, RU_CHAIN_ID, RU_WETH},
     evm::test_signet_evm,
     specs::{make_wallet, sign_tx_with_key_pair, simple_send},
 };
@@ -168,6 +172,8 @@ fn test_execute_two_blocks() {
 
 #[test]
 fn test_an_enter() {
+    tracing_subscriber::fmt::init();
+
     let mut context = TestEnv::new();
     let user = Address::repeat_byte(2);
 
@@ -196,14 +202,23 @@ fn test_an_enter() {
     let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
+    let expected_tx = MintToken::from_enter(0, RU_WETH, &extracts.enters[0]).to_transaction();
+
     assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(
-        sealed_block.block.body.transactions().collect::<Vec<_>>(),
-        vec![&extracts.enters[0].make_transaction(0)]
-    );
+    assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&expected_tx]);
     assert_eq!(receipts.len(), 1);
-    assert_eq!(trevm.read_balance(user), U256::from(100));
-    assert_eq!(trevm.read_nonce(user), 0);
+
+    let ReceiptEnvelope::Eip1559(ref receipt) = receipts[0] else {
+        panic!("expected 1559 receipt")
+    };
+    let mint_log = receipt.receipt.logs.last().unwrap();
+
+    let decoded = MintTokenSysLog::decode_log(mint_log).unwrap();
+
+    assert_eq!(decoded.address, RU_WETH);
+    assert_eq!(decoded.recipient, user);
+    assert_eq!(decoded.amount, U256::from(100));
+    assert_eq!(decoded.token, RU_WETH);
 }
 
 #[test]
@@ -254,10 +269,13 @@ fn test_a_transact() {
     let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
+    let expected_tx_0 = MintToken::from_enter(0, RU_WETH, &extracts.enters[0]).to_transaction();
+    let expexcted_tx_1 = extracts.transacts[0].make_transaction(0);
+
     assert_eq!(sealed_block.senders, vec![MINTER_ADDRESS, sender]);
     assert_eq!(
         sealed_block.block.body.transactions().collect::<Vec<_>>(),
-        vec![&extracts.enters[0].make_transaction(0), &extracts.transacts[0].make_transaction(0)]
+        vec![&expected_tx_0, &expexcted_tx_1]
     );
     assert_eq!(receipts.len(), 2);
     assert_eq!(trevm.read_balance(recipient), U256::from(100));

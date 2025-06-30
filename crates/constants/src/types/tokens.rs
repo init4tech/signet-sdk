@@ -10,6 +10,8 @@ pub enum PermissionedToken {
     Usdt,
     /// WBTC
     Wbtc,
+    /// ETH or WETH
+    Weth,
 }
 
 /// Rollup configuration pre-deploy tokens.
@@ -22,12 +24,14 @@ pub struct PredeployTokens {
     usdt: Address,
     /// WBTC.
     wbtc: Address,
+    /// ETH or WETH
+    weth: Address,
 }
 
 impl PredeployTokens {
     /// Create a new pre-deploy tokens configuration.
-    pub const fn new(usdc: Address, usdt: Address, wbtc: Address) -> Self {
-        Self { usdc, usdt, wbtc }
+    pub const fn new(usdc: Address, usdt: Address, wbtc: Address, weth: Address) -> Self {
+        Self { usdc, usdt, wbtc, weth }
     }
 
     /// Get the hard-coded pecorino host tokens.
@@ -60,6 +64,8 @@ impl PredeployTokens {
             Some(PermissionedToken::Usdt)
         } else if address.const_eq(&self.wbtc) {
             Some(PermissionedToken::Wbtc)
+        } else if address.const_eq(&self.weth) {
+            Some(PermissionedToken::Weth)
         } else {
             None
         }
@@ -73,6 +79,8 @@ impl PredeployTokens {
             Some(PermissionedToken::Usdt)
         } else if address == self.wbtc {
             Some(PermissionedToken::Wbtc)
+        } else if address == self.weth {
+            Some(PermissionedToken::Weth)
         } else {
             None
         }
@@ -94,6 +102,7 @@ impl PredeployTokens {
             PermissionedToken::Usdc => self.usdc,
             PermissionedToken::Usdt => self.usdt,
             PermissionedToken::Wbtc => self.wbtc,
+            PermissionedToken::Weth => self.weth,
         }
     }
 
@@ -110,5 +119,10 @@ impl PredeployTokens {
     /// Get the address of the WBTC token.
     pub const fn wbtc(&self) -> Address {
         self.wbtc
+    }
+
+    /// Get the address of the WETH token.
+    pub const fn weth(&self) -> Address {
+        self.weth
     }
 }
