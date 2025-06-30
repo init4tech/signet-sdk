@@ -28,8 +28,10 @@ pub struct MintToken {
     recipient: Address,
     /// The amount of tokens to mint.
     amount: U256,
-    /// The token address.
+    /// The token being minted.
     token: Address,
+    /// The corresponding token on the host.
+    host_token: Address,
 
     /// The magic signature for the mint.
     magic_sig: MagicSig,
@@ -88,6 +90,7 @@ impl MintToken {
             recipient: event.event.recipient(),
             amount: event.event.amount(),
             token,
+            host_token: event.event.token,
             magic_sig: event.magic_sig(),
             nonce,
             rollup_chain_id: event.rollup_chain_id(),
@@ -105,6 +108,7 @@ impl MintToken {
             recipient: event.event.recipient(),
             amount: event.event.amount(),
             token,
+            host_token: Address::repeat_byte(0xee),
             magic_sig: event.magic_sig(),
             nonce,
             rollup_chain_id: event.rollup_chain_id(),
@@ -123,7 +127,7 @@ impl MintToken {
             logIndex: self.magic_sig.event_idx as u64,
             recipient: self.recipient,
             amount: self.amount,
-            token: self.token, // TODO: this needs to be the HOST token
+            hostToken: self.host_token, // TODO: this needs to be the HOST token
         }
     }
 

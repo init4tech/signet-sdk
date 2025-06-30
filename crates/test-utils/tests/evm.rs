@@ -218,7 +218,7 @@ fn test_an_enter() {
     assert_eq!(decoded.address, RU_WETH);
     assert_eq!(decoded.recipient, user);
     assert_eq!(decoded.amount, U256::from(100));
-    assert_eq!(decoded.token, RU_WETH);
+    assert_eq!(decoded.hostToken, Address::repeat_byte(0xee));
 }
 
 #[test]

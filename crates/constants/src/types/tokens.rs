@@ -1,5 +1,7 @@
 use alloy::primitives::Address;
 
+use crate::ETH_ADDRESS;
+
 /// Rollup pre-deploy tokens.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -64,7 +66,7 @@ impl PredeployTokens {
             Some(PermissionedToken::Usdt)
         } else if address.const_eq(&self.wbtc) {
             Some(PermissionedToken::Wbtc)
-        } else if address.const_eq(&self.weth) {
+        } else if address.const_eq(&self.weth) || address.const_eq(&ETH_ADDRESS) {
             Some(PermissionedToken::Weth)
         } else {
             None
@@ -79,7 +81,7 @@ impl PredeployTokens {
             Some(PermissionedToken::Usdt)
         } else if address == self.wbtc {
             Some(PermissionedToken::Wbtc)
-        } else if address == self.weth {
+        } else if address == self.weth || address == ETH_ADDRESS {
             Some(PermissionedToken::Weth)
         } else {
             None

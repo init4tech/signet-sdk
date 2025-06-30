@@ -14,7 +14,7 @@ alloy::sol! {
         bytes32 indexed txHash,
         uint64 indexed logIndex,
         address indexed recipient,
-        address token,
+        address hostToken,
         uint256 amount,
     );
 
