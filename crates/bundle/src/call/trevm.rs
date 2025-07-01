@@ -1,4 +1,5 @@
 use crate::SignetCallBundle;
+use alloy::primitives::U256;
 use trevm::{revm::context::BlockEnv, Block};
 
 impl Block for SignetCallBundle {
@@ -14,9 +15,9 @@ impl Block for SignetCallBundle {
             blob_excess_gas_and_price: _,
         } = block_env;
 
-        *number = self.bundle.state_block_number.as_number().unwrap_or(*number);
+        *number = self.bundle.state_block_number.as_number().map(U256::from).unwrap_or(*number);
         *beneficiary = self.bundle.coinbase.unwrap_or(*beneficiary);
-        *timestamp = self.bundle.timestamp.unwrap_or(*timestamp);
+        *timestamp = self.bundle.timestamp.map(U256::from).unwrap_or(*timestamp);
         *gas_limit = self.bundle.gas_limit.unwrap_or(*gas_limit);
         *difficulty = self.bundle.difficulty.unwrap_or(*difficulty);
         *basefee =

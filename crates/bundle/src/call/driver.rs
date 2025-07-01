@@ -117,12 +117,12 @@ where
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
-            trevm.block_number() == bundle.block_number,
+            trevm.block_number().to::<u64>() == bundle.block_number,
             trevm,
             BundleError::BlockNumberMismatch
         );
         // Set the state block number this simulation was based on
-        self.response.state_block_number = trevm.block_number();
+        self.response.state_block_number = trevm.block_number().to();
 
         // Check if the state block number is valid (not 0, and not a tag)
         trevm_ensure!(

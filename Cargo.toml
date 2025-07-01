@@ -49,19 +49,19 @@ signet-zenith = { version = "0.5.0", path = "crates/zenith" }
 ajj = { version = "0.3.4" }
 
 # trevm
-trevm = { version = "0.23.7", features = ["full_env_cfg"] }
+trevm = { version = "0.27.0", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
-alloy = { version = "=1.0.11", features = [
+alloy = { version = "1.0.13", features = [
     "full",
     "rpc-types-mev",
     "genesis",
     "arbitrary",
 ] }
-alloy-contract = { version = "=1.0.11", features = ["pubsub"] }
-alloy-trie = { version = "=0.8.1" }
-alloy-genesis = { version = "=1.0.11" }
-alloy-consensus = { version = "=1.0.11" }
+alloy-contract = { version = "1.0.13", features = ["pubsub"] }
+# # alloy-trie = { version = "0.8.1" }
+# alloy-genesis = { version = "1.0.13" }
+# alloy-consensus = { version = "1.0.13" }
 
 # Reth
 reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.4.3" }
