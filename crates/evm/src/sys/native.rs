@@ -83,8 +83,7 @@ where
     C: Extractable,
 {
     fn mint_native_receipt(&self, mint: &MintNative) -> ReceiptEnvelope {
-        let cumulative_gas_used =
-            self.cumulative_gas_used().saturating_add(MIN_TRANSACTION_GAS);
+        let cumulative_gas_used = self.cumulative_gas_used().saturating_add(MIN_TRANSACTION_GAS);
 
         ReceiptEnvelope::Eip1559(
             alloy::consensus::Receipt {
