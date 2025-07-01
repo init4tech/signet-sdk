@@ -14,7 +14,7 @@ signet-extract.workspace = true
 signet-types.workspace = true
 signet-zenith.workspace = true
 
-trevm = { workspace = true, features = ["secp256r1"] }
+trevm.workspace = true
 
 alloy.workspace = true
 

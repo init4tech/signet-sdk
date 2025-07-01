@@ -9,7 +9,7 @@ use trevm::{
     helpers::Ctx,
     revm::{
         interpreter::{
-            CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter,
+            CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
             InterpreterTypes,
         },
         Database, Inspector,
@@ -138,28 +138,6 @@ where
         &mut self,
         _context: &mut Ctx<Db>,
         _inputs: &CreateInputs,
-        outcome: &mut CreateOutcome,
-    ) {
-        if outcome.result.is_ok() {
-            self.orders.exit_frame();
-        } else {
-            self.orders.revert_frame();
-        }
-    }
-
-    fn eofcreate(
-        &mut self,
-        _context: &mut Ctx<Db>,
-        _inputs: &mut EOFCreateInputs,
-    ) -> Option<CreateOutcome> {
-        self.orders.enter_frame();
-        None
-    }
-
-    fn eofcreate_end(
-        &mut self,
-        _context: &mut Ctx<Db>,
-        _inputs: &EOFCreateInputs,
         outcome: &mut CreateOutcome,
     ) {
         if outcome.result.is_ok() {
