@@ -41,7 +41,7 @@ pub const RU_NAME: &str = "Pecorino";
 /// Chain ID for the Pecorino testnet RU chain.
 pub const RU_CHAIN_ID: u64 = 14174;
 /// `Orders` contract address for the Pecorino testnet RU chain.
-pub const RU_ORDERS: Address = address!("0x8e9806fFF56d0660683F0A8157cE70F541A49dD0");
+pub const RU_ORDERS: Address = address!("0xC2D3Dac6B115564B10329697195656459BFb2c74");
 /// `Passage` contract address for the Pecorino testnet RU chain.
 pub const RU_PASSAGE: Address = address!("0x862c10E42B7D07dfDE6F74af61B20A55ca5243FE");
 /// Base fee recipient address for the Pecorino testnet RU chain.
