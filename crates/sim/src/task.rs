@@ -86,6 +86,13 @@ where
                 debug!("No items to simulate. Skipping simulation round");
                 let sleep_until = (Instant::now() + Duration::from_millis(50)).min(finish_by);
                 tokio::time::sleep_until(sleep_until).instrument(span).await;
+
+                // If we sleep until the deadline, we just break the loop.
+                if sleep_until == finish_by {
+                    debug!("Deadline reached, stopping sim loop");
+                    break;
+                }
+
                 continue;
             }
 
