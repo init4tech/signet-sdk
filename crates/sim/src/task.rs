@@ -10,6 +10,9 @@ use trevm::{
     Block, Cfg,
 };
 
+/// The amount of time to sleep between simulation rounds when there are no items to simulate.
+pub(crate) const SIM_SLEEP_MS: u64 = 50;
+
 /// Builds a single block by repeatedly invoking [`SimEnv`].
 #[derive(Debug)]
 pub struct BlockBuild<Db, Insp = NoOpInspector> {
@@ -84,7 +87,8 @@ where
             // and restart the loop.
             if self.env.sim_items().is_empty() && Instant::now() >= finish_by {
                 debug!("No items to simulate. Skipping simulation round");
-                let sleep_until = (Instant::now() + Duration::from_millis(50)).min(finish_by);
+                let sleep_until =
+                    (Instant::now() + Duration::from_millis(SIM_SLEEP_MS)).min(finish_by);
                 tokio::time::sleep_until(sleep_until).instrument(span).await;
 
                 // If we sleep until the deadline, we just break the loop.
