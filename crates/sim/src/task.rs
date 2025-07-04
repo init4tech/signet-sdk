@@ -1,12 +1,17 @@
+use std::time::Duration;
+
 use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
 use signet_types::constants::SignetSystemConstants;
-use tokio::select;
+use tokio::{select, time::Instant};
 use tracing::{debug, info_span, trace, Instrument};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
     Block, Cfg,
 };
+
+/// The amount of time to sleep between simulation rounds when there are no items to simulate.
+pub(crate) const SIM_SLEEP_MS: u64 = 50;
 
 /// Builds a single block by repeatedly invoking [`SimEnv`].
 #[derive(Debug)]
@@ -76,6 +81,26 @@ where
         loop {
             let span = info_span!("build", round = i);
             let finish_by = self.finish_by.into();
+
+            // Only simulate if there are items to simulate.
+            // If there are not items, we sleep for the minimum of 50ms or until the deadline is reached,
+            // and restart the loop.
+            if self.env.sim_items().is_empty() {
+                debug!("No items to simulate. Skipping simulation round");
+                let sleep_until =
+                    (Instant::now() + Duration::from_millis(SIM_SLEEP_MS)).min(finish_by);
+                tokio::time::sleep_until(sleep_until).instrument(span).await;
+
+                // If we sleep until the deadline, we just break the loop.
+                if sleep_until == finish_by {
+                    debug!("Deadline reached, stopping sim loop");
+                    break;
+                }
+
+                continue;
+            }
+
+            // If there are items to simulate, we run a simulation round.
             let fut = self.round().instrument(span);
 
             select! {
@@ -87,10 +112,6 @@ where
                     i+= 1;
                     let remaining = self.env.sim_items().len();
                     trace!(%remaining, round = i, "Round completed");
-                    if remaining == 0 {
-                        debug!("No more items to simulate, stopping sim loop");
-                        break;
-                    }
                 }
             }
         }
