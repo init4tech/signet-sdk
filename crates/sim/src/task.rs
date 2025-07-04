@@ -85,7 +85,7 @@ where
             // Only simulate if there are items to simulate.
             // If there are not items, we sleep for the minimum of 50ms or until the deadline is reached,
             // and restart the loop.
-            if self.env.sim_items().is_empty() && Instant::now() >= finish_by {
+            if self.env.sim_items().is_empty() {
                 debug!("No items to simulate. Skipping simulation round");
                 let sleep_until =
                     (Instant::now() + Duration::from_millis(SIM_SLEEP_MS)).min(finish_by);
