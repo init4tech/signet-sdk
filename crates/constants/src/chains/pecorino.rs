@@ -43,7 +43,8 @@ pub const RU_CHAIN_ID: u64 = 14174;
 /// `Orders` contract address for the Pecorino testnet RU chain.
 pub const RU_ORDERS: Address = address!("0xC2D3Dac6B115564B10329697195656459BFb2c74");
 /// `Passage` contract address for the Pecorino testnet RU chain.
-pub const RU_PASSAGE: Address = address!("0x862c10E42B7D07dfDE6F74af61B20A55ca5243FE");
+/// This is currently a dummy value and will be replaced with the actual Passage contract address in the future.
+pub const RU_PASSAGE: Address = address!("0xffffffffffffffffffffffffffffffffffffffff");
 /// Base fee recipient address for the Pecorino testnet RU chain.
 pub const BASE_FEE_RECIPIENT: Address = address!("0xe0eDA3701D44511ce419344A4CeD30B52c9Ba231");
 
