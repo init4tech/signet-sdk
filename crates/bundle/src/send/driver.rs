@@ -122,7 +122,7 @@ where
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
-            trevm.block_number() == bundle.block_number,
+            trevm.block_number().to::<u64>() == bundle.block_number,
             trevm,
             BundleError::BlockNumberMismatch.into()
         );
@@ -130,14 +130,13 @@ where
         // Check if the state block number is valid (not 0, and not a tag)
         let timestamp = trevm.block_timestamp();
         trevm_ensure!(
-            timestamp >= bundle.min_timestamp.unwrap_or_default()
-                && timestamp <= bundle.max_timestamp.unwrap_or(u64::MAX),
+            self.bundle.is_valid_at_timestamp(timestamp.to()),
             trevm,
             BundleError::TimestampOutOfRange.into()
         );
 
         // Check that the `SignedFill` is valid at the timestamp.
-        if self.bundle().validate_fills_offchain(timestamp).is_err() {
+        if self.bundle().validate_fills_offchain(timestamp.to()).is_err() {
             return Err(trevm.errored(BundleError::BundleReverted.into()));
         }
 
