@@ -1,20 +1,20 @@
 use alloy::{consensus::TxReceipt, primitives::Log, sol_types::SolEvent};
 use signet_extract::ExtractedEvent;
-use signet_zenith::{Passage, Transactor, MINTER_ADDRESS};
+use signet_zenith::{Transactor, MINTER_ADDRESS};
 
 alloy::sol! {
-    event Enter(
+    event MintNative(
         bytes32 indexed txHash,
         uint64 indexed logIndex,
         address indexed recipient,
         uint256 amount,
     );
 
-    event EnterToken(
+    event MintToken(
         bytes32 indexed txHash,
         uint64 indexed logIndex,
         address indexed recipient,
-        address token,
+        address hostToken,
         uint256 amount,
     );
 
@@ -28,37 +28,20 @@ alloy::sol! {
     );
 }
 
-impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Passage::Enter>> for Enter {
-    fn from(event: &ExtractedEvent<'_, R, Passage::Enter>) -> Self {
-        Enter {
-            recipient: event.event.rollupRecipient,
-            txHash: event.tx_hash(),
-            logIndex: event.log_index as u64,
-            amount: event.amount(),
-        }
-    }
-}
-
-impl From<Enter> for Log {
-    fn from(value: Enter) -> Self {
+impl From<MintNative> for Log {
+    fn from(value: MintNative) -> Self {
         Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }
 
-impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Passage::EnterToken>> for EnterToken {
-    fn from(event: &ExtractedEvent<'_, R, Passage::EnterToken>) -> Self {
-        EnterToken {
-            recipient: event.event.rollupRecipient,
-            txHash: event.tx_hash(),
-            logIndex: event.log_index as u64,
-            token: event.token(),
-            amount: event.amount(),
-        }
+impl From<MintToken> for Log {
+    fn from(value: MintToken) -> Self {
+        Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }
 
-impl From<EnterToken> for Log {
-    fn from(value: EnterToken) -> Self {
+impl From<Transact> for Log {
+    fn from(value: Transact) -> Self {
         Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }
@@ -73,11 +56,5 @@ impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Transactor::Transact>>
             gas: event.event.gas,
             maxFeePerGas: event.event.maxFeePerGas,
         }
-    }
-}
-
-impl From<Transact> for Log {
-    fn from(value: Transact) -> Self {
-        Log { address: MINTER_ADDRESS, data: value.encode_log_data() }
     }
 }
