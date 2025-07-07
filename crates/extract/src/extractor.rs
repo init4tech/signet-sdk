@@ -17,6 +17,18 @@ pub struct Extractor {
     constants: SignetSystemConstants,
 }
 
+impl From<SignetSystemConstants> for Extractor {
+    fn from(constants: SignetSystemConstants) -> Self {
+        Self { constants }
+    }
+}
+
+impl From<Extractor> for SignetSystemConstants {
+    fn from(extractor: Extractor) -> Self {
+        extractor.constants
+    }
+}
+
 impl Extractor {
     /// Create a new [`Extractor`] from system constants.
     pub const fn new(constants: SignetSystemConstants) -> Self {
