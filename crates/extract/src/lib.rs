@@ -39,3 +39,6 @@ pub use extractor::Extractor;
 
 mod r#trait;
 pub use r#trait::{Extractable, HasTxns};
+
+mod step;
+pub use step::ExtractStep;
