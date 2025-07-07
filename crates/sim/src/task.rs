@@ -92,8 +92,7 @@ where
             }
 
             // Only simulate if there are items to simulate.
-            // If there are not items, we sleep for the minimum of 50ms or until the deadline is reached,
-            // and restart the loop.
+            // If there are not items, we sleep for [`SIM_SLEEP_MS`] and restart the loop.
             if self.env.sim_items().is_empty() {
                 tokio::time::sleep_until(next_round_time).await;
                 continue;
