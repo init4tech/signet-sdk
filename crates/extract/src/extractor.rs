@@ -1,8 +1,4 @@
-use crate::{
-    r#trait::{Extractable, HasTxns},
-    step::ExtractStep,
-    Extracts,
-};
+use crate::{r#trait::Extractable, ExtractStep, Extracts};
 use alloy::consensus::BlockHeader;
 use signet_types::constants::SignetSystemConstants;
 
@@ -39,7 +35,7 @@ impl Extractor {
     ///     - Accumulate the fills.
     ///     - Associate each event with block, tx and receipt references.
     ///     - Yield the extracted block info.
-    pub fn extract_signet<'a: 'c, 'b: 'c, 'c, C: Extractable + HasTxns>(
+    pub fn extract_signet<'a: 'c, 'b: 'c, 'c, C: Extractable>(
         &'a self,
         chain: &'b C,
     ) -> impl Iterator<Item = Extracts<'c, C>> {

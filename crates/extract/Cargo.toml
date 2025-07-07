@@ -16,4 +16,3 @@ signet-zenith.workspace = true
 
 alloy.workspace = true
 
-tracing.workspace = true

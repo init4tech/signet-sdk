@@ -176,3 +176,9 @@ impl<'a, C: Extractable> core::ops::Deref for Extracts<'a, C> {
         &self.events
     }
 }
+
+impl<'a, C: Extractable> core::ops::DerefMut for Extracts<'a, C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.events
+    }
+}

@@ -8,6 +8,8 @@ use signet_types::constants::SignetSystemConstants;
 /// The extract step trait defines an object that can extract data from logs in
 /// transaction receipts.
 pub trait ExtractStep<C: Extractable> {
+    /// The type of data that can be extracted from the logs. This is returned
+    /// by [`ExtractStep::extract_log`].
     type Extract: Sized + 'static;
 
     /// Check if the expected data can be extracted from the log, and return
@@ -17,6 +19,10 @@ pub trait ExtractStep<C: Extractable> {
     /// Extracts the expected data from a transaction receipt, returning an
     /// iterator over the extracted data. The iterator yields tuples
     /// containing the index of the log in the receipt and the extracted data.
+    ///
+    /// By default, this method will simply iterate over the logs in the
+    /// receipt and apply [`ExtractStep::extract_log`] to each log, filtering
+    /// out any logs that do not yield an extracted value.
     fn extract_receipt<'a, 'b, 'c>(
         &'a self,
         receipt: &'b C::Receipt,
@@ -34,6 +40,11 @@ pub trait ExtractStep<C: Extractable> {
     /// Extracts the expected data from a block, returning an iterator over the
     /// extracted data. The iterator yields tuples containing the index of the
     /// log in the block and the extracted data.
+    ///
+    /// By default, this method will iterate over the transactions in the
+    /// block and their corresponding receipts, applying
+    /// [`ExtractStep::extract_receipt`] to each receipt, and yielding an
+    /// [`ExtractedEvent`] for each log that yields an extracted value.
     fn extract_block<'a, 'b, 'c>(
         &'a self,
         block: &'b C::Block,
@@ -56,6 +67,10 @@ pub trait ExtractStep<C: Extractable> {
     /// Extracts the expected data from a chain, returning an iterator over the
     /// extracted data. The iterator yields tuples containing the block and an
     /// iterator over events extracted from that block.
+    ///
+    /// By default, this method will iterate over the blocks and receipts in
+    /// the chain, applying [`ExtractStep::extract_block`] to each block and
+    /// yielding an iterator over the extracted events for each block.
     fn extract<'a, 'b, 'c>(
         &'a self,
         extractable: &'b C,
@@ -63,7 +78,6 @@ pub trait ExtractStep<C: Extractable> {
         Item = (&'b C::Block, impl Iterator<Item = ExtractedEvent<'c, C::Receipt, Self::Extract>>),
     >
     where
-        C: HasTxns,
         'a: 'c,
         'b: 'c,
     {
@@ -95,6 +109,9 @@ where
         None
     }
 
+    // NB: this implementation is specialized to filter out blocks that are at
+    // or below the host deploy height, as these blocks do not contain any
+    // Zenith events.
     fn extract<'a, 'b, 'c>(
         &'a self,
         extractable: &'b C,
@@ -102,7 +119,6 @@ where
         Item = (&'b C::Block, impl Iterator<Item = ExtractedEvent<'c, C::Receipt, Self::Extract>>),
     >
     where
-        C: HasTxns,
         'a: 'c,
         'b: 'c,
     {
