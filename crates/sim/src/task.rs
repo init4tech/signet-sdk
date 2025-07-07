@@ -1,5 +1,4 @@
 use std::time::Duration;
-
 use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
 use signet_types::constants::SignetSystemConstants;
 use tokio::{select, time::Instant};
