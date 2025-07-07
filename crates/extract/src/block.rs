@@ -158,12 +158,7 @@ impl<'a, C: Extractable> Extracts<'a, C> {
             host_block,
             chain_id: 0,
             ru_height: 0,
-            events: HostEvents {
-                submitted: None,
-                enters: vec![],
-                transacts: vec![],
-                enter_tokens: vec![],
-            },
+            events: Default::default(),
             context: Default::default(),
         }
     }
