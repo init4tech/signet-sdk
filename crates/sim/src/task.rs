@@ -102,6 +102,7 @@ where
             let fut = self.round().instrument(span);
 
             select! {
+                biased;
                 _ = tokio::time::sleep_until(finish_by) => {
                     debug!("Deadline reached, stopping sim loop");
                     break;
