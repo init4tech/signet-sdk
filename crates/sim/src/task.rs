@@ -1,6 +1,6 @@
-use std::time::Duration;
 use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
 use signet_types::constants::SignetSystemConstants;
+use std::time::Duration;
 use tokio::{select, time::Instant};
 use tracing::{debug, info_span, trace, Instrument};
 use trevm::{
@@ -81,21 +81,21 @@ where
             let span = info_span!("build", round = i);
             let finish_by = self.finish_by.into();
 
+            let next_round_time = Instant::now() + Duration::from_millis(SIM_SLEEP_MS);
+
+            // If the next round time is past the deadline, we stop the simulation loop.
+            // This will stop the simulation even if there are items, but that is an acceptable tradeoff
+            // as we must ensure there's enough time to submit the blob to the host chain.
+            if next_round_time >= finish_by {
+                debug!("Next round time is past the deadline, stopping sim loop");
+                break;
+            }
+
             // Only simulate if there are items to simulate.
             // If there are not items, we sleep for the minimum of 50ms or until the deadline is reached,
             // and restart the loop.
             if self.env.sim_items().is_empty() {
-                debug!("No items to simulate. Skipping simulation round");
-                let sleep_until =
-                    (Instant::now() + Duration::from_millis(SIM_SLEEP_MS)).min(finish_by);
-                tokio::time::sleep_until(sleep_until).instrument(span).await;
-
-                // If we sleep until the deadline, we just break the loop.
-                if sleep_until == finish_by {
-                    debug!("Deadline reached, stopping sim loop");
-                    break;
-                }
-
+                tokio::time::sleep_until(next_round_time).await;
                 continue;
             }
 
