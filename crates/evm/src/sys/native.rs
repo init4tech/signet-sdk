@@ -33,6 +33,15 @@ pub struct MintNative {
     rollup_chain_id: u64,
 }
 
+impl<R> From<&ExtractedEvent<'_, R, Passage::EnterToken>> for MintNative
+where
+    R: TxReceipt<Log = Log>,
+{
+    fn from(event: &ExtractedEvent<'_, R, Passage::EnterToken>) -> Self {
+        Self::new(event)
+    }
+}
+
 impl MintNative {
     /// Create a new [`MintNative`] instance from an [`ExtractedEvent`]
     /// containing a [`Passage::EnterToken`] event.
@@ -49,7 +58,7 @@ impl MintNative {
     }
 
     /// Create a new [`Log`] for the [`MintNative`] operation.
-    pub const fn to_log(&self) -> MintNativeSysLog {
+    const fn to_log(&self) -> MintNativeSysLog {
         MintNativeSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -59,7 +68,7 @@ impl MintNative {
     }
 
     /// Convert the [`MintNative`] instance into a [`TransactionSigned`].
-    pub fn to_transaction(&self) -> TransactionSigned {
+    fn to_transaction(&self) -> TransactionSigned {
         TransactionSigned::new_unhashed(
             Transaction::Eip1559(TxEip1559 {
                 chain_id: self.rollup_chain_id,

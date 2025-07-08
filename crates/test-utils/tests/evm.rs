@@ -201,7 +201,7 @@ fn test_an_enter() {
     let (sealed_block, receipts) = driver.finish();
 
     let expected_tx =
-        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).to_transaction();
+        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).produce_transaction();
 
     assert_eq!(sealed_block.senders.len(), 1);
     assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&expected_tx]);
@@ -289,8 +289,9 @@ fn test_a_transact() {
     // 2. MintNative for the enter token event
     // 3. Transact for the transact event
     let expected_tx_0 =
-        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).to_transaction();
-    let expected_tx_1 = MintNative::new(&extracts.enter_tokens[0]).with_nonce(1).to_transaction();
+        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).produce_transaction();
+    let expected_tx_1 =
+        MintNative::new(&extracts.enter_tokens[0]).with_nonce(1).produce_transaction();
     let expected_tx_2 = extracts.transacts[0].make_transaction(0);
 
     assert_eq!(sealed_block.senders, vec![MINTER_ADDRESS, MINTER_ADDRESS, sender]);
