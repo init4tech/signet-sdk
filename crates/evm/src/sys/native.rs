@@ -28,7 +28,7 @@ pub struct MintNative {
     magic_sig: MagicSig,
 
     /// The nonce of the mint transaction.
-    nonce: u64,
+    nonce: Option<u64>,
     /// The rollup chain ID.
     rollup_chain_id: u64,
 }
@@ -37,14 +37,13 @@ impl MintNative {
     /// Create a new [`MintNative`] instance from an [`ExtractedEvent`]
     /// containing a [`Passage::EnterToken`] event.
     pub fn new<R: TxReceipt<Log = Log>>(
-        nonce: u64,
         event: &ExtractedEvent<'_, R, Passage::EnterToken>,
     ) -> Self {
         Self {
             recipient: event.event.recipient(),
             amount: event.event.amount(),
             magic_sig: event.magic_sig(),
-            nonce,
+            nonce: None,
             rollup_chain_id: event.rollup_chain_id(),
         }
     }
@@ -64,7 +63,7 @@ impl MintNative {
         TransactionSigned::new_unhashed(
             Transaction::Eip1559(TxEip1559 {
                 chain_id: self.rollup_chain_id,
-                nonce: self.nonce,
+                nonce: self.nonce.expect("must be set"),
                 gas_limit: MIN_TRANSACTION_GAS,
                 max_fee_per_gas: 0,
                 max_priority_fee_per_gas: 0,
@@ -79,6 +78,14 @@ impl MintNative {
 }
 
 impl SysOutput for MintNative {
+    fn has_nonce(&self) -> bool {
+        self.nonce.is_some()
+    }
+
+    fn populate_nonce(&mut self, nonce: u64) {
+        self.nonce = Some(nonce)
+    }
+
     fn produce_transaction(&self) -> TransactionSigned {
         self.to_transaction()
     }

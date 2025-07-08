@@ -19,7 +19,6 @@ mod aliases;
 pub use aliases::*;
 
 mod driver;
-pub(crate) use driver::ControlFlow;
 pub use driver::SignetDriver;
 
 mod journal;

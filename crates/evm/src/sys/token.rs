@@ -1,4 +1,4 @@
-use crate::sys::{MintTokenSysLog, SysOutput};
+use crate::sys::{MintTokenSysLog, SysOutput, SysTx, UnmeteredSysTx};
 use alloy::{
     consensus::{TxEip1559, TxReceipt},
     primitives::{Address, Log, U256},
@@ -32,7 +32,7 @@ pub struct MintToken {
     magic_sig: MagicSig,
 
     /// The nonce of the mint transaction.
-    nonce: u64,
+    nonce: Option<u64>,
     /// The rollup chain ID.
     rollup_chain_id: u64,
 }
@@ -63,7 +63,7 @@ impl trevm::Tx for MintToken {
         *kind = TransactTo::Call(self.token);
         *value = U256::ZERO;
         *data = self.mint_call().abi_encode().into();
-        *nonce = self.nonce;
+        *nonce = self.nonce.expect("must be set");
         *chain_id = Some(self.rollup_chain_id);
         *access_list = Default::default();
         *gas_priority_fee = Some(0);
@@ -77,7 +77,6 @@ impl MintToken {
     /// Create a new [`MintToken`] instance from an [`ExtractedEvent`]
     /// containing a [`Passage::EnterToken`] event.
     pub fn from_enter_token<R: TxReceipt<Log = Log>>(
-        nonce: u64,
         token: Address,
         event: &ExtractedEvent<'_, R, Passage::EnterToken>,
     ) -> Self {
@@ -87,7 +86,7 @@ impl MintToken {
             token,
             host_token: event.event.token,
             magic_sig: event.magic_sig(),
-            nonce,
+            nonce: None,
             rollup_chain_id: event.rollup_chain_id(),
         }
     }
@@ -95,7 +94,6 @@ impl MintToken {
     /// Create a new [`MintToken`] instance from an [`ExtractedEvent`]
     /// containing a [`Passage::Enter`] event.
     pub fn from_enter<R: TxReceipt<Log = Log>>(
-        nonce: u64,
         token: Address,
         event: &ExtractedEvent<'_, R, Passage::Enter>,
     ) -> Self {
@@ -105,7 +103,7 @@ impl MintToken {
             token,
             host_token: Address::repeat_byte(0xee),
             magic_sig: event.magic_sig(),
-            nonce,
+            nonce: None,
             rollup_chain_id: event.rollup_chain_id(),
         }
     }
@@ -133,7 +131,7 @@ impl MintToken {
         TransactionSigned::new_unhashed(
             Transaction::Eip1559(TxEip1559 {
                 chain_id: self.rollup_chain_id,
-                nonce: self.nonce,
+                nonce: self.nonce.expect("must be set"),
                 gas_limit: MIN_TRANSACTION_GAS,
                 max_fee_per_gas: 0,
                 max_priority_fee_per_gas: 0,
@@ -149,6 +147,10 @@ impl MintToken {
 }
 
 impl SysOutput for MintToken {
+    fn populate_nonce(&mut self, nonce: u64) {
+        self.nonce = Some(nonce);
+    }
+
     fn produce_transaction(&self) -> TransactionSigned {
         self.to_transaction()
     }
@@ -160,4 +162,12 @@ impl SysOutput for MintToken {
     fn sender(&self) -> Address {
         MINTER_ADDRESS
     }
+
+    fn has_nonce(&self) -> bool {
+        self.nonce.is_some()
+    }
 }
+
+impl SysTx for MintToken {}
+
+impl UnmeteredSysTx for MintToken {}

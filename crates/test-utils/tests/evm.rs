@@ -9,7 +9,7 @@ use alloy::{
 };
 use signet_constants::SignetSystemConstants;
 use signet_evm::{
-    sys::{MintNative, MintToken, MintTokenSysLog},
+    sys::{MintNative, MintToken, MintTokenSysLog, SysOutput},
     SignetDriver,
 };
 use signet_extract::{Extractable, ExtractedEvent, Extracts};
@@ -200,7 +200,8 @@ fn test_an_enter() {
     let _trevm = context.trevm().drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
-    let expected_tx = MintToken::from_enter(0, RU_WETH, &extracts.enters[0]).to_transaction();
+    let expected_tx =
+        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).to_transaction();
 
     assert_eq!(sealed_block.senders.len(), 1);
     assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&expected_tx]);
@@ -287,8 +288,9 @@ fn test_a_transact() {
     // 1. MintToken for the enter event
     // 2. MintNative for the enter token event
     // 3. Transact for the transact event
-    let expected_tx_0 = MintToken::from_enter(0, RU_WETH, &extracts.enters[0]).to_transaction();
-    let expected_tx_1 = MintNative::new(1, &extracts.enter_tokens[0]).to_transaction();
+    let expected_tx_0 =
+        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).to_transaction();
+    let expected_tx_1 = MintNative::new(&extracts.enter_tokens[0]).with_nonce(1).to_transaction();
     let expected_tx_2 = extracts.transacts[0].make_transaction(0);
 
     assert_eq!(sealed_block.senders, vec![MINTER_ADDRESS, MINTER_ADDRESS, sender]);

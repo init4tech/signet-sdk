@@ -1,7 +1,6 @@
 use crate::{
-    orders::SignetInspector,
-    sys::{MintNative, MintToken, SysAction, SysTx, TransactSysLog},
-    BlockResult, EvmNeedsTx, EvmTransacted, ExecutionOutcome, RunTxResult, SignetLayered,
+    orders::SignetInspector, BlockResult, EvmNeedsTx, EvmTransacted, ExecutionOutcome, RunTxResult,
+    SignetLayered,
 };
 use alloy::{
     consensus::{
@@ -11,17 +10,15 @@ use alloy::{
     eips::eip1559::{BaseFeeParams, INITIAL_BASE_FEE as EIP1559_INITIAL_BASE_FEE},
     primitives::{Address, Bloom, U256},
 };
-use signet_extract::{Extractable, ExtractedEvent, Extracts};
+use signet_extract::{Extractable, Extracts};
 use signet_types::{
     constants::SignetSystemConstants,
     primitives::{BlockBody, RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
     AggregateFills, MarketError,
 };
-use signet_zenith::{Transactor, MINTER_ADDRESS};
-use std::collections::{HashSet, VecDeque};
-use tracing::{debug, debug_span, warn};
+use std::collections::VecDeque;
+use tracing::{debug, debug_span, info_span, warn};
 use trevm::{
-    fillers::{DisableGasChecks, DisableNonceCheck},
     helpers::Ctx,
     revm::{
         context::{
@@ -202,7 +199,7 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     parent: SealedHeader,
 
     /// Rollup constants, including pre-deploys
-    constants: SignetSystemConstants,
+    pub(crate) constants: SignetSystemConstants,
 
     /// The working context is a clone of the block's [`AggregateFills`] that
     /// is updated progessively as the block is evaluated.
@@ -379,12 +376,11 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// This path is used by
     /// - [`TransactionSigned`] objects
-    /// - [`Transact`] events
+    /// - [`Transactor::Transact`] events
     pub(crate) fn check_fills_and_accept<Db, Insp>(
         &mut self,
         mut trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
-        extract: Option<&ExtractedEvent<'_, C::Receipt, Transactor::Transact>>,
     ) -> RunTxResult<Self, Db, Insp>
     where
         Db: Database + DatabaseCommit,
@@ -402,14 +398,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             return Ok(trevm.reject());
         }
 
-        if let ExecutionResult::Success { logs, .. } = trevm.result_mut_unchecked() {
-            if let Some(extract) = extract {
-                // Push the sys_log to the outcome
-                let sys_log = TransactSysLog::from(extract).into();
-                logs.push(sys_log);
-            }
-        }
-
         // We track this separately from the cumulative gas used. Enters and
         // EnterTokens are not payable, so we don't want to include their gas
         // usage in the payable gas used.
@@ -423,8 +411,10 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// This path is used by
     /// - [`TransactionSigned`] objects
-    /// - [`Transact`] events
-    /// - [`Enter`] events
+    /// - [`Transactor::Transact`] events
+    /// - [`Passage::Enter`] events
+    ///
+    /// [`Passage::Enter`]: signet_zenith::Passage::Enter
     pub(crate) fn accept_tx<Db, Insp>(
         &mut self,
         trevm: EvmTransacted<Db, Insp>,
@@ -482,7 +472,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             s.record("sender", sender.to_string());
             // Run the tx, returning from this function if there is a tx error
             let t = run_tx_early_return!(self, trevm, &FillShim(&tx, sender), sender);
-            trevm = self.check_fills_and_accept(t, tx, None)?;
+            trevm = self.check_fills_and_accept(t, tx)?;
         } else {
             warn!("Failed to recover signer for transaction");
         }
@@ -504,134 +494,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         }
 
         Ok(trevm)
-    }
-
-    fn apply_sys_action<Db, Insp, S>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-        action: &S,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-        S: SysAction,
-    {
-        // Run the system action.
-        trevm_try!(action.apply(&mut trevm), trevm);
-        // push receipt and transaction to the block
-        self.processed.push(action.produce_transaction());
-        self.output
-            .push_result(action.produce_receipt(self.cumulative_gas_used()), action.sender());
-
-        Ok(trevm)
-    }
-
-    fn apply_sys_transaction<Db, Insp, S>(
-        &mut self,
-        trevm: EvmNeedsTx<Db, Insp>,
-        sys_tx: &S,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-        S: SysTx,
-    {
-        // Run the transaction.
-        let mut t = run_tx_early_return!(self, trevm, sys_tx, MINTER_ADDRESS);
-
-        // push a sys_log to the outcome
-        if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
-            logs.push(sys_tx.produce_log().into());
-        }
-
-        let tx = sys_tx.produce_transaction();
-        Ok(self.accept_tx(t, tx))
-    }
-
-    fn run_mints_inner<Db, Insp>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        // Load the nonce once, we'll write it at the end
-        let minter_nonce =
-            trevm_try!(trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database), trevm);
-
-        // Some setup for logging
-        let _span = debug_span!(
-            "signet_evm::evm::run_mints",
-            enters = self.extracts.enters.len(),
-            enter_tokens = self.extracts.enter_tokens.len(),
-            minter_nonce
-        );
-        let mut eth_minted = U256::ZERO;
-        let mut eth_accts = HashSet::with_capacity(self.extracts.enters.len());
-        let mut usd_minted = U256::ZERO;
-        let mut usd_accts = HashSet::with_capacity(self.extracts.enter_tokens.len());
-
-        let eth_token = self.constants.rollup().tokens().weth();
-
-        for (i, e) in self.extracts.enters.iter().enumerate() {
-            let mint = MintToken::from_enter(minter_nonce + i as u64, eth_token, e);
-            trevm = self.apply_sys_transaction(trevm, &mint)?;
-            eth_minted += e.event.amount;
-            eth_accts.insert(e.event.recipient());
-        }
-
-        // Use a new base nonce for the enter_tokens
-        let minter_nonce = minter_nonce + self.extracts.enters.len() as u64;
-
-        for (i, e) in self.extracts.enter_tokens.iter().enumerate() {
-            let nonce = minter_nonce + i as u64;
-            if self.constants.is_host_usd(e.event.token) {
-                // USDC is handled as a native mint
-                let mint = MintNative::new(nonce, e);
-                trevm = self.apply_sys_action(trevm, &mint)?;
-                usd_minted += e.event.amount;
-                usd_accts.insert(e.event.recipient());
-            } else {
-                // All other tokens are non-native mints
-                let ru_token_addr = self
-                    .constants
-                    .rollup_token_from_host_address(e.event.token)
-                    .expect("token enters must be permissioned");
-                let mint = MintToken::from_enter_token(nonce, ru_token_addr, e);
-                trevm = self.apply_sys_transaction(trevm, &mint)?;
-            }
-        }
-
-        // Update the minter nonce.
-        let minter_nonce = minter_nonce + self.extracts.enter_tokens.len() as u64;
-        trevm_try!(
-            trevm.try_set_nonce_unchecked(MINTER_ADDRESS, minter_nonce).map_err(EVMError::Database),
-            trevm
-        );
-
-        debug!(
-            %eth_minted,
-            eth_accts_touched = %eth_accts.len(),
-            %usd_minted,
-            usd_accts_touched = %usd_accts.len(),
-            "Minting completed"
-        );
-
-        Ok(trevm)
-    }
-
-    fn run_all_mints<Db, Insp>(
-        &mut self,
-        trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        trevm.try_with_cfg(&DisableGasChecks, |trevm| {
-            trevm.try_with_cfg(&DisableNonceCheck, |trevm| self.run_mints_inner(trevm))
-        })
     }
 
     /// Clear the balance of the rollup passage. This is run at the end of the
@@ -709,8 +571,8 @@ where
     }
 
     fn run_txns(&mut self, mut trevm: EvmNeedsTx<Db, Insp>) -> RunTxResult<Self, Db, Insp> {
-        let _span = debug_span!(
-            "run_txns",
+        let _span = info_span!(
+            "SignetDriver::run_txns",
             txn_count = self.to_process.len(),
             enter_count = self.extracts.enters.len(),
             enter_token_count = self.extracts.enter_tokens.len(),

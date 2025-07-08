@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::Events;
 use alloy::{
     consensus::{TxEip1559, TxReceipt},
@@ -16,7 +18,7 @@ use signet_zenith::{Passage, RollupOrders, Transactor, Zenith};
 /// receipt's logs, and the extracted event itself.
 ///
 /// Events may be either the enum type [`Events`], or a specific event type.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Copy, PartialEq, Eq)]
 pub struct ExtractedEvent<'a, R, E = Events> {
     /// The transaction that caused the event
     pub tx: &'a TransactionSigned,
@@ -28,11 +30,35 @@ pub struct ExtractedEvent<'a, R, E = Events> {
     pub event: E,
 }
 
-impl<R, E> std::ops::Deref for ExtractedEvent<'_, R, E>
+impl<R, E> fmt::Debug for ExtractedEvent<'_, R, E>
 where
-    R: TxReceipt<Log = Log>,
-    E: Into<Events>,
+    E: Into<Events> + fmt::Debug,
 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExtractedEvent")
+            .field("tx", &self.tx)
+            .field("log_index", &self.log_index)
+            .field("event", &self.event)
+            .finish_non_exhaustive()
+    }
+}
+
+// NB: manual impl because of incorrect auto-derive bound on `R: Clone`
+impl<R, E> Clone for ExtractedEvent<'_, R, E>
+where
+    E: Clone,
+{
+    fn clone(&self) -> Self {
+        ExtractedEvent {
+            tx: self.tx,
+            receipt: self.receipt,
+            log_index: self.log_index,
+            event: self.event.clone(),
+        }
+    }
+}
+
+impl<R, E> std::ops::Deref for ExtractedEvent<'_, R, E> {
     type Target = E;
 
     fn deref(&self) -> &Self::Target {
@@ -40,26 +66,24 @@ where
     }
 }
 
-impl<R, E> ExtractedEvent<'_, R, E>
-where
-    R: TxReceipt<Log = Log>,
-    E: Into<Events>,
-{
+impl<R, E> ExtractedEvent<'_, R, E> {
     /// Get the transaction hash of the extracted event.
     pub fn tx_hash(&self) -> TxHash {
         *self.tx.hash()
     }
+}
 
+impl<R, E> ExtractedEvent<'_, R, E>
+where
+    R: TxReceipt<Log = Log>,
+{
     /// Borrow the raw log from the receipt.
     pub fn raw_log(&self) -> &Log {
         &self.receipt.logs()[self.log_index]
     }
 }
 
-impl<'a, R> ExtractedEvent<'a, R, Events>
-where
-    R: TxReceipt<Log = Log>,
-{
+impl<'a, R> ExtractedEvent<'a, R, Events> {
     /// True if the event is an [`Passage::EnterToken`].
     pub const fn is_enter_token(&self) -> bool {
         self.event.is_enter_token()
@@ -197,12 +221,12 @@ where
     }
 }
 
-impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Transactor::Transact> {
+impl<R> ExtractedEvent<'_, R, Transactor::Transact> {
     /// Create a magic signature for the transact event, containing sender
     /// information.
     pub fn magic_sig(&self) -> MagicSig {
         MagicSig {
-            ty: MagicSigInfo::Transact { sender: self.sender() },
+            ty: MagicSigInfo::Transact { sender: self.event.sender() },
             txid: self.tx_hash(),
             event_idx: self.log_index,
         }
@@ -233,14 +257,14 @@ impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Transactor::Transact> {
     }
 }
 
-impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Passage::Enter> {
+impl<R> ExtractedEvent<'_, R, Passage::Enter> {
     /// Get the magic signature for the enter event.
     pub fn magic_sig(&self) -> MagicSig {
         MagicSig { ty: MagicSigInfo::Enter, txid: self.tx_hash(), event_idx: self.log_index }
     }
 }
 
-impl<R: TxReceipt<Log = Log>> ExtractedEvent<'_, R, Passage::EnterToken> {
+impl<R> ExtractedEvent<'_, R, Passage::EnterToken> {
     /// Get the magic signature for the enter token event.
     pub fn magic_sig(&self) -> MagicSig {
         MagicSig { ty: MagicSigInfo::EnterToken, txid: self.tx_hash(), event_idx: self.log_index }
