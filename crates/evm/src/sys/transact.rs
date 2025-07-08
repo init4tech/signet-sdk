@@ -37,7 +37,7 @@ impl TransactSysTx {
     }
 
     /// Create a [`TransactSysLog`] from the filler.
-    fn to_log(&self) -> TransactSysLog {
+    fn make_sys_log(&self) -> TransactSysLog {
         TransactSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -92,7 +92,7 @@ impl SysOutput for TransactSysTx {
     }
 
     fn produce_log(&self) -> Log {
-        self.to_log().into()
+        self.make_sys_log().into()
     }
 
     fn sender(&self) -> Address {

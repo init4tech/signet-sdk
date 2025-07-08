@@ -114,7 +114,7 @@ impl MintToken {
     }
 
     /// Create a new [`Log`] for the [`MintToken`] operation.
-    const fn to_log(self) -> MintTokenSysLog {
+    const fn make_sys_log(self) -> MintTokenSysLog {
         MintTokenSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -125,7 +125,7 @@ impl MintToken {
     }
 
     /// Convert the [`MintToken`] instance into a [`TransactionSigned`].
-    pub(crate) fn to_transaction(&self) -> TransactionSigned {
+    fn make_transaction(&self) -> TransactionSigned {
         let input = self.mint_call().abi_encode().into();
 
         TransactionSigned::new_unhashed(
@@ -152,11 +152,11 @@ impl SysOutput for MintToken {
     }
 
     fn produce_transaction(&self) -> TransactionSigned {
-        self.to_transaction()
+        self.make_transaction()
     }
 
     fn produce_log(&self) -> Log {
-        self.to_log().into()
+        self.make_sys_log().into()
     }
 
     fn sender(&self) -> Address {
