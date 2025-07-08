@@ -1,143 +1,117 @@
-use crate::{ControlFlow, EvmNeedsTx, RunTxResult, SignetDriver};
-use alloy::primitives::U256;
-use signet_extract::{Extractable, ExtractedEvent};
-use signet_zenith::Transactor;
-use tracing::{debug, debug_span};
-use trevm::{
-    fillers::DisableNonceCheck,
-    helpers::Ctx,
-    revm::{
-        context::{
-            result::{EVMError, ExecutionResult},
-            TxEnv,
-        },
-        Database, DatabaseCommit, Inspector,
-    },
-    trevm_try, Tx,
+use crate::sys::{MeteredSysTx, SysOutput, SysTx, TransactSysLog};
+use alloy::{
+    consensus::{EthereumTxEnvelope, Transaction},
+    primitives::{Address, Log, TxKind, U256},
 };
+use core::fmt;
+use signet_extract::ExtractedEvent;
+use signet_types::{primitives::TransactionSigned, MagicSig};
+use signet_zenith::Transactor;
+use trevm::{revm::context::TxEnv, Tx};
 
 /// Shim to impl [`Tx`] for [`Transactor::Transact`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct TransactFiller<'a, 'b, R> {
-    /// The extracted event for the transact event.
-    pub transact: &'a ExtractedEvent<'b, R, Transactor::Transact>,
+#[derive(PartialEq, Eq)]
+pub struct TransactSysTx {
+    tx: TransactionSigned,
+
     /// The nonce of the transaction.
-    pub nonce: u64,
+    nonce: Option<u64>,
+
+    /// The magic sig. Memoized here to make it a little simpler to
+    /// access. Also available on the [`MagicSig`] in the transaction above.
+    magic_sig: MagicSig,
 }
 
-impl<R: Sync> Tx for TransactFiller<'_, '_, R> {
-    fn fill_tx_env(&self, tx_env: &mut TxEnv) {
-        self.transact.event.fill_tx_env(tx_env);
-        tx_env.nonce = self.nonce;
+impl<'a, R> From<&ExtractedEvent<'a, R, Transactor::Transact>> for TransactSysTx {
+    fn from(transact: &ExtractedEvent<'a, R, Transactor::Transact>) -> Self {
+        Self::new(transact)
     }
 }
 
-impl<'a, 'b, C> SignetDriver<'a, 'b, C>
-where
-    C: Extractable,
-{
-    /// Execute a [`Transactor::Transact`] event.
-    ///
-    /// This function does the following:
-    /// - Run the transaction.
-    /// - Check the aggregate fills.
-    /// - Debit the sender's account for unused gas.
-    /// - Create a receipt.
-    /// - Create a transaction and push it to the block.
-    ///
-    /// [`Transactor::Transact`]: signet_zenith::Transactor::Transact
-    fn execute_transact_event<Db, Insp>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-        idx: usize,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        let _span = {
-            let e = &self.extracts.transacts[idx];
-            debug_span!("execute_transact_event", idx,
-                host_tx = %e.tx_hash(),
-                log_index = e.log_index,
-                sender = %e.event.sender,
-                gas_limit = e.event.gas(),
-            )
-            .entered()
-        };
+impl TransactSysTx {
+    /// Instantiate a new [`TransactFiller`].
+    pub fn new<R>(transact: &ExtractedEvent<'_, R, Transactor::Transact>) -> Self {
+        let magic_sig = transact.magic_sig();
+        let tx = transact.make_transaction(0);
+        Self { tx, nonce: None, magic_sig }
+    }
 
-        let sender = self.extracts.transacts[idx].event.sender;
-        let nonce = trevm_try!(trevm.try_read_nonce(sender).map_err(EVMError::Database), trevm);
-
-        let transact = &self.extracts.transacts[idx];
-        let to_execute = TransactFiller { transact, nonce };
-
-        let mut t = run_tx_early_return!(self, trevm, &to_execute, sender);
-
-        {
-            // NB: This is a little sensitive.
-            // Although the EVM performs a check on the balance of the sender,
-            // to ensure they can pay the full price, that check may be
-            // invalidated by transaction execution. As a result, we have to
-            // perform the same check here, again.
-            let gas_used = t.result().gas_used();
-
-            // Set gas used to the transact gas limit
-            match t.result_mut_unchecked() {
-                ExecutionResult::Success { gas_used, .. }
-                | ExecutionResult::Revert { gas_used, .. }
-                | ExecutionResult::Halt { gas_used, .. } => {
-                    *gas_used = if transact.gas() >= u64::MAX as u128 {
-                        u64::MAX
-                    } else {
-                        transact.gas() as u64
-                    }
-                }
-            }
-
-            let unused_gas = transact.gas.saturating_sub(U256::from(gas_used));
-            let base_fee = t.block().basefee;
-            let to_debit = U256::from(base_fee) * unused_gas;
-
-            debug!(%base_fee, gas_used, %unused_gas, %to_debit, "Debiting unused transact gas");
-
-            let acct = t
-                .result_and_state_mut_unchecked()
-                .state
-                .get_mut(&transact.sender)
-                .expect("sender account must be in state, as it is touched by definition");
-
-            match acct.info.balance.checked_sub(to_debit) {
-                // If the balance is sufficient, debit the account.
-                Some(balance) => acct.info.balance = balance,
-                // If the balance is insufficient, discard the transaction.
-                None => {
-                    debug!("Discarding transact outcome due to insufficient balance to pay for unused transact gas");
-                    return Ok(t.reject());
-                }
-            }
+    /// Create a [`TransactSysLog`] from the filler.
+    pub fn to_log(&self) -> TransactSysLog {
+        TransactSysLog {
+            txHash: self.magic_sig.txid,
+            logIndex: self.magic_sig.event_idx as u64,
+            sender: self.sender(),
+            value: self.tx.value(),
+            gas: U256::from(self.tx.gas_limit()),
+            maxFeePerGas: U256::from(self.tx.max_fee_per_gas()),
         }
+    }
+}
 
-        // Convert the transact event into a transaction, and then check the
-        // aggregate fills
-        let tx = transact.make_transaction(nonce);
-        self.check_fills_and_accept(t, tx, Some(transact))
+// NB: manual impl because of incorrect auto-derive bound on `R: Debug`
+impl fmt::Debug for TransactSysTx {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TransactFiller")
+            .field("transact", &self.tx)
+            .field("magic_sig", &self.magic_sig)
+            .finish()
+    }
+}
+
+// NB: manual impl because of incorrect auto-derive bound on `R: Clone`
+impl Clone for TransactSysTx {
+    fn clone(&self) -> Self {
+        Self { tx: self.tx.clone(), nonce: self.nonce, magic_sig: self.magic_sig }
+    }
+}
+
+impl Tx for TransactSysTx {
+    fn fill_tx_env(&self, tx_env: &mut TxEnv) {
+        self.tx.as_eip1559().unwrap().fill_tx_env(tx_env);
+        tx_env.caller = self.magic_sig.sender();
+    }
+}
+
+impl SysOutput for TransactSysTx {
+    fn has_nonce(&self) -> bool {
+        self.nonce.is_some()
     }
 
-    /// Execute all transact events.
-    pub(crate) fn execute_all_transacts<Db, Insp>(
-        &mut self,
-        trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
-            for i in 0..self.extracts.transacts.len() {
-                trevm = self.execute_transact_event(trevm, i)?;
-            }
-            Ok(trevm)
-        })
+    fn populate_nonce(&mut self, nonce: u64) {
+        // NB: we have to set the nonce on the tx as well.
+        let EthereumTxEnvelope::Eip1559(signed) = &mut self.tx else {
+            unreachable!("new sets this to 1559");
+        };
+        signed.tx_mut().nonce = nonce;
+        self.nonce = Some(nonce);
+    }
+
+    fn produce_transaction(&self) -> TransactionSigned {
+        self.tx.clone()
+    }
+
+    fn produce_log(&self) -> Log {
+        self.to_log().into()
+    }
+
+    fn sender(&self) -> Address {
+        self.magic_sig.sender()
+    }
+}
+
+impl SysTx for TransactSysTx {}
+
+impl MeteredSysTx for TransactSysTx {
+    fn gas_limit(&self) -> u128 {
+        self.tx.gas_limit() as u128
+    }
+
+    fn callee(&self) -> TxKind {
+        self.tx.kind()
+    }
+
+    fn input(&self) -> alloy::primitives::Bytes {
+        self.tx.input().clone()
     }
 }
