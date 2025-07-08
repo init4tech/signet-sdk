@@ -325,8 +325,8 @@ where
         self.cache.get_recovered_block(hash).await.map_err(Into::into).map(|b| b.map(|b| (hash, b)))
     }
 
-    ///
-    pub fn tx_resp_builder(&self) -> EthRpcConverter {
+    /// Create a transaction response builder for the RPC API.
+    pub const fn tx_resp_builder(&self) -> EthRpcConverter {
         EthRpcConverter::new()
     }
 
