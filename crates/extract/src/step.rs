@@ -104,7 +104,25 @@ where
             return Events::decode_transactor(log, self.ru_chain_id());
         }
         if log.address == self.host_passage() {
-            return Events::decode_passage(log, self.ru_chain_id());
+            let event = Events::decode_passage(log, self.ru_chain_id())?;
+            // NB: If this is an `EnterToken` event, we only want to return it
+            // if the token is in the host tokens constants. This is a redundant
+            // safety check to as it is performed in the contract as well.
+            match event {
+                Events::Enter(_) => {
+                    return Some(event);
+                }
+                Events::EnterToken(enter_token) if self.is_host_token(enter_token.token()) => {
+                    return Some(event);
+                }
+                _ => {
+                    tracing::warn!(
+                        event = ?event,
+                        "Unexpected Passage event in host chain log"
+                    );
+                    return None;
+                }
+            }
         }
         None
     }

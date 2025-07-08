@@ -59,8 +59,11 @@ impl<'a, C: Extractable> HostEvents<'a, C> {
 /// populated with the fills present in the host block.
 #[derive(Debug, Clone)]
 pub struct Extracts<'a, C: Extractable> {
+    /// The `chain_id` of the host chain.
+    pub host_chain_id: u64,
     /// The host block.
     pub host_block: &'a C::Block,
+
     /// The rollup chain ID.
     pub chain_id: u64,
     /// The rollup block number.
@@ -120,27 +123,24 @@ impl<C: Extractable> Extracts<'_, C> {
 impl<'a, C: Extractable> Extracts<'a, C> {
     /// Ingest an [`Events`] into the host events, updating the [`HostEvents`]
     /// or the [`AggregateFills`].
-    pub fn ingest_event(
-        &mut self,
-        constants: &SignetSystemConstants,
-        event: ExtractedEvent<'a, C::Receipt, Events>,
-    ) {
+    pub fn ingest_event(&mut self, event: ExtractedEvent<'a, C::Receipt, Events>) {
         match event.event {
             Events::Enter(_) => {
                 self.events.ingest_enter(event.try_into_enter().expect("checked by match guard"));
             }
-            Events::EnterToken(enter) => {
-                if constants.is_host_token(enter.token) {
-                    self.events.ingest_enter_token(
-                        event.try_into_enter_token().expect("checked by match guard"),
-                    );
-                }
+            Events::EnterToken(_) => {
+                // NB: It is assumed that the `EnterToken` event has already
+                // been filtered to only include host tokens during the
+                // extraction process.
+                self.events.ingest_enter_token(
+                    event.try_into_enter_token().expect("checked by match guard"),
+                );
             }
             Events::Filled(fill) => {
                 // Fill the swap, ignoring overflows
                 // host swaps are pre-filtered to only include the
                 // host chain, so no need to check the chain id
-                self.context.add_fill(constants.host_chain_id(), &fill);
+                self.context.add_fill(self.host_chain_id, &fill);
             }
             Events::Transact(_) => {
                 self.events
@@ -158,6 +158,7 @@ impl<'a, C: Extractable> Extracts<'a, C> {
     #[doc(hidden)]
     pub fn empty(host_block: &'a C::Block) -> Self {
         Self {
+            host_chain_id: 0,
             host_block,
             chain_id: 0,
             ru_height: 0,

@@ -59,6 +59,7 @@ impl Extractor {
                 .expect("checked by filter");
 
             let mut extracts = Extracts {
+                host_chain_id: self.constants.host_chain_id(),
                 host_block,
                 chain_id: self.constants.ru_chain_id(),
                 ru_height,
