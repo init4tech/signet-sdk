@@ -125,7 +125,7 @@ impl MintToken {
     }
 
     /// Convert the [`MintToken`] instance into a [`TransactionSigned`].
-    pub fn to_transaction(&self) -> TransactionSigned {
+    pub(crate) fn to_transaction(&self) -> TransactionSigned {
         let input = self.mint_call().abi_encode().into();
 
         TransactionSigned::new_unhashed(
