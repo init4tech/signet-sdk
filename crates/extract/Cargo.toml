@@ -11,9 +11,9 @@ repository.workspace = true
 
 [dependencies]
 signet-types.workspace = true
-
 signet-zenith.workspace = true
 
 alloy.workspace = true
 
 tracing.workspace = true
+
