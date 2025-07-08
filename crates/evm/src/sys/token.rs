@@ -1,23 +1,18 @@
-use crate::{sys::MintTokenSysLog, ControlFlow, EvmNeedsTx, RunTxResult, SignetDriver};
+use crate::sys::{MintTokenSysLog, SysOutput};
 use alloy::{
     consensus::{TxEip1559, TxReceipt},
     primitives::{Address, Log, U256},
     sol_types::SolCall,
 };
-use signet_extract::{Extractable, ExtractedEvent};
+use signet_extract::ExtractedEvent;
 use signet_types::{
     constants::MINTER_ADDRESS,
     primitives::{Transaction, TransactionSigned},
     MagicSig,
 };
 use signet_zenith::Passage;
-use tracing::debug_span;
 use trevm::{
-    helpers::Ctx,
-    revm::{
-        context::{result::ExecutionResult, TransactTo, TransactionType, TxEnv},
-        Database, DatabaseCommit, Inspector,
-    },
+    revm::context::{TransactTo, TransactionType, TxEnv},
     MIN_TRANSACTION_GAS,
 };
 
@@ -127,12 +122,12 @@ impl MintToken {
             logIndex: self.magic_sig.event_idx as u64,
             recipient: self.recipient,
             amount: self.amount,
-            hostToken: self.host_token, // TODO: this needs to be the HOST token
+            hostToken: self.host_token,
         }
     }
 
     /// Convert the [`MintToken`] instance into a [`TransactionSigned`].
-    pub fn to_transaction(self) -> TransactionSigned {
+    pub fn to_transaction(&self) -> TransactionSigned {
         let input = self.mint_call().abi_encode().into();
 
         TransactionSigned::new_unhashed(
@@ -153,33 +148,16 @@ impl MintToken {
     }
 }
 
-impl<'a, 'b, C> SignetDriver<'a, 'b, C>
-where
-    C: Extractable,
-{
-    /// Execute a [`MintToken`], triggered by either a [`Passage::Enter`] or a
-    /// [`Passage::EnterToken`].
-    pub(crate) fn execute_mint_token<Db, Insp>(
-        &mut self,
-        trevm: EvmNeedsTx<Db, Insp>,
-        mint: &MintToken,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        let _span = debug_span!("signet::evm::Execute_mint_token", host_tx = %mint.magic_sig.txid, log_index = mint.magic_sig.event_idx).entered();
+impl SysOutput for MintToken {
+    fn produce_transaction(&self) -> TransactionSigned {
+        self.to_transaction()
+    }
 
-        // Run the transaction.
-        let mut t = run_tx_early_return!(self, trevm, mint, MINTER_ADDRESS);
+    fn produce_log(&self) -> Log {
+        self.to_log().into()
+    }
 
-        // push a sys_log to the outcome
-        if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
-            logs.push(mint.to_log().into());
-        }
-
-        // No need to check AggregateFills. This call cannot result in orders.
-        let tx = mint.to_transaction();
-        Ok(self.accept_tx(t, tx))
+    fn sender(&self) -> Address {
+        MINTER_ADDRESS
     }
 }
