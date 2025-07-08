@@ -9,8 +9,7 @@ use trevm::{
     helpers::Ctx,
     revm::{
         interpreter::{
-            CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
-            InterpreterTypes,
+            CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter, InterpreterTypes,
         },
         Database, Inspector,
     },

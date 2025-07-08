@@ -60,7 +60,7 @@ where
         );
         let finish_by = env.finish_by();
         let number = env.block().number;
-        Self { env: env.into(), block: BuiltBlock::new(number), finish_by, max_gas }
+        Self { env: env.into(), block: BuiltBlock::new(number.to()), finish_by, max_gas }
     }
 
     /// Run a simulation round, and accumulate the results into the block.

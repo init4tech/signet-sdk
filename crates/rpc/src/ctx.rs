@@ -23,8 +23,7 @@ use reth::{
     },
     revm::{database::StateProviderDatabase, primitives::hardfork::SpecId},
     rpc::{
-        compat::block::from_block,
-        eth::{filter::EthFilterError, EthTxBuilder},
+        eth::{filter::EthFilterError, helpers::types::EthRpcConverter},
         server_types::eth::{
             fee_history::{
                 calculate_reward_percentiles_for_block, fee_history_cache_new_blocks_task,
@@ -39,7 +38,7 @@ use reth::{
 };
 use reth_chainspec::{BaseFeeParams, ChainSpec, ChainSpecProvider};
 use reth_node_api::{BlockBody, FullNodeComponents};
-use reth_rpc_eth_api::{RpcBlock, RpcReceipt, RpcTransaction};
+use reth_rpc_eth_api::{RpcBlock, RpcConvert, RpcReceipt, RpcTransaction};
 use signet_evm::EvmNeedsTx;
 use signet_tx_cache::client::TxCache;
 use signet_types::{constants::SignetSystemConstants, MagicSig};
@@ -203,7 +202,7 @@ where
 
     // Gas stuff
     gas_oracle: GasPriceOracle<BlockchainProvider<Inner>>,
-    fee_history: FeeHistoryCache,
+    fee_history: FeeHistoryCache<reth::primitives::Header>,
 
     // Tx stuff
     tx_cache: Option<TxCache>,
@@ -326,6 +325,11 @@ where
         self.cache.get_recovered_block(hash).await.map_err(Into::into).map(|b| b.map(|b| (hash, b)))
     }
 
+    ///
+    pub fn tx_resp_builder(&self) -> EthRpcConverter {
+        EthRpcConverter::new()
+    }
+
     /// Get the block for a given block, formatting the block for
     /// the RPC API.
     pub async fn block(
@@ -341,7 +345,11 @@ where
             return Ok(None);
         };
 
-        from_block((*block).clone(), full.unwrap_or_default().into(), &EthTxBuilder::default())
+        (*block)
+            .clone()
+            .into_rpc_block(full.unwrap_or_default().into(), |tx, tx_info| {
+                self.tx_resp_builder().fill(tx, tx_info)
+            })
             .map(Some)
     }
 
@@ -627,7 +635,10 @@ where
             }
 
             for entry in &fee_entries {
-                base_fee_per_gas.push(entry.base_fee_per_gas as u128);
+                base_fee_per_gas.push(
+                    entry.header.base_fee_per_gas().expect("signet only has post-eip1559 headers")
+                        as u128,
+                );
                 gas_used_ratio.push(entry.gas_used_ratio);
 
                 if let Some(percentiles) = &reward_percentiles {
@@ -642,8 +653,12 @@ where
 
             // Also need to include the `base_fee_per_gas` and `base_fee_per_blob_gas` for the
             // next block
-            base_fee_per_gas
-                .push(last_entry.next_block_base_fee(self.provider().chain_spec()) as u128);
+            base_fee_per_gas.push(
+                last_entry
+                    .header
+                    .next_block_base_fee(BaseFeeParams::ethereum())
+                    .expect("signet only has post-eip1559 headers") as u128,
+            );
         } else {
             // read the requested header range
             let headers = self.provider().sealed_headers_range(start_block..=end_block)?;
