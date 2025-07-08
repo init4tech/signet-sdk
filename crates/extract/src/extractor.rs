@@ -58,17 +58,15 @@ impl Extractor {
                 .host_block_to_rollup_block_num(host_height)
                 .expect("checked by filter");
 
-            let mut extracts = Extracts {
-                host_chain_id: self.constants.host_chain_id(),
+            let mut extracts = Extracts::new(
+                self.constants.host_chain_id(),
                 host_block,
-                chain_id: self.constants.ru_chain_id(),
+                self.constants.ru_chain_id(),
                 ru_height,
-                events: Default::default(),
-                context: Default::default(),
-            };
+            );
 
-            events.for_each(|event| {
-                extracts.ingest_event(&self.constants, event);
+            events.for_each(|e| {
+                extracts.ingest_event(e);
             });
 
             extracts

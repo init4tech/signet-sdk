@@ -1,6 +1,6 @@
 use crate::{Events, Extractable, ExtractedEvent};
 use alloy::consensus::BlockHeader;
-use signet_types::{constants::SignetSystemConstants, AggregateFills};
+use signet_types::AggregateFills;
 use signet_zenith::{Passage, Transactor, Zenith};
 
 /// Events extracted from a host block.
@@ -73,7 +73,26 @@ pub struct Extracts<'a, C: Extractable> {
     pub events: HostEvents<'a, C>,
 
     /// The net fills extracted from the host block.
-    pub(crate) context: AggregateFills,
+    context: AggregateFills,
+}
+
+impl<'a, C: Extractable> Extracts<'a, C> {
+    /// Create a new [`Extracts`] from the given host block and chain ID.
+    pub fn new(
+        host_chain_id: u64,
+        host_block: &'a C::Block,
+        chain_id: u64,
+        ru_height: u64,
+    ) -> Self {
+        Self {
+            host_chain_id,
+            host_block,
+            chain_id,
+            ru_height,
+            events: Default::default(),
+            context: Default::default(),
+        }
+    }
 }
 
 impl<C: Extractable> Extracts<'_, C> {
