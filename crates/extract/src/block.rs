@@ -18,6 +18,8 @@ pub struct HostEvents<'a, C: Extractable> {
     pub enter_tokens: Vec<ExtractedEvent<'a, C::Receipt, Passage::EnterToken>>,
 }
 
+// NB: manual implementation because derived version incorrectly bounds `Vec<T>`
+// where T: Default`
 impl<C: Extractable> Default for HostEvents<'_, C> {
     fn default() -> Self {
         Self { submitted: None, enters: vec![], transacts: vec![], enter_tokens: vec![] }
@@ -25,17 +27,12 @@ impl<C: Extractable> Default for HostEvents<'_, C> {
 }
 
 impl<'a, C: Extractable> HostEvents<'a, C> {
-    /// Add an enter event to the host events.
+    /// Add [`Passage::Enter`] event to the host events.
     pub fn ingest_enter(&mut self, event: ExtractedEvent<'a, C::Receipt, Passage::Enter>) {
         self.enters.push(event);
     }
 
-    /// Add a transact event to the host events.
-    pub fn ingest_transact(&mut self, event: ExtractedEvent<'a, C::Receipt, Transactor::Transact>) {
-        self.transacts.push(event);
-    }
-
-    /// Add an enter token event to the host events.
+    /// Add an [`Passage::EnterToken`] event to the host events.
     pub fn ingest_enter_token(
         &mut self,
         event: ExtractedEvent<'a, C::Receipt, Passage::EnterToken>,
@@ -43,7 +40,12 @@ impl<'a, C: Extractable> HostEvents<'a, C> {
         self.enter_tokens.push(event);
     }
 
-    /// Add a filled event to the host events.
+    /// Add a [`Transactor::Transact`] event to the host events.
+    pub fn ingest_transact(&mut self, event: ExtractedEvent<'a, C::Receipt, Transactor::Transact>) {
+        self.transacts.push(event);
+    }
+
+    /// Add a [`Zenith::BlockSubmitted`] event to the host events.
     pub fn ingest_block_submitted(
         &mut self,
         event: ExtractedEvent<'a, C::Receipt, Zenith::BlockSubmitted>,
@@ -116,7 +118,8 @@ impl<C: Extractable> Extracts<'_, C> {
 }
 
 impl<'a, C: Extractable> Extracts<'a, C> {
-    /// Ingest an event into the host events.
+    /// Ingest an [`Events`] into the host events, updating the [`HostEvents`]
+    /// or the [`AggregateFills`].
     pub fn ingest_event(
         &mut self,
         constants: &SignetSystemConstants,
