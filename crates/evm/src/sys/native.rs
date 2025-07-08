@@ -58,7 +58,7 @@ impl MintNative {
     }
 
     /// Create a new [`Log`] for the [`MintNative`] operation.
-    const fn to_log(&self) -> MintNativeSysLog {
+    const fn make_sys_log(&self) -> MintNativeSysLog {
         MintNativeSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -68,7 +68,7 @@ impl MintNative {
     }
 
     /// Convert the [`MintNative`] instance into a [`TransactionSigned`].
-    fn to_transaction(&self) -> TransactionSigned {
+    fn make_transaction(&self) -> TransactionSigned {
         TransactionSigned::new_unhashed(
             Transaction::Eip1559(TxEip1559 {
                 chain_id: self.rollup_chain_id,
@@ -96,11 +96,11 @@ impl SysOutput for MintNative {
     }
 
     fn produce_transaction(&self) -> TransactionSigned {
-        self.to_transaction()
+        self.make_transaction()
     }
 
     fn produce_log(&self) -> Log {
-        self.to_log().into()
+        self.make_sys_log().into()
     }
 
     fn sender(&self) -> Address {
@@ -128,7 +128,7 @@ impl SysAction for MintNative {
             alloy::consensus::Receipt {
                 status: true.into(),
                 cumulative_gas_used: cumulative_gas_used.saturating_add(MIN_TRANSACTION_GAS),
-                logs: vec![self.to_log().into()],
+                logs: vec![self.make_sys_log().into()],
             }
             .with_bloom(),
         )
