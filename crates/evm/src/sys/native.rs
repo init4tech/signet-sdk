@@ -1,9 +1,9 @@
-use crate::{sys::MintNativeSysLog, EvmNeedsTx, RunTxResult, SignetDriver};
+use crate::sys::{MintNativeSysLog, SysAction, SysOutput};
 use alloy::{
     consensus::{ReceiptEnvelope, TxEip1559, TxReceipt},
     primitives::{Address, Log, U256},
 };
-use signet_extract::{Extractable, ExtractedEvent};
+use signet_extract::ExtractedEvent;
 use signet_types::{
     constants::MINTER_ADDRESS,
     primitives::{Transaction, TransactionSigned},
@@ -13,7 +13,7 @@ use signet_zenith::Passage;
 use trevm::{
     helpers::Ctx,
     revm::{context::result::EVMError, Database, DatabaseCommit, Inspector},
-    trevm_try, MIN_TRANSACTION_GAS,
+    Trevm, MIN_TRANSACTION_GAS,
 };
 
 /// System transaction to mint native tokens.
@@ -78,44 +78,43 @@ impl MintNative {
     }
 }
 
-impl<'a, 'b, C> SignetDriver<'a, 'b, C>
-where
-    C: Extractable,
-{
-    fn mint_native_receipt(&self, mint: &MintNative) -> ReceiptEnvelope {
-        let cumulative_gas_used = self.cumulative_gas_used().saturating_add(MIN_TRANSACTION_GAS);
-
-        ReceiptEnvelope::Eip1559(
-            alloy::consensus::Receipt {
-                status: true.into(),
-                cumulative_gas_used,
-                logs: vec![mint.to_log().into()],
-            }
-            .with_bloom(),
-        )
+impl SysOutput for MintNative {
+    fn produce_transaction(&self) -> TransactionSigned {
+        self.to_transaction()
     }
 
-    pub(crate) fn mint_native<Db, Insp>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-        mint: &MintNative,
-    ) -> RunTxResult<Self, Db, Insp>
+    fn produce_log(&self) -> Log {
+        self.to_log().into()
+    }
+
+    fn sender(&self) -> Address {
+        MINTER_ADDRESS
+    }
+}
+
+impl SysAction for MintNative {
+    fn apply<Db, Insp, State>(
+        &self,
+        evm: &mut Trevm<Db, Insp, State>,
+    ) -> Result<(), EVMError<Db::Error>>
     where
         Db: Database + DatabaseCommit,
         Insp: Inspector<Ctx<Db>>,
     {
-        // Increase the balance
-        trevm_try!(
-            trevm
-                .try_increase_balance_unchecked(mint.recipient, mint.amount)
-                .map_err(EVMError::Database),
-            trevm
-        );
+        // Increase the balance of the recipient
+        evm.try_increase_balance_unchecked(self.recipient, self.amount)
+            .map(drop)
+            .map_err(EVMError::Database)
+    }
 
-        // push receipt and transaction to the block
-        self.processed.push(mint.to_transaction());
-        self.output.push_result(self.mint_native_receipt(mint), MINTER_ADDRESS);
-
-        Ok(trevm)
+    fn produce_receipt(&self, cumulative_gas_used: u64) -> ReceiptEnvelope {
+        ReceiptEnvelope::Eip1559(
+            alloy::consensus::Receipt {
+                status: true.into(),
+                cumulative_gas_used: cumulative_gas_used.saturating_add(MIN_TRANSACTION_GAS),
+                logs: vec![self.to_log().into()],
+            }
+            .with_bloom(),
+        )
     }
 }

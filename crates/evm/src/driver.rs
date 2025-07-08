@@ -1,6 +1,6 @@
 use crate::{
     orders::SignetInspector,
-    sys::{MintNative, MintToken, TransactSysLog},
+    sys::{MintNative, MintToken, SysAction, SysTx, TransactSysLog},
     BlockResult, EvmNeedsTx, EvmTransacted, ExecutionOutcome, RunTxResult, SignetLayered,
 };
 use alloy::{
@@ -506,6 +506,48 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Ok(trevm)
     }
 
+    fn apply_sys_action<Db, Insp, S>(
+        &mut self,
+        mut trevm: EvmNeedsTx<Db, Insp>,
+        action: &S,
+    ) -> RunTxResult<Self, Db, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        Insp: Inspector<Ctx<Db>>,
+        S: SysAction,
+    {
+        // Run the system action.
+        trevm_try!(action.apply(&mut trevm), trevm);
+        // push receipt and transaction to the block
+        self.processed.push(action.produce_transaction());
+        self.output
+            .push_result(action.produce_receipt(self.cumulative_gas_used()), action.sender());
+
+        Ok(trevm)
+    }
+
+    fn apply_sys_transaction<Db, Insp, S>(
+        &mut self,
+        trevm: EvmNeedsTx<Db, Insp>,
+        sys_tx: &S,
+    ) -> RunTxResult<Self, Db, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        Insp: Inspector<Ctx<Db>>,
+        S: SysTx,
+    {
+        // Run the transaction.
+        let mut t = run_tx_early_return!(self, trevm, sys_tx, MINTER_ADDRESS);
+
+        // push a sys_log to the outcome
+        if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
+            logs.push(sys_tx.produce_log().into());
+        }
+
+        let tx = sys_tx.produce_transaction();
+        Ok(self.accept_tx(t, tx))
+    }
+
     fn run_mints_inner<Db, Insp>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
@@ -534,7 +576,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
         for (i, e) in self.extracts.enters.iter().enumerate() {
             let mint = MintToken::from_enter(minter_nonce + i as u64, eth_token, e);
-            trevm = self.execute_mint_token(trevm, &mint)?;
+            trevm = self.apply_sys_transaction(trevm, &mint)?;
             eth_minted += e.event.amount;
             eth_accts.insert(e.event.recipient());
         }
@@ -547,7 +589,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             if self.constants.is_host_usd(e.event.token) {
                 // USDC is handled as a native mint
                 let mint = MintNative::new(nonce, e);
-                trevm = self.mint_native(trevm, &mint)?;
+                trevm = self.apply_sys_action(trevm, &mint)?;
                 usd_minted += e.event.amount;
                 usd_accts.insert(e.event.recipient());
             } else {
@@ -557,7 +599,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
                     .rollup_token_from_host_address(e.event.token)
                     .expect("token enters must be permissioned");
                 let mint = MintToken::from_enter_token(nonce, ru_token_addr, e);
-                trevm = self.execute_mint_token(trevm, &mint)?;
+                trevm = self.apply_sys_transaction(trevm, &mint)?;
             }
         }
 
