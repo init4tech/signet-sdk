@@ -97,6 +97,11 @@ impl SignetSystemConstants {
         self.host.is_usd(address)
     }
 
+    /// Get the host USD record for the given address, if it is a host USD.
+    pub fn host_usd_record(&self, address: Address) -> Option<&HostUsdRecord> {
+        self.host.usd_record(address)
+    }
+
     /// Get the Order contract address for the given chain id.
     pub const fn orders_for(&self, chain_id: u64) -> Option<Address> {
         if chain_id == self.host_chain_id() {
