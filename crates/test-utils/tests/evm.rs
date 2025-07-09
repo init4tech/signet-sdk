@@ -6,6 +6,7 @@ use alloy::{
     primitives::{Address, U256},
     signers::{local::PrivateKeySigner, Signature},
     sol_types::SolEvent,
+    uint,
 };
 use signet_constants::SignetSystemConstants;
 use signet_evm::{
@@ -14,7 +15,9 @@ use signet_evm::{
 };
 use signet_extract::{Extractable, ExtractedEvent, Extracts};
 use signet_test_utils::{
-    chain::{fake_block, Chain, HOST_USDC, RU_CHAIN_ID, RU_WETH},
+    chain::{
+        fake_block, Chain, HOST_USDC, HOST_USDT, RU_CHAIN_ID, RU_WETH, USDC_RECORD, USDT_RECORD,
+    },
     evm::test_signet_evm,
     specs::{make_wallet, sign_tx_with_key_pair, simple_send},
 };
@@ -227,6 +230,7 @@ fn test_a_transact() {
     let mut context = TestEnv::new();
     let sender = Address::repeat_byte(1);
     let recipient = Address::repeat_byte(2);
+    let third_party = Address::repeat_byte(3);
 
     // Set up a couple fake events
     let fake_tx = fake_tx();
@@ -243,6 +247,20 @@ fn test_a_transact() {
         rollupRecipient: sender,
         token: HOST_USDC,
         amount: U256::from(ETH_TO_WEI),
+    };
+
+    let enter_token_2 = signet_zenith::Passage::EnterToken {
+        rollupChainId: U256::from(RU_CHAIN_ID),
+        rollupRecipient: third_party,
+        token: HOST_USDT,
+        amount: uint!(1_000_000_000_000_U256),
+    };
+
+    let enter_token_3 = signet_zenith::Passage::EnterToken {
+        rollupChainId: U256::from(RU_CHAIN_ID),
+        rollupRecipient: third_party,
+        token: HOST_USDC,
+        amount: U256::from(1_000_000),
     };
 
     let transact = signet_zenith::Transactor::Transact {
@@ -270,6 +288,18 @@ fn test_a_transact() {
         log_index: 0,
         event: enter_token,
     });
+    extracts.enter_tokens.push(ExtractedEvent {
+        tx: &fake_tx,
+        receipt: &fake_receipt,
+        log_index: 0,
+        event: enter_token_2,
+    });
+    extracts.enter_tokens.push(ExtractedEvent {
+        tx: &fake_tx,
+        receipt: &fake_receipt,
+        log_index: 0,
+        event: enter_token_3,
+    });
     extracts.transacts.push(ExtractedEvent {
         tx: &fake_tx,
         receipt: &fake_receipt,
@@ -288,19 +318,40 @@ fn test_a_transact() {
     // 1. MintToken for the enter event
     // 2. MintNative for the enter token event
     // 3. Transact for the transact event
-    let expected_tx_0 =
-        MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).produce_transaction();
-    let expected_tx_1 =
-        MintNative::new(&extracts.enter_tokens[0]).with_nonce(1).produce_transaction();
-    let expected_tx_2 = extracts.transacts[0].make_transaction(0);
+    // 4. MintNative for the second enter token event
+    // 5. MintNative for the third enter token event
+    let expected_sys_0 = MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0);
+    let expected_tx_0 = expected_sys_0.produce_transaction();
 
-    assert_eq!(sealed_block.senders, vec![MINTER_ADDRESS, MINTER_ADDRESS, sender]);
+    let expected_sys_1 =
+        MintNative::new(&extracts.enter_tokens[0], USDC_RECORD.decimals()).with_nonce(1);
+    let expected_tx_1 = expected_sys_1.produce_transaction();
+
+    let expected_sys_2 =
+        MintNative::new(&extracts.enter_tokens[1], USDT_RECORD.decimals()).with_nonce(2);
+    let expected_tx_2 = expected_sys_2.produce_transaction();
+
+    let expected_sys_3 =
+        MintNative::new(&extracts.enter_tokens[2], USDC_RECORD.decimals()).with_nonce(3);
+    let expected_tx_3 = expected_sys_3.produce_transaction();
+
+    let expected_tx_4 = extracts.transacts[0].make_transaction(0);
+
+    assert_eq!(
+        sealed_block.senders,
+        vec![MINTER_ADDRESS, MINTER_ADDRESS, MINTER_ADDRESS, MINTER_ADDRESS, sender]
+    );
     assert_eq!(
         sealed_block.block.body.transactions().collect::<Vec<_>>(),
-        vec![&expected_tx_0, &expected_tx_1, &expected_tx_2]
+        vec![&expected_tx_0, &expected_tx_1, &expected_tx_2, &expected_tx_3, &expected_tx_4]
     );
-    assert_eq!(receipts.len(), 3);
+    assert_eq!(receipts.len(), 5);
     assert_eq!(trevm.read_balance(recipient), U256::from(100));
+
+    let inbound_usdt = expected_sys_2.mint_amount();
+    let inbound_usdc = expected_sys_3.mint_amount();
+    let expected_third_party_balance = inbound_usdc + inbound_usdt;
+    assert_eq!(trevm.read_balance(third_party), expected_third_party_balance);
 }
 
 fn fake_tx() -> TransactionSigned {

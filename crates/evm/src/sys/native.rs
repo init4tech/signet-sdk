@@ -57,12 +57,12 @@ impl MintNative {
     }
 
     /// Create a new [`Log`] for the [`MintNative`] operation.
-    const fn make_sys_log(&self) -> MintNativeSysLog {
+    fn make_sys_log(&self) -> MintNativeSysLog {
         MintNativeSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
             recipient: self.recipient,
-            amount: self.host_amount,
+            amount: self.mint_amount(),
         }
     }
 
@@ -76,7 +76,7 @@ impl MintNative {
                 max_fee_per_gas: 0,
                 max_priority_fee_per_gas: 0,
                 to: self.recipient.into(),
-                value: self.host_amount,
+                value: self.mint_amount(),
                 access_list: Default::default(),
                 input: Default::default(),
             }),
@@ -87,15 +87,8 @@ impl MintNative {
     /// Get the amount of native tokens to mint, adjusted for the decimals of
     /// the host USD record.
     pub fn mint_amount(&self) -> U256 {
-        if self.decimals > ETH_DECIMALS {
-            let divisor_exp = self.decimals - ETH_DECIMALS;
-            let divisor = U256::from(10u64).pow(U256::from(divisor_exp));
-            self.host_amount / divisor
-        } else {
-            let multiplier_exp = ETH_DECIMALS - self.decimals;
-            let multiplier = U256::from(10u64).pow(U256::from(multiplier_exp));
-            self.host_amount * multiplier
-        }
+        let decimals = self.decimals;
+        adjust_decimals(self.host_amount, decimals, ETH_DECIMALS)
     }
 }
 
@@ -145,5 +138,54 @@ impl SysAction for MintNative {
             }
             .with_bloom(),
         )
+    }
+}
+
+/// Adjust the amount of tokens based on the decimals of the host USD record
+/// and the target decimals.
+///
+/// This is done by either dividing or multiplying the host amount
+/// by a power of 10, depending on whether the host decimals are greater than
+/// or less than the target decimals.
+fn adjust_decimals(amount: U256, decimals: u8, target_decimals: u8) -> U256 {
+    if target_decimals == 0 || decimals == 0 {
+        // If target decimals is 0, return the host amount unchanged
+        return amount;
+    }
+
+    if decimals > target_decimals {
+        let divisor_exp = decimals - target_decimals;
+        let divisor = U256::from(10u64).pow(U256::from(divisor_exp));
+        amount / divisor
+    } else {
+        let multiplier_exp = target_decimals.checked_sub(decimals).unwrap_or_default();
+        let multiplier = U256::from(10u64).pow(U256::from(multiplier_exp));
+        amount * multiplier
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::uint;
+
+    #[test]
+    fn mint_amount_math() {
+        uint! {
+            assert_eq!(adjust_decimals(10_U256.pow(6_U256), 6, 18), 10_U256.pow(18_U256));
+            assert_eq!(adjust_decimals(10_U256.pow(18_U256), 18, 6), 10_U256.pow(6_U256));
+
+            assert_eq!(adjust_decimals(10_U256.pow(6_U256), 6, 12), 10_U256.pow(12_U256));
+            assert_eq!(adjust_decimals(10_U256.pow(12_U256), 12, 6), 10_U256.pow(6_U256));
+
+            assert_eq!(adjust_decimals(10_U256.pow(18_U256), 18, 12), 10_U256.pow(12_U256));
+            assert_eq!(adjust_decimals(10_U256.pow(12_U256), 12, 18), 10_U256.pow(18_U256));
+
+            assert_eq!(adjust_decimals(10_U256.pow(6_U256), 6, 0), 10_U256.pow(6_U256));
+
+            assert_eq!(adjust_decimals(10_U256.pow(18_U256), 3, 6), 10_U256.pow(21_U256));
+            assert_eq!(adjust_decimals(10_U256.pow(21_U256), 6, 3), 10_U256.pow(18_U256));
+            assert_eq!(adjust_decimals(10_U256.pow(18_U256), 6, 3), 10_U256.pow(15_U256));
+        }
     }
 }
