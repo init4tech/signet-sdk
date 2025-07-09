@@ -26,9 +26,10 @@ use trevm::{
     Trevm, Tx,
 };
 
-/// Produce a transaction from a system action. This will be ingested into the
-/// block during EVM execution.
-pub trait SysOutput: fmt::Debug + Clone {
+/// [`SysBase`] is the root trait for all system actions and transactions. It
+/// provides the basic functionality that the [`SignetDriver`] needs to process
+/// system actions and transactions.
+pub trait SysBase: fmt::Debug + Clone {
     /// Check if the system action has a nonce. This is typically used to
     /// determine if the nonce should be populated by the Evm during
     /// transaction processing.
@@ -57,24 +58,26 @@ pub trait SysOutput: fmt::Debug + Clone {
     /// of the receipt, and
     fn produce_log(&self) -> Log;
 
-    /// Get the address of the sender of the system action. This is typically
-    /// the [`MINTER_ADDRESS`] for minting actions, or the address of the
-    /// system contract caller for other actions.
-    fn sender(&self) -> Address;
+    /// Get the address that the Signet EVM considers to be the sender of the
+    /// system action. This is typically the [`MINTER_ADDRESS`] for token or
+    /// native asset mints, and the host-chain user address for transact events.
+    ///
+    /// [`MINTER_ADDRESS`]: signet_types::constants::MINTER_ADDRESS
+    fn evm_sender(&self) -> Address;
 }
 
 /// A transaction that is run on the EVM, and may or may not pay gas.
 ///
 /// See [`MeteredSysTx`] and [`UnmeteredSysTx`] for more specific
 /// transaction types.
-pub trait SysTx: SysOutput + Tx {}
+pub trait SysTx: SysBase + Tx {}
 
 /// System actions are operations that apply changes to the EVM state without
 /// going through the transaction processing pipeline. They are not run as
 /// transactions, and do not have gas limits or revert semantics. They are
 /// typically used for operations that need to be applied directly to the state,
 /// such as modifying balances.
-pub trait SysAction: SysOutput {
+pub trait SysAction: SysBase {
     /// Apply the system action to the EVM state.
     fn apply<Db, Insp, State>(
         &self,
@@ -95,7 +98,7 @@ pub trait SysAction: SysOutput {
 /// and CAN halt. They are typically used for operations that need to be run as
 /// transactions, but should not pay gas. E.g. minting tokens or performing
 /// system-level operations that do not require gas payment.
-pub trait UnmeteredSysTx: SysOutput + Tx {}
+pub trait UnmeteredSysTx: SysBase + Tx {}
 
 /// System transactions run on the EVM as a transaction, and are subject to the
 /// same rules and constraints as regular transactions. They may run arbitrary
@@ -108,7 +111,7 @@ pub trait UnmeteredSysTx: SysOutput + Tx {}
 /// They are distinct from [`SysAction`], which are not run as transactions,
 /// but rather apply changes to the state directly without going through the
 /// transaction processing pipeline.
-pub trait MeteredSysTx: SysOutput + Tx {
+pub trait MeteredSysTx: SysBase + Tx {
     /// Get the gas limit for the transaction. This is the maximum amount of
     /// gas that the transaction is allowed to consume.
     ///

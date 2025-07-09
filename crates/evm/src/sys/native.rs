@@ -1,4 +1,4 @@
-use crate::sys::{MintNativeSysLog, SysAction, SysOutput};
+use crate::sys::{MintNativeSysLog, SysAction, SysBase};
 use alloy::{
     consensus::{ReceiptEnvelope, TxEip1559, TxReceipt},
     primitives::{Address, Log, U256},
@@ -86,7 +86,7 @@ impl MintNative {
     }
 }
 
-impl SysOutput for MintNative {
+impl SysBase for MintNative {
     fn has_nonce(&self) -> bool {
         self.nonce.is_some()
     }
@@ -103,7 +103,7 @@ impl SysOutput for MintNative {
         self.make_sys_log().into()
     }
 
-    fn sender(&self) -> Address {
+    fn evm_sender(&self) -> Address {
         MINTER_ADDRESS
     }
 }

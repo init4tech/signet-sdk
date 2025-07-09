@@ -1,4 +1,4 @@
-use crate::sys::{MintTokenSysLog, SysOutput, SysTx, UnmeteredSysTx};
+use crate::sys::{MintTokenSysLog, SysBase, SysTx, UnmeteredSysTx};
 use alloy::{
     consensus::{TxEip1559, TxReceipt},
     primitives::{Address, Log, U256},
@@ -146,7 +146,7 @@ impl MintToken {
     }
 }
 
-impl SysOutput for MintToken {
+impl SysBase for MintToken {
     fn populate_nonce(&mut self, nonce: u64) {
         self.nonce = Some(nonce);
     }
@@ -159,7 +159,7 @@ impl SysOutput for MintToken {
         self.make_sys_log().into()
     }
 
-    fn sender(&self) -> Address {
+    fn evm_sender(&self) -> Address {
         MINTER_ADDRESS
     }
 

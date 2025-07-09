@@ -9,7 +9,7 @@ use alloy::{
 };
 use signet_constants::SignetSystemConstants;
 use signet_evm::{
-    sys::{MintNative, MintToken, MintTokenSysLog, SysOutput},
+    sys::{MintNative, MintToken, MintTokenSysLog, SysBase},
     SignetDriver,
 };
 use signet_extract::{Extractable, ExtractedEvent, Extracts};
