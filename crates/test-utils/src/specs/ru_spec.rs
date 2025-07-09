@@ -43,11 +43,6 @@ impl RuBlockSpec {
         Self { constants, tx: vec![], gas_limit: None, reward_address: None }
     }
 
-    /// Create a new empty RU block spec with the pecorino constants.
-    pub const fn pecorino() -> Self {
-        Self::new(SignetSystemConstants::pecorino())
-    }
-
     /// Create a new empty RU block spec with the test constants.
     pub const fn test() -> Self {
         Self::new(SignetSystemConstants::test())
@@ -152,7 +147,6 @@ impl FromStr for RuBlockSpec {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
     }

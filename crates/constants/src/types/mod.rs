@@ -14,7 +14,9 @@ mod chains;
 pub use chains::{KnownChains, ParseChainError};
 
 mod tokens;
-pub use tokens::{PermissionedToken, PredeployTokens};
+pub use tokens::{
+    HostPermitted, HostTokens, HostUsdRecord, RollupPermitted, RollupTokens, UsdRecords,
+};
 
 mod environment;
 pub use environment::SignetEnvironmentConstants;
@@ -31,7 +33,7 @@ use std::str::FromStr;
 /// information about the host and rollup state. These constants are used to
 /// determine the behavior of the chain, such as which contracts the Signet
 /// node should listen to, and the addresses of system-priveleged tokens.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub struct SignetSystemConstants {
     /// Host constants.
     host: HostConstants,
@@ -43,11 +45,6 @@ impl SignetSystemConstants {
     /// Create a new set of constants.
     pub const fn new(host: HostConstants, rollup: RollupConstants) -> Self {
         Self { host, rollup }
-    }
-
-    /// Get the hard-coded pecorino system constants.
-    pub const fn pecorino() -> Self {
-        crate::chains::pecorino::PECORINO_SYS
     }
 
     /// Get the hard-coded local test constants.
@@ -65,8 +62,8 @@ impl SignetSystemConstants {
     }
 
     /// Get the host addresses.
-    pub const fn host(&self) -> HostConstants {
-        self.host
+    pub const fn host(&self) -> &HostConstants {
+        &self.host
     }
 
     /// Get the rollup addresses.
@@ -96,7 +93,7 @@ impl SignetSystemConstants {
 
     /// True if the address is a host USD that can be used to mint rollup
     /// native asset.
-    pub const fn is_host_usd(&self, address: Address) -> bool {
+    pub fn is_host_usd(&self, address: Address) -> bool {
         self.host.is_usd(address)
     }
 
@@ -191,30 +188,21 @@ impl SignetSystemConstants {
 
     /// `True` if the address is a host token corresponding to a pre-deployed
     /// token on the rollup.
-    pub const fn const_is_host_token(&self, address: Address) -> bool {
-        self.host.tokens().const_is_token(address)
-    }
-
-    /// `True` if the address is a host token corresponding to a pre-deployed
-    /// token on the rollup.
     pub fn is_host_token(&self, address: Address) -> bool {
         self.host.tokens().is_token(address)
     }
 
     /// `True` if the address is a pre-deployed token on the rollup.
-    pub const fn const_is_rollup_token(&self, address: Address) -> bool {
-        self.rollup.tokens().const_is_token(address)
-    }
-    /// `True` if the address is a pre-deployed token on the rollup.
-    pub fn is_rollup_token(&self, address: Address) -> bool {
+    pub const fn is_rollup_token(&self, address: Address) -> bool {
         self.rollup.tokens().is_token(address)
     }
 
     /// Get the rollup token address corresponding to a host address.
     ///
     /// Returns `None` if the address is not a pre-deployed token.
-    pub fn rollup_token_from_host_address(&self, host_address: Address) -> Option<Address> {
-        self.host.tokens().token_for(host_address).map(|t| self.rollup.tokens().address_for(t))
+    pub fn rollup_address_from_host_address(&self, host_address: Address) -> Option<Address> {
+        let perm = self.host.tokens().token_for(host_address)?;
+        Some(self.rollup.tokens().address_for(perm.into()))
     }
 
     /// Get the minter address.
@@ -229,7 +217,6 @@ impl FromStr for SignetSystemConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
@@ -254,11 +241,6 @@ impl SignetConstants {
         Self { system, environment }
     }
 
-    /// Get the hard-coded pecorino rollup constants.
-    pub const fn pecorino() -> Self {
-        crate::chains::pecorino::PECORINO
-    }
-
     /// Get the hard-coded local test rollup constants.
     #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
@@ -266,13 +248,13 @@ impl SignetConstants {
     }
 
     /// Get the system constants.
-    pub const fn system(&self) -> SignetSystemConstants {
-        self.system
+    pub const fn system(&self) -> &SignetSystemConstants {
+        &self.system
     }
 
     /// Get the host constants.
-    pub const fn host(&self) -> HostConstants {
-        self.system.host
+    pub const fn host(&self) -> &HostConstants {
+        &self.system.host
     }
 
     /// Get the rollup constants.
@@ -292,7 +274,6 @@ impl FromStr for SignetConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }

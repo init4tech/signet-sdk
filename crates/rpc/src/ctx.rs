@@ -172,7 +172,7 @@ where
 
         let db = self.signet.state_provider_database(height)?;
 
-        let mut trevm = signet_evm::signet_evm(db, self.signet.constants)
+        let mut trevm = signet_evm::signet_evm(db, self.signet.constants.clone())
             .fill_cfg(&self.signet)
             .fill_block(block);
 
@@ -264,8 +264,8 @@ where
     }
 
     /// Access the signet constants
-    pub const fn constants(&self) -> SignetSystemConstants {
-        self.constants
+    pub const fn constants(&self) -> &SignetSystemConstants {
+        &self.constants
     }
 
     /// Access the signet DB

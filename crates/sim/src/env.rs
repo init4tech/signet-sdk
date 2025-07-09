@@ -251,7 +251,7 @@ where
         let inspector =
             Layered::new(TimeLimit::new(self.finish_by - Instant::now()), Insp::default());
 
-        Ok(signet_evm::signet_evm_with_inspector(db, inspector, self.constants))
+        Ok(signet_evm::signet_evm_with_inspector(db, inspector, self.constants.clone()))
     }
 }
 

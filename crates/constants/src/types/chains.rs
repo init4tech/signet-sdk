@@ -14,8 +14,6 @@ pub enum ParseChainError {
 /// Known chains for the Signet system.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum KnownChains {
-    /// Pecorino chain.
-    Pecorino,
     /// Test chain.
     #[cfg(any(test, feature = "test-utils"))]
     Test,
@@ -27,7 +25,6 @@ impl FromStr for KnownChains {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().to_lowercase();
         match s.as_str() {
-            "pecorino" => Ok(Self::Pecorino),
             #[cfg(any(test, feature = "test-utils"))]
             "test" => Ok(Self::Test),
             _ => Err(ParseChainError::ChainNotSupported(s)),

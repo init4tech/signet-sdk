@@ -1,10 +1,11 @@
 use alloy::{
+    consensus::constants::GWEI_TO_WEI,
     primitives::{uint, U256},
     signers::Signer,
 };
 use chrono::Utc;
 use eyre::Error;
-use signet_constants::SignetConstants;
+use signet_constants::{SignetConstants, ETH_ADDRESS};
 use signet_tx_cache::client::TxCache;
 use signet_types::UnsignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
@@ -61,10 +62,14 @@ where
 
     /// Get an example Order which swaps 1 USDC on the rollup for 1 USDC on the host.
     fn example_order(&self) -> Order {
-        // input is 1 USDC on the rollup
-        let input = Input { token: self.constants.rollup().tokens().usdc(), amount: ONE_USDC };
+        let amount = U256::from(GWEI_TO_WEI);
 
-        // output is 1 USDC on the host chain
+        // input is 1 USD on the rollup
+        let input = Input { token: ETH_ADDRESS, amount };
+
+        // output is 1 USDC on the host chain.
+        // NB: decimals are important! USDC has 6 decimals, while Signet's USD
+        // native asset has 18.
         let output = Output {
             token: self.constants.host().tokens().usdc(),
             amount: ONE_USDC,
