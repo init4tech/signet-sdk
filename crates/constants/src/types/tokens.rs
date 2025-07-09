@@ -256,6 +256,12 @@ impl PartialEq for UsdRecords {
 
 impl Eq for UsdRecords {}
 
+impl Default for UsdRecords {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UsdRecords {
     /// Create a new empty set of USD records.
     pub const fn new() -> Self {
@@ -298,7 +304,7 @@ impl UsdRecords {
     }
 
     /// Get a slice of the USD records.
-    pub fn as_slice(&self) -> &[HostUsdRecord] {
+    pub const fn as_slice(&self) -> &[HostUsdRecord] {
         // SAFETY: We ensure that the data is initialized when pushing records.
         unsafe { std::slice::from_raw_parts(self.data.as_ptr() as *const HostUsdRecord, self.len) }
     }
