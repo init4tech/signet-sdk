@@ -107,6 +107,10 @@ impl MeteredSysTx for TransactSysTx {
         self.tx.gas_limit() as u128
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.tx.max_fee_per_gas() as u128
+    }
+
     fn callee(&self) -> TxKind {
         self.tx.kind()
     }
