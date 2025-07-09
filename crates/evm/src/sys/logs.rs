@@ -1,4 +1,4 @@
-use alloy::{consensus::TxReceipt, primitives::Log, sol_types::SolEvent};
+use alloy::{primitives::Log, sol_types::SolEvent};
 use signet_extract::ExtractedEvent;
 use signet_zenith::{Transactor, MINTER_ADDRESS};
 
@@ -46,7 +46,7 @@ impl From<Transact> for Log {
     }
 }
 
-impl<R: TxReceipt<Log = Log>> From<&ExtractedEvent<'_, R, Transactor::Transact>> for Transact {
+impl<R> From<&ExtractedEvent<'_, R, Transactor::Transact>> for Transact {
     fn from(event: &ExtractedEvent<'_, R, Transactor::Transact>) -> Self {
         Transact {
             sender: event.event.sender,
