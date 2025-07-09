@@ -950,9 +950,9 @@ impl<C: Extractable> trevm::Block for SignetDriver<'_, '_, C> {
             prevrandao,
             blob_excess_gas_and_price,
         } = block_env;
-        *number = self.ru_height();
+        *number = U256::from(self.ru_height());
         *beneficiary = self.beneficiary();
-        *timestamp = self.extracts.host_block.timestamp();
+        *timestamp = U256::from(self.extracts.host_block.timestamp());
         *gas_limit = self.gas_limit();
         *basefee = self.base_fee();
         *difficulty = self.extracts.host_block.difficulty();
