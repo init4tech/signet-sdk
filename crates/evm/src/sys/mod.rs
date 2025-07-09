@@ -16,7 +16,7 @@ pub use transact::TransactSysTx;
 
 use alloy::{
     consensus::ReceiptEnvelope,
-    primitives::{Address, Bytes, Log, TxKind},
+    primitives::{Address, Bytes, Log, TxKind, U256},
 };
 use core::fmt;
 use signet_types::primitives::TransactionSigned;
@@ -117,6 +117,25 @@ pub trait MeteredSysTx: SysBase + Tx {
     ///
     /// Metered system transactions ALWAYS consume all gas.
     fn gas_limit(&self) -> u128;
+
+    /// Get the max fee per gas for the transaction. This is the maximum
+    /// amount of gas that the transaction is willing to pay for each unit of
+    /// gas consumed.
+    ///
+    /// Metered system transactions ALWAYS consume all gas and NEVER pay a tip.
+    fn max_fee_per_gas(&self) -> u128;
+
+    /// Get the precise total fee for the transaction. This is the product of
+    /// [`MeteredSysTx::gas_limit`] and [`MeteredSysTx::max_fee_per_gas`]. This
+    /// is distinct from the actual fee paid, which may be less than this. The
+    /// actual fee paid is the product of [`MeteredSysTx::gas_limit`] and the
+    /// current block's basefee.
+    ///
+    /// Metered system transactions ALWAYS consume all gas and NEVER pay a tip,
+    /// so the maximum fee they will pay is known up front.
+    fn max_fee(&self) -> U256 {
+        U256::from(self.gas_limit()) * U256::from(self.max_fee_per_gas())
+    }
 
     /// Get the callee address for the transaction.
     fn callee(&self) -> TxKind;
