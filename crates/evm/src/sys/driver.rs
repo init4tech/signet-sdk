@@ -404,9 +404,9 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
         for (i, e) in self.extracts.enter_tokens.iter().enumerate() {
             let nonce = minter_nonce + i as u64;
-            if self.constants.is_host_usd(e.event.token) {
+            if let Some(record) = self.constants.host_usd_record(e.event.token) {
                 // USDC is handled as a native mint
-                let mut mint = MintNative::new(e);
+                let mut mint = MintNative::new(e, record.decimals());
                 mint.populate_nonce(nonce);
                 trevm = self.apply_sys_action_single(trevm, mint)?;
                 usd_minted += e.event.amount;

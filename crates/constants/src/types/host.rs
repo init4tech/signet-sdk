@@ -1,4 +1,7 @@
-use crate::types::{ConfigError, HostTokens, KnownChains, ParseChainError};
+use crate::{
+    types::{ConfigError, HostTokens, KnownChains, ParseChainError},
+    HostUsdRecord,
+};
 use alloy::{genesis::Genesis, primitives::Address};
 use serde_json::Value;
 use std::str::FromStr;
@@ -118,6 +121,11 @@ impl HostConstants {
     /// Get the host tokens.
     pub const fn tokens(&self) -> &HostTokens {
         &self.tokens
+    }
+
+    /// Get the host USD record for the given address, if it is a host USD.
+    pub fn usd_record(&self, address: Address) -> Option<&HostUsdRecord> {
+        self.tokens.usd_record(address)
     }
 
     /// Return true if the address is an approved USD token.

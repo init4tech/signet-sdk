@@ -16,13 +16,19 @@ use trevm::{
     Trevm, MIN_TRANSACTION_GAS,
 };
 
+const ETH_DECIMALS: u8 = 18;
+
 /// System transaction to mint native tokens.
 #[derive(Debug, Clone, Copy)]
 pub struct MintNative {
     /// The address that will receive the minted tokens.
     recipient: Address,
+
+    /// The host USD record for the mint.
+    decimals: u8,
+
     /// The amount of native tokens to mint.
-    amount: U256,
+    host_amount: U256,
 
     /// The magic signature for the mint.
     magic_sig: MagicSig,
@@ -33,24 +39,17 @@ pub struct MintNative {
     rollup_chain_id: u64,
 }
 
-impl<R> From<&ExtractedEvent<'_, R, Passage::EnterToken>> for MintNative
-where
-    R: TxReceipt<Log = Log>,
-{
-    fn from(event: &ExtractedEvent<'_, R, Passage::EnterToken>) -> Self {
-        Self::new(event)
-    }
-}
-
 impl MintNative {
     /// Create a new [`MintNative`] instance from an [`ExtractedEvent`]
     /// containing a [`Passage::EnterToken`] event.
     pub fn new<R: TxReceipt<Log = Log>>(
         event: &ExtractedEvent<'_, R, Passage::EnterToken>,
+        decimals: u8,
     ) -> Self {
         Self {
             recipient: event.event.recipient(),
-            amount: event.event.amount(),
+            decimals,
+            host_amount: event.event.amount(),
             magic_sig: event.magic_sig(),
             nonce: None,
             rollup_chain_id: event.rollup_chain_id(),
@@ -63,7 +62,7 @@ impl MintNative {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
             recipient: self.recipient,
-            amount: self.amount,
+            amount: self.host_amount,
         }
     }
 
@@ -77,12 +76,26 @@ impl MintNative {
                 max_fee_per_gas: 0,
                 max_priority_fee_per_gas: 0,
                 to: self.recipient.into(),
-                value: self.amount,
+                value: self.host_amount,
                 access_list: Default::default(),
                 input: Default::default(),
             }),
             self.magic_sig.into(),
         )
+    }
+
+    /// Get the amount of native tokens to mint, adjusted for the decimals of
+    /// the host USD record.
+    pub fn mint_amount(&self) -> U256 {
+        if self.decimals > ETH_DECIMALS {
+            let divisor_exp = self.decimals - ETH_DECIMALS;
+            let divisor = U256::from(10u64).pow(U256::from(divisor_exp));
+            self.host_amount / divisor
+        } else {
+            let multiplier_exp = ETH_DECIMALS - self.decimals;
+            let multiplier = U256::from(10u64).pow(U256::from(multiplier_exp));
+            self.host_amount * multiplier
+        }
     }
 }
 
@@ -118,7 +131,7 @@ impl SysAction for MintNative {
         Insp: Inspector<Ctx<Db>>,
     {
         // Increase the balance of the recipient
-        evm.try_increase_balance_unchecked(self.recipient, self.amount)
+        evm.try_increase_balance_unchecked(self.recipient, self.mint_amount())
             .map(drop)
             .map_err(EVMError::Database)
     }
