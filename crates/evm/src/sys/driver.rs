@@ -415,7 +415,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
                 // All other tokens are non-native mints
                 let ru_token_addr = self
                     .constants
-                    .rollup_token_from_host_address(e.event.token)
+                    .rollup_address_from_host_address(e.event.token)
                     .expect("token enters must be permissioned");
                 let mut mint = MintToken::from_enter_token(ru_token_addr, e);
                 mint.populate_nonce(nonce);

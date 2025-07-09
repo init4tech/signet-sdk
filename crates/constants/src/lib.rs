@@ -17,15 +17,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod chains;
-pub use chains::pecorino;
 #[cfg(any(test, feature = "test-utils"))]
 pub use chains::test_utils;
 
 mod types;
 pub use types::{
-    ConfigError, HostConstants, KnownChains, PairedHeights, ParseChainError, PermissionedToken,
-    PredeployTokens, RollupConstants, SignetConstants, SignetEnvironmentConstants,
-    SignetSystemConstants, MINTER_ADDRESS,
+    ConfigError, HostConstants, HostPermitted, HostTokens, HostUsdRecord, KnownChains,
+    PairedHeights, ParseChainError, RollupConstants, RollupPermitted, RollupTokens,
+    SignetConstants, SignetEnvironmentConstants, SignetSystemConstants, UsdRecords, MINTER_ADDRESS,
 };
 
 /// Placeholder address for ETH.

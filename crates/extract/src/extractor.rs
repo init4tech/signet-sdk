@@ -12,7 +12,7 @@ use signet_types::constants::SignetSystemConstants;
 /// represented as [`ExtractedEvent`] objects containing [`Events`]. One
 /// [`Extracts`] will be produced for each block in the input chain, provided
 /// that Signet was deployed at that height.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Extractor {
     constants: SignetSystemConstants,
 }
