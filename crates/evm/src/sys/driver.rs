@@ -2,9 +2,7 @@
 
 use crate::{
     driver::ControlFlow,
-    sys::{
-        MeteredSysTx, MintNative, MintToken, SysAction, SysOutput, TransactSysTx, UnmeteredSysTx,
-    },
+    sys::{MeteredSysTx, MintNative, MintToken, SysAction, SysBase, TransactSysTx, UnmeteredSysTx},
     EvmNeedsTx, RunTxResult, SignetDriver,
 };
 use alloy::primitives::{map::HashSet, U256};
@@ -29,7 +27,7 @@ fn populate_nonce_from_trevm<Db, Insp, S>(
 where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
-    S: SysOutput,
+    S: SysBase,
 {
     // If the sys_output already has a nonce, we don't need to populate it.
     if sys_output.has_nonce() {
@@ -38,7 +36,7 @@ where
 
     // Read the nonce from the database and populate it in the sys_output.
     trevm
-        .try_read_nonce(sys_output.sender())
+        .try_read_nonce(sys_output.evm_sender())
         .map(|nonce| sys_output.populate_nonce(nonce))
         .map_err(EVMError::Database)
 }
@@ -82,7 +80,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         // push receipt and transaction to the block
         self.processed.push(action.produce_transaction());
         self.output
-            .push_result(action.produce_receipt(self.cumulative_gas_used()), action.sender());
+            .push_result(action.produce_receipt(self.cumulative_gas_used()), action.evm_sender());
 
         Ok(trevm)
     }
@@ -268,7 +266,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             let acct = t
                 .result_and_state_mut_unchecked()
                 .state
-                .get_mut(&sys_tx.sender())
+                .get_mut(&sys_tx.evm_sender())
                 .expect("sender account must be in state, as it is touched by definition");
 
             match acct.info.balance.checked_sub(U256::from(to_debit)) {
@@ -316,7 +314,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         for mut sys_tx in sys_txs {
             let span = tracing::debug_span!(
                 "SignetDriver::apply_metered_sys_transactions",
-                sender = %sys_tx.sender(),
+                sender = %sys_tx.evm_sender(),
                 gas_limit = sys_tx.gas_limit(),
                 callee = ?sys_tx.callee(),
             );
@@ -326,7 +324,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             let _enter = span.entered();
 
             let nonce = trevm_try!(
-                trevm.try_read_nonce(sys_tx.sender()).map_err(EVMError::Database),
+                trevm.try_read_nonce(sys_tx.evm_sender()).map_err(EVMError::Database),
                 trevm
             );
             sys_tx.populate_nonce(nonce);

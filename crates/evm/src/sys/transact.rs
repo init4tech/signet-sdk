@@ -1,4 +1,4 @@
-use crate::sys::{MeteredSysTx, SysOutput, SysTx, TransactSysLog};
+use crate::sys::{MeteredSysTx, SysBase, SysTx, TransactSysLog};
 use alloy::{
     consensus::{EthereumTxEnvelope, Transaction},
     primitives::{Address, Log, TxKind, U256},
@@ -41,7 +41,7 @@ impl TransactSysTx {
         TransactSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
-            sender: self.sender(),
+            sender: self.evm_sender(),
             value: self.tx.value(),
             gas: U256::from(self.tx.gas_limit()),
             maxFeePerGas: U256::from(self.tx.max_fee_per_gas()),
@@ -73,7 +73,7 @@ impl Tx for TransactSysTx {
     }
 }
 
-impl SysOutput for TransactSysTx {
+impl SysBase for TransactSysTx {
     fn has_nonce(&self) -> bool {
         self.nonce.is_some()
     }
@@ -95,7 +95,7 @@ impl SysOutput for TransactSysTx {
         self.make_sys_log().into()
     }
 
-    fn sender(&self) -> Address {
+    fn evm_sender(&self) -> Address {
         self.magic_sig.sender()
     }
 }
