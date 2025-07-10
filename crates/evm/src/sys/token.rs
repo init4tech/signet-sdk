@@ -1,7 +1,9 @@
+use std::sync::OnceLock;
+
 use crate::sys::{MintTokenSysLog, SysBase, SysTx, UnmeteredSysTx};
 use alloy::{
     consensus::{TxEip1559, TxReceipt},
-    primitives::{Address, Log, U256},
+    primitives::{Address, Bytes, Log, TxKind, U256},
     sol_types::SolCall,
 };
 use signet_extract::ExtractedEvent;
@@ -17,7 +19,7 @@ use trevm::{
 };
 
 /// System transaction to mint tokens.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct MintToken {
     /// The address that will receive the minted tokens.
     recipient: Address,
@@ -35,6 +37,9 @@ pub struct MintToken {
     nonce: Option<u64>,
     /// The rollup chain ID.
     rollup_chain_id: u64,
+
+    /// The ABI-encoded call for the mint operation./s
+    encoded_call: OnceLock<Bytes>,
 }
 
 impl trevm::Tx for MintToken {
@@ -62,7 +67,7 @@ impl trevm::Tx for MintToken {
         *gas_price = 0;
         *kind = TransactTo::Call(self.token);
         *value = U256::ZERO;
-        *data = self.mint_call().abi_encode().into();
+        *data = self.encoded_call().clone();
         *nonce = self.nonce.expect("must be set");
         *chain_id = Some(self.rollup_chain_id);
         *access_list = Default::default();
@@ -88,6 +93,7 @@ impl MintToken {
             magic_sig: event.magic_sig(),
             nonce: None,
             rollup_chain_id: event.rollup_chain_id(),
+            encoded_call: OnceLock::new(),
         }
     }
 
@@ -105,16 +111,22 @@ impl MintToken {
             magic_sig: event.magic_sig(),
             nonce: None,
             rollup_chain_id: event.rollup_chain_id(),
+            encoded_call: OnceLock::new(),
         }
     }
 
     /// Create the ABI-encoded call for the mint operation.
-    const fn mint_call(&self) -> signet_zenith::mintCall {
+    pub const fn mint_call(&self) -> signet_zenith::mintCall {
         signet_zenith::mintCall { amount: self.amount, to: self.recipient }
     }
 
+    /// Get the ABI-encoded call for the mint operation, lazily initialized.
+    pub fn encoded_call(&self) -> &Bytes {
+        self.encoded_call.get_or_init(|| self.mint_call().abi_encode().into())
+    }
+
     /// Create a new [`Log`] for the [`MintToken`] operation.
-    const fn make_sys_log(self) -> MintTokenSysLog {
+    const fn make_sys_log(&self) -> MintTokenSysLog {
         MintTokenSysLog {
             txHash: self.magic_sig.txid,
             logIndex: self.magic_sig.event_idx as u64,
@@ -126,7 +138,7 @@ impl MintToken {
 
     /// Convert the [`MintToken`] instance into a [`TransactionSigned`].
     fn make_transaction(&self) -> TransactionSigned {
-        let input = self.mint_call().abi_encode().into();
+        let input = self.encoded_call().clone();
 
         TransactionSigned::new_unhashed(
             Transaction::Eip1559(TxEip1559 {
@@ -168,6 +180,14 @@ impl SysBase for MintToken {
     }
 }
 
-impl SysTx for MintToken {}
+impl SysTx for MintToken {
+    fn callee(&self) -> TxKind {
+        self.token.into()
+    }
+
+    fn input(&self) -> Bytes {
+        self.encoded_call().clone()
+    }
+}
 
 impl UnmeteredSysTx for MintToken {}
