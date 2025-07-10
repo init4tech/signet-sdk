@@ -72,6 +72,14 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Insp: Inspector<Ctx<Db>>,
         S: SysAction,
     {
+        let _guard = debug_span!(
+            "SignetDriver::apply_sys_action_single",
+            action = S::name(),
+            details = action.description(),
+            sender = %action.evm_sender(),
+        )
+        .entered();
+
         // Populate the nonce for the action.
         trevm_try!(populate_nonce_from_trevm(&mut trevm, &mut action), trevm);
 
@@ -123,6 +131,15 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         debug_assert!(trevm.inner().cfg.disable_balance_check);
         debug_assert!(trevm.inner().cfg.disable_base_fee);
         debug_assert!(trevm.inner().cfg.disable_nonce_check);
+
+        let _guard = debug_span!(
+            "SignetDriver::apply_unmetered_sys_transaction_inner",
+            action = S::name(),
+            details = sys_tx.description(),
+            sender = %sys_tx.evm_sender(),
+            callee = ?sys_tx.callee(),
+        )
+        .entered();
 
         // Populate the nonce for the action.
         trevm_try!(populate_nonce_from_trevm(&mut trevm, &mut sys_tx), trevm);
@@ -267,6 +284,18 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Insp: Inspector<Ctx<Db>>,
         S: MeteredSysTx,
     {
+        let _guard = debug_span!(
+            "SignetDriver::apply_metered_sys_transaction_single",
+            action = S::name(),
+            details = sys_tx.description(),
+            sender = %sys_tx.evm_sender(),
+            callee = ?sys_tx.callee(),
+            value = %sys_tx.value(),
+            gas_limit = %sys_tx.gas_limit(),
+            max_fee_per_gas = %sys_tx.max_fee_per_gas(),
+        )
+        .entered();
+
         // Populate the nonce for the action.
         trevm_try!(populate_nonce_from_trevm(&mut trevm, &mut sys_tx), trevm);
 
@@ -348,23 +377,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         S: MeteredSysTx,
     {
         for mut sys_tx in sys_txs {
-            let span = tracing::debug_span!(
-                "SignetDriver::apply_metered_sys_transactions",
-                sender = %sys_tx.evm_sender(),
-                gas_limit = sys_tx.gas_limit(),
-                callee = ?sys_tx.callee(),
-            );
-            if tracing::enabled!(tracing::Level::TRACE) {
-                span.record("input", format!("{}", &sys_tx.input()));
-            }
-            let _enter = span.entered();
-
-            let nonce = trevm_try!(
-                trevm.try_read_nonce(sys_tx.evm_sender()).map_err(EVMError::Database),
-                trevm
-            );
-            sys_tx.populate_nonce(nonce);
-            debug!(nonce, "Applying metered sys tx");
+            trevm_try!(populate_nonce_from_trevm(&mut trevm, &mut sys_tx), trevm);
             trevm = self.apply_metered_sys_transaction_single(trevm, sys_tx)?;
         }
         Ok(trevm)

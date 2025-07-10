@@ -183,6 +183,17 @@ impl MintToken {
 }
 
 impl SysBase for MintToken {
+    fn name() -> &'static str {
+        "MintToken"
+    }
+
+    fn description(&self) -> String {
+        format!(
+            "Mint {} tokens to {} on token contract {}",
+            self.amount, self.recipient, self.token
+        )
+    }
+
     fn populate_nonce(&mut self, nonce: u64) {
         self.nonce = Some(nonce);
     }
@@ -211,6 +222,10 @@ impl SysTx for MintToken {
 
     fn input(&self) -> Bytes {
         self.encoded_call().clone()
+    }
+
+    fn value(&self) -> U256 {
+        U256::ZERO
     }
 }
 
