@@ -376,8 +376,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Insp: Inspector<Ctx<Db>>,
         S: MeteredSysTx,
     {
-        for mut sys_tx in sys_txs {
-            trevm_try!(populate_nonce_from_trevm(&mut trevm, &mut sys_tx), trevm);
+        for sys_tx in sys_txs {
             trevm = self.apply_metered_sys_transaction_single(trevm, sys_tx)?;
         }
         Ok(trevm)

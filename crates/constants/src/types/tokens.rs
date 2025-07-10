@@ -349,3 +349,39 @@ impl<'de> serde::Deserialize<'de> for UsdRecords {
         Ok(records)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn usd_records_serde() {
+        let json = r#"[
+            {"address": "0x0000000000000000000000000000000000000001", "ticker": "USDC", "decimals": 6},
+            {"address": "0x0000000000000000000000000000000000000002", "ticker": "USDT", "decimals": 12},
+            {"address": "0x0000000000000000000000000000000000000003", "ticker": "DAI", "decimals": 18}
+        ]"#;
+
+        let mut records = UsdRecords::new();
+        records.push(HostUsdRecord {
+            address: Address::with_last_byte(0x01),
+            ticker: "USDC".into(),
+            decimals: 6,
+        });
+        records.push(HostUsdRecord {
+            address: Address::with_last_byte(0x02),
+            ticker: "USDT".into(),
+            decimals: 12,
+        });
+        records.push(HostUsdRecord {
+            address: Address::with_last_byte(0x03),
+            ticker: "DAI".into(),
+            decimals: 18,
+        });
+
+        let records: UsdRecords = serde_json::from_str(json).unwrap();
+        let serialized = serde_json::to_string(&records).unwrap();
+        let deserialized: UsdRecords = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(records, deserialized);
+    }
+}
