@@ -96,7 +96,9 @@ impl SysBase for TransactSysTx {
     }
 
     fn populate_nonce(&mut self, nonce: u64) {
-        // NB: we have to set the nonce on the tx as well.
+        // NB: we have to set the nonce on the tx as well. Setting the nonce on
+        // the TX will change its hash, but will not invalidate the magic sig
+        // (as it's not a real signature).
         let EthereumTxEnvelope::Eip1559(signed) = &mut self.tx else {
             unreachable!("new sets this to 1559");
         };
