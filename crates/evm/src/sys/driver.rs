@@ -106,6 +106,10 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// This function expects that gas and nonce checks are already disabled
     /// in the EVM, and will not re-enable them.
+    ///
+    /// # Panics
+    ///
+    /// If the EVM is not configured to disable gas, basefee, and nonce checks.
     pub(crate) fn apply_unmetered_sys_transaction_inner<Db, Insp, S>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
@@ -116,6 +120,10 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Insp: Inspector<Ctx<Db>>,
         S: UnmeteredSysTx,
     {
+        debug_assert!(trevm.inner().cfg.disable_balance_check);
+        debug_assert!(trevm.inner().cfg.disable_base_fee);
+        debug_assert!(trevm.inner().cfg.disable_nonce_check);
+
         // Populate the nonce for the action.
         trevm_try!(populate_nonce_from_trevm(&mut trevm, &mut sys_tx), trevm);
 
@@ -129,6 +137,38 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
         let tx = sys_tx.produce_transaction();
         Ok(self.accept_tx(t, tx))
+    }
+
+    /// Apply a series of [`UnmeteredSysTx`]s to the EVM state.
+    ///
+    /// This will do the following:
+    /// - Run each system transaction in the EVM as
+    ///   [`Self::apply_unmetered_sys_transaction_inner`].
+    ///
+    /// This function expects that gas and nonce checks are already disabled
+    /// in the EVM, and will not re-enable them.
+    ///
+    /// # Panics
+    ///
+    /// If the EVM is not configured to disable gas, basefee, and nonce checks.
+    pub(crate) fn apply_unmetered_sys_transactions_inner<Db, Insp, S>(
+        &mut self,
+        mut trevm: EvmNeedsTx<Db, Insp>,
+        sys_txs: impl IntoIterator<Item = S>,
+    ) -> RunTxResult<Self, Db, Insp>
+    where
+        Db: Database + DatabaseCommit,
+        Insp: Inspector<Ctx<Db>>,
+        S: UnmeteredSysTx,
+    {
+        debug_assert!(trevm.inner().cfg.disable_balance_check);
+        debug_assert!(trevm.inner().cfg.disable_base_fee);
+        debug_assert!(trevm.inner().cfg.disable_nonce_check);
+
+        for sys_tx in sys_txs {
+            trevm = self.apply_unmetered_sys_transaction_inner(trevm, sys_tx)?;
+        }
+        Ok(trevm)
     }
 
     /// Apply a [`UnmeteredSysTx`] to the EVM state.
@@ -191,12 +231,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         S: UnmeteredSysTx,
     {
         trevm.try_with_cfg(&DisableGasChecks, |trevm| {
-            trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
-                for sys_tx in sys_txs {
-                    // Populate the nonce for the transaction
-                    trevm = self.apply_unmetered_sys_transaction_inner(trevm, sys_tx)?;
-                }
-                Ok(trevm)
+            trevm.try_with_cfg(&DisableNonceCheck, |trevm| {
+                self.apply_unmetered_sys_transactions_inner(trevm, sys_txs)
             })
         })
     }
@@ -372,6 +408,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Db: Database + DatabaseCommit,
         Insp: Inspector<Ctx<Db>>,
     {
+        let eth_token = self.constants.rollup().tokens().weth();
+
         // Load the nonce once, we'll write it at the end
         let minter_nonce =
             trevm_try!(trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database), trevm);
@@ -388,19 +426,29 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         let mut usd_minted = U256::ZERO;
         let mut usd_accts = HashSet::with_capacity(self.extracts.enter_tokens.len());
 
-        let eth_token = self.constants.rollup().tokens().weth();
-
-        for (i, e) in self.extracts.enters.iter().enumerate() {
+        let eth_mints = self.extracts.enters.iter().enumerate().map(|(i, e)| {
+            eth_accts.insert(e.event.recipient());
+            eth_minted = eth_minted.saturating_add(e.event.amount);
             let mut mint = MintToken::from_enter(eth_token, e);
             mint.populate_nonce(minter_nonce + i as u64);
-            trevm = self.apply_unmetered_sys_transaction_inner(trevm, mint)?;
+            mint
+        });
 
-            eth_minted += e.event.amount;
-            eth_accts.insert(e.event.recipient());
-        }
+        trevm = self.apply_unmetered_sys_transactions_inner(trevm, eth_mints)?;
 
         // Use a new base nonce for the enter_tokens
         let minter_nonce = minter_nonce + self.extracts.enters.len() as u64;
+
+        // NB: I would love to refactor this to use filter and the batch apply
+        // fns however
+        // - The filters would require cloning the `SignetSystemConstants` to
+        //   avoid borrowchecker issues.
+        // - It would result in 2 iterations over the enter tokens, one for
+        //   tokens and one for USDs.
+        //
+        // Instead, we iterate over the enter tokens, minting USDs and tokens
+        // singly. It might be worth revisiting this to make it so native asset
+        // is always minted first.
 
         for (i, e) in self.extracts.enter_tokens.iter().enumerate() {
             let nonce = minter_nonce + i as u64;
