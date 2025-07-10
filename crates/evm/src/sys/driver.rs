@@ -423,8 +423,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         );
         let mut eth_minted = U256::ZERO;
         let mut eth_accts = HashSet::with_capacity(self.extracts.enters.len());
-        let mut usd_minted = U256::ZERO;
-        let mut usd_accts = HashSet::with_capacity(self.extracts.enter_tokens.len());
 
         let eth_mints = self.extracts.enters.iter().enumerate().map(|(i, e)| {
             eth_accts.insert(e.event.recipient());
@@ -438,6 +436,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
         // Use a new base nonce for the enter_tokens
         let minter_nonce = minter_nonce + self.extracts.enters.len() as u64;
+        let mut usd_minted = U256::ZERO;
+        let mut usd_accts = HashSet::with_capacity(self.extracts.enter_tokens.len());
 
         // NB: I would love to refactor this to use filter and the batch apply
         // fns however
