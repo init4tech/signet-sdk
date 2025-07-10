@@ -382,6 +382,12 @@ mod test {
         let records: UsdRecords = serde_json::from_str(json).unwrap();
         let serialized = serde_json::to_string(&records).unwrap();
         let deserialized: UsdRecords = serde_json::from_str(&serialized).unwrap();
+
         assert_eq!(records, deserialized);
+        assert_eq!(records.len(), 3);
+        assert_eq!(deserialized.len(), 3);
+        assert!(records.iter().any(|r| r.ticker == "USDC"));
+        assert!(records.iter().any(|r| r.ticker == "USDT"));
+        assert!(records.iter().any(|r| r.ticker == "DAI"));
     }
 }
