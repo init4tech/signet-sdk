@@ -66,12 +66,6 @@ pub trait SysBase: fmt::Debug + Clone {
     fn evm_sender(&self) -> Address;
 }
 
-/// A transaction that is run on the EVM, and may or may not pay gas.
-///
-/// See [`MeteredSysTx`] and [`UnmeteredSysTx`] for more specific
-/// transaction types.
-pub trait SysTx: SysBase + Tx {}
-
 /// System actions are operations that apply changes to the EVM state without
 /// going through the transaction processing pipeline. They are not run as
 /// transactions, and do not have gas limits or revert semantics. They are
@@ -98,8 +92,20 @@ pub trait SysAction: SysBase {
 /// and CAN halt. They are typically used for operations that need to be run as
 /// transactions, but should not pay gas. E.g. minting tokens or performing
 /// system-level operations that do not require gas payment.
-pub trait UnmeteredSysTx: SysBase + Tx {}
+pub trait UnmeteredSysTx: SysBase + SysTx {}
 
+/// A transaction that is run on the EVM, and may or may not pay gas.
+///
+/// See [`MeteredSysTx`] and [`UnmeteredSysTx`] for more specific
+/// transaction types.
+pub trait SysTx: SysBase + Tx {
+    /// Get the callee address for the transaction.
+    fn callee(&self) -> TxKind;
+
+    /// Get the input data for the transaction. This is the calldata that is
+    /// passed to the callee when the transaction is executed.
+    fn input(&self) -> Bytes;
+}
 /// System transactions run on the EVM as a transaction, and are subject to the
 /// same rules and constraints as regular transactions. They may run arbitrary
 /// execution, have gas limits, and can revert if they fail. They must satisfy
@@ -111,7 +117,7 @@ pub trait UnmeteredSysTx: SysBase + Tx {}
 /// They are distinct from [`SysAction`], which are not run as transactions,
 /// but rather apply changes to the state directly without going through the
 /// transaction processing pipeline.
-pub trait MeteredSysTx: SysBase + Tx {
+pub trait MeteredSysTx: SysBase + SysTx {
     /// Get the gas limit for the transaction. This is the maximum amount of
     /// gas that the transaction is allowed to consume.
     ///
@@ -136,11 +142,4 @@ pub trait MeteredSysTx: SysBase + Tx {
     fn max_fee(&self) -> U256 {
         U256::from(self.gas_limit()) * U256::from(self.max_fee_per_gas())
     }
-
-    /// Get the callee address for the transaction.
-    fn callee(&self) -> TxKind;
-
-    /// Get the input data for the transaction. This is the calldata that is
-    /// passed to the callee when the transaction is executed.
-    fn input(&self) -> Bytes;
 }

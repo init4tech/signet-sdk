@@ -1,7 +1,7 @@
 use crate::sys::{MeteredSysTx, SysBase, SysTx, TransactSysLog};
 use alloy::{
     consensus::{EthereumTxEnvelope, Transaction},
-    primitives::{Address, Log, TxKind, U256},
+    primitives::{Address, Bytes, Log, TxKind, U256},
 };
 use core::fmt;
 use signet_extract::ExtractedEvent;
@@ -100,7 +100,15 @@ impl SysBase for TransactSysTx {
     }
 }
 
-impl SysTx for TransactSysTx {}
+impl SysTx for TransactSysTx {
+    fn callee(&self) -> TxKind {
+        self.tx.kind()
+    }
+
+    fn input(&self) -> Bytes {
+        self.tx.input().clone()
+    }
+}
 
 impl MeteredSysTx for TransactSysTx {
     fn gas_limit(&self) -> u128 {
@@ -109,13 +117,5 @@ impl MeteredSysTx for TransactSysTx {
 
     fn max_fee_per_gas(&self) -> u128 {
         self.tx.max_fee_per_gas()
-    }
-
-    fn callee(&self) -> TxKind {
-        self.tx.kind()
-    }
-
-    fn input(&self) -> alloy::primitives::Bytes {
-        self.tx.input().clone()
     }
 }
