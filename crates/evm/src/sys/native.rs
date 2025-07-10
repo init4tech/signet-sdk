@@ -1,7 +1,7 @@
 use crate::sys::{MintNativeSysLog, SysAction, SysBase};
 use alloy::{
     consensus::{ReceiptEnvelope, TxEip1559, TxReceipt},
-    primitives::{Address, Log, U256},
+    primitives::{utils::format_ether, Address, Log, U256},
 };
 use signet_extract::ExtractedEvent;
 use signet_types::{
@@ -104,6 +104,14 @@ impl MintNative {
 }
 
 impl SysBase for MintNative {
+    fn name() -> &'static str {
+        "MintNative"
+    }
+
+    fn description(&self) -> String {
+        format!("Mint {} native tokens to {}", format_ether(self.mint_amount()), self.recipient)
+    }
+
     fn has_nonce(&self) -> bool {
         self.nonce.is_some()
     }

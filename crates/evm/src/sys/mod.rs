@@ -29,7 +29,25 @@ use trevm::{
 /// [`SysBase`] is the root trait for all system actions and transactions. It
 /// provides the basic functionality that the [`SignetDriver`] needs to process
 /// system actions and transactions.
+///
+/// The [`fmt::Display`] impl is used for tracing, and should be a short
+///
 pub trait SysBase: fmt::Debug + Clone {
+    /// Get the name of the system action or transaction. This is used for
+    /// tracing, and should be short, descriptive, and unique for each
+    /// system action or transaction type.
+    fn name() -> &'static str;
+
+    /// Get a short description of the system action or transaction. This
+    /// should be a concise, human-readable string that describes the
+    /// system action or transaction.
+    ///
+    /// E.g.
+    /// - "Mint 100 USD to 0xabcd..."
+    /// - "Transact 0.5 ETH from 0xabcd... to 0xef01... with input data
+    ///   0x1234..."
+    fn description(&self) -> String;
+
     /// Check if the system action has a nonce. This is typically used to
     /// determine if the nonce should be populated by the Evm during
     /// transaction processing.
@@ -105,6 +123,11 @@ pub trait SysTx: SysBase + Tx {
     /// Get the input data for the transaction. This is the calldata that is
     /// passed to the callee when the transaction is executed.
     fn input(&self) -> Bytes;
+
+    /// Get the value of the transaction. This is the amount of native
+    /// asset that is being transferred to the callee when the transaction is
+    /// executed.
+    fn value(&self) -> U256;
 }
 /// System transactions run on the EVM as a transaction, and are subject to the
 /// same rules and constraints as regular transactions. They may run arbitrary

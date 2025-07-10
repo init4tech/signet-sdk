@@ -1,7 +1,8 @@
 use crate::sys::{MeteredSysTx, SysBase, SysTx, TransactSysLog};
 use alloy::{
     consensus::{EthereumTxEnvelope, Transaction},
-    primitives::{Address, Bytes, Log, TxKind, U256},
+    hex,
+    primitives::{utils::format_ether, Address, Bytes, Log, TxKind, U256},
 };
 use core::fmt;
 use signet_extract::ExtractedEvent;
@@ -74,6 +75,22 @@ impl Tx for TransactSysTx {
 }
 
 impl SysBase for TransactSysTx {
+    fn name() -> &'static str {
+        "TransactSysTx"
+    }
+
+    fn description(&self) -> String {
+        format!(
+            "Transact from {} to {} with value {} and {} bytes of input data: `0x{}{}`",
+            self.magic_sig.sender(),
+            self.tx.to().expect("creates not allowed"),
+            format_ether(self.tx.value()),
+            self.tx.input().len(),
+            self.tx.input().chunks(4).next().map(hex::encode).unwrap_or_default(),
+            if self.tx.input().len() > 4 { "..." } else { "" },
+        )
+    }
+
     fn has_nonce(&self) -> bool {
         self.nonce.is_some()
     }
@@ -107,6 +124,10 @@ impl SysTx for TransactSysTx {
 
     fn input(&self) -> Bytes {
         self.tx.input().clone()
+    }
+
+    fn value(&self) -> U256 {
+        self.tx.value()
     }
 }
 
