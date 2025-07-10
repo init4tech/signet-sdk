@@ -56,6 +56,17 @@ impl MintNative {
         }
     }
 
+    /// Create a new [`MintNative`] instance with a nonce.
+    pub fn new_with_nonce<R: TxReceipt<Log = Log>>(
+        event: &ExtractedEvent<'_, R, Passage::EnterToken>,
+        decimals: u8,
+        nonce: u64,
+    ) -> Self {
+        let mut mint = Self::new(event, decimals);
+        mint.populate_nonce(nonce);
+        mint
+    }
+
     /// Create a new [`Log`] for the [`MintNative`] operation.
     fn make_sys_log(&self) -> MintNativeSysLog {
         MintNativeSysLog {

@@ -427,9 +427,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         let eth_mints = self.extracts.enters.iter().enumerate().map(|(i, e)| {
             eth_accts.insert(e.event.recipient());
             eth_minted = eth_minted.saturating_add(e.event.amount);
-            let mut mint = MintToken::from_enter(eth_token, e);
-            mint.populate_nonce(minter_nonce + i as u64);
-            mint
+            MintToken::from_enter_with_nonce(eth_token, e, minter_nonce + i as u64)
         });
 
         trevm = self.apply_unmetered_sys_transactions_inner(trevm, eth_mints)?;
@@ -454,8 +452,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             let nonce = minter_nonce + i as u64;
             if let Some(record) = self.constants.host_usd_record(e.event.token) {
                 // USDC is handled as a native mint
-                let mut mint = MintNative::new(e, record.decimals());
-                mint.populate_nonce(nonce);
+                let mint = MintNative::new_with_nonce(e, record.decimals(), nonce);
                 trevm = self.apply_sys_action_single(trevm, mint)?;
                 usd_minted += e.event.amount;
                 usd_accts.insert(e.event.recipient());
@@ -464,9 +461,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
                 let ru_token_addr = self
                     .constants
                     .rollup_address_from_host_address(e.event.token)
-                    .expect("token enters must be permissioned");
-                let mut mint = MintToken::from_enter_token(ru_token_addr, e);
-                mint.populate_nonce(nonce);
+                    .expect("unpermissioned tokens must be filtered during extraction");
+                let mint = MintToken::from_enter_token_with_nonce(ru_token_addr, e, nonce);
                 trevm = self.apply_unmetered_sys_transaction_inner(trevm, mint)?;
             }
         }

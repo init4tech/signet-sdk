@@ -38,7 +38,7 @@ pub struct MintToken {
     /// The rollup chain ID.
     rollup_chain_id: u64,
 
-    /// The ABI-encoded call for the mint operation./s
+    /// The ABI-encoded call for the mint operation.
     encoded_call: OnceLock<Bytes>,
 }
 
@@ -98,6 +98,18 @@ impl MintToken {
     }
 
     /// Create a new [`MintToken`] instance from an [`ExtractedEvent`]
+    /// containing a [`Passage::EnterToken`] event, with a specified nonce.
+    pub fn from_enter_token_with_nonce<R: TxReceipt<Log = Log>>(
+        token: Address,
+        event: &ExtractedEvent<'_, R, Passage::EnterToken>,
+        nonce: u64,
+    ) -> Self {
+        let mut mint = Self::from_enter_token(token, event);
+        mint.populate_nonce(nonce);
+        mint
+    }
+
+    /// Create a new [`MintToken`] instance from an [`ExtractedEvent`]
     /// containing a [`Passage::Enter`] event.
     pub fn from_enter<R: TxReceipt<Log = Log>>(
         token: Address,
@@ -113,6 +125,18 @@ impl MintToken {
             rollup_chain_id: event.rollup_chain_id(),
             encoded_call: OnceLock::new(),
         }
+    }
+
+    /// Create a new [`MintToken`] instance from an [`ExtractedEvent`]
+    /// containing a [`Passage::Enter`] event, with a specified nonce.
+    pub fn from_enter_with_nonce<R: TxReceipt<Log = Log>>(
+        token: Address,
+        event: &ExtractedEvent<'_, R, Passage::Enter>,
+        nonce: u64,
+    ) -> Self {
+        let mut mint = Self::from_enter(token, event);
+        mint.populate_nonce(nonce);
+        mint
     }
 
     /// Create the ABI-encoded call for the mint operation.
