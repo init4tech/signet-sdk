@@ -58,7 +58,7 @@ pub fn fake_block(number: u64) -> RecoveredBlock {
         number,
         mix_hash: B256::repeat_byte(0xed),
         nonce: B64::repeat_byte(0xbe),
-        timestamp: 1716555586, // the time when i wrote this function lol
+        timestamp: 1716555576, // no particular significance other than divisible by 12
         excess_blob_gas: Some(0),
         ..Default::default()
     };
