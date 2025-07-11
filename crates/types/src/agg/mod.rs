@@ -46,6 +46,10 @@ mod tests {
         let mut fills = AggregateFills::default();
         fills.add_fill(HOST_CHAIN_ID, &fill);
 
-        fills.checked_remove_order(&order).unwrap();
+        // fills.checked_remove_order(&order).unwrap();
+        let mut agg_orders = AggregateOrders::default();
+        agg_orders.ingest(&order);
+
+        fills.checked_remove_ru_tx_events(&agg_orders, &Default::default()).unwrap();
     }
 }
