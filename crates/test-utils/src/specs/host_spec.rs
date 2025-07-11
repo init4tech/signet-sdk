@@ -314,7 +314,7 @@ impl HostBlockSpec {
             number: self.block_number(),
             mix_hash: B256::repeat_byte(0xed),
             nonce: FixedBytes::repeat_byte(0xbe),
-            timestamp: 1716555586, // the time when i wrote this function lol
+            timestamp: 1716555576,
             excess_blob_gas: Some(0),
             ..Default::default()
         };
