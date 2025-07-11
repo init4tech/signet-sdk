@@ -33,7 +33,13 @@ impl TxCache {
 
     /// Instantiate a new cache with the given URL and a new reqwest client.
     pub fn new(url: reqwest::Url) -> Self {
-        Self { url, client: reqwest::Client::new() }
+        Self {
+            url,
+            client: reqwest::Client::builder()
+                .use_rustls_tls()
+                .build()
+                .expect("Failed to build reqwest client"),
+        }
     }
 
     /// Create a new cache given a string URL.
