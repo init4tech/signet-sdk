@@ -59,7 +59,7 @@ pub struct HostBlockSpec {
 impl Clone for HostBlockSpec {
     fn clone(&self) -> Self {
         Self {
-            constants: self.constants,
+            constants: self.constants.clone(),
             receipts: self.receipts.clone(),
             ru_block: self.ru_block.clone(),
             sidecar: self.sidecar.clone(),
@@ -88,11 +88,6 @@ impl HostBlockSpec {
             block_number: AtomicU64::new(0),
             events: vec![],
         }
-    }
-
-    /// Make a new block spec with pecorino constants.
-    pub const fn pecorino() -> Self {
-        Self::new(SignetSystemConstants::pecorino())
     }
 
     /// Make a new block spec with test constants.
@@ -417,7 +412,6 @@ impl FromStr for HostBlockSpec {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
     }

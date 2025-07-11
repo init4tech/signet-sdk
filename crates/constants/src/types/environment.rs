@@ -22,11 +22,6 @@ impl SignetEnvironmentConstants {
         Self { host_name, rollup_name, transaction_cache }
     }
 
-    /// Get the hard-coded pecorino rollup constants.
-    pub const fn pecorino() -> Self {
-        crate::chains::pecorino::PECORINO_ENV
-    }
-
     /// Get the hard-coded local test rollup constants.
     #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
@@ -55,7 +50,6 @@ impl FromStr for SignetEnvironmentConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }

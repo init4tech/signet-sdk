@@ -1,8 +1,11 @@
 //! Constants for local testnet chains.
 
 use crate::{
-    HostConstants, PredeployTokens, RollupConstants, SignetConstants, SignetEnvironmentConstants,
-    SignetSystemConstants,
+    types::{
+        HostConstants, HostTokens, HostUsdRecord, RollupConstants, RollupTokens, SignetConstants,
+        SignetEnvironmentConstants, SignetSystemConstants,
+    },
+    UsdRecords,
 };
 use alloy::primitives::{address, Address};
 use std::borrow::Cow;
@@ -25,19 +28,33 @@ pub const HOST_PASSAGE: Address = Address::repeat_byte(0x33);
 /// Test address for the host transactor
 pub const HOST_TRANSACTOR: Address = Address::repeat_byte(0x44);
 
-/// Test address for predeployed USDC
+/// Test address for host USDC
 pub const HOST_USDC: Address = Address::repeat_byte(0x55);
-/// Test address for predeployed USDT
+/// Test address for host USDT
 pub const HOST_USDT: Address = Address::repeat_byte(0x66);
-/// Test address for predeployed WBTC
+/// Test address for host WBTC
 pub const HOST_WBTC: Address = Address::repeat_byte(0x77);
+/// Test address for host WETH
+pub const HOST_WETH: Address = Address::repeat_byte(0x88);
 
-/// Test address for predeployed USDC
-pub const RU_USDC: Address = address!("0x0B8BC5e60EE10957E0d1A0d95598fA63E65605e2");
-/// Test address for predeployed USDT
-pub const RU_USDT: Address = address!("0xF34326d3521F1b07d1aa63729cB14A372f8A737C");
+/// Test record for host USDC.
+pub const USDC_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDC, Cow::Borrowed("USDC"), 6);
+
+/// Test record for host USDT.
+pub const USDT_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDT, Cow::Borrowed("USDT"), 12);
+
+/// Test records for host USD tokens.
+pub const HOST_USDS: UsdRecords = {
+    let mut records = UsdRecords::new();
+    records.push(USDC_RECORD);
+    records.push(USDT_RECORD);
+    records
+};
+
 /// Test address for predeployed WBTC
-pub const RU_WBTC: Address = address!("0xE3d7066115f7d6b65F88Dff86288dB4756a7D733");
+pub const RU_WBTC: Address = Address::repeat_byte(0x99);
+/// Test address for predeployed WETH
+pub const RU_WETH: Address = Address::repeat_byte(0xaa);
 
 /// Name for the network.
 pub const RU_NAME: &str = "Test Rollup";
@@ -51,10 +68,10 @@ pub const RU_PASSAGE: Address = address!("0xB043BdD3d91376A76078c361bb82496Fdb80
 pub const BASE_FEE_RECIPIENT: Address = Address::repeat_byte(0xab);
 
 /// Host system tokens.
-pub const HOST_TOKENS: PredeployTokens = PredeployTokens::new(HOST_USDC, HOST_USDT, HOST_WBTC);
+pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USDS, HOST_WBTC, HOST_WETH);
 
 /// RU system tokens.
-pub const RU_TOKENS: PredeployTokens = PredeployTokens::new(RU_USDC, RU_USDT, RU_WBTC);
+pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
 
 /// The URL of the Transaction Cache endpoint.
 pub const TX_CACHE_URL: &str = "localhost:8080/txcache";
