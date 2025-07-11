@@ -22,3 +22,4 @@ chrono.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 tokio = { version = "1.37.0", features = ["macros"] }
+signet-constants = { workspace = true, features = ["test-utils"] }
