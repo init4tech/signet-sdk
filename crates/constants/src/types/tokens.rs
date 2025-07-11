@@ -1,5 +1,6 @@
 use crate::ETH_ADDRESS;
 use alloy::primitives::Address;
+use core::fmt;
 use serde::ser::SerializeSeq;
 use std::{borrow::Cow, mem::MaybeUninit};
 
@@ -22,7 +23,7 @@ pub enum HostPermitted {
 #[non_exhaustive]
 pub enum RollupPermitted {
     /// USD (Native Asset)
-    USD,
+    Usd,
     /// WBTC
     Wbtc,
     /// WETH
@@ -32,8 +33,8 @@ pub enum RollupPermitted {
 impl From<HostPermitted> for RollupPermitted {
     fn from(value: HostPermitted) -> Self {
         match value {
-            HostPermitted::Usdc => RollupPermitted::USD,
-            HostPermitted::Usdt => RollupPermitted::USD,
+            HostPermitted::Usdc => RollupPermitted::Usd,
+            HostPermitted::Usdt => RollupPermitted::Usd,
             HostPermitted::Wbtc => RollupPermitted::Wbtc,
             HostPermitted::Weth => RollupPermitted::Weth,
         }
@@ -220,7 +221,7 @@ impl RollupTokens {
         match token {
             RollupPermitted::Wbtc => self.wbtc,
             RollupPermitted::Weth => self.weth,
-            RollupPermitted::USD => ETH_ADDRESS,
+            RollupPermitted::Usd => ETH_ADDRESS,
         }
     }
 }
@@ -231,10 +232,18 @@ const USD_RECORD_CAPACITY: usize = 5;
 /// reasonable limit for the number of USD tokens that can be predeployed on
 /// the host chain. This limit is arbitrary but should be sufficient for most
 /// use cases, and can be adjusted trivially if needed.
-#[derive(Debug)]
 pub struct UsdRecords {
     len: usize,
     data: [MaybeUninit<HostUsdRecord>; USD_RECORD_CAPACITY],
+}
+
+impl fmt::Debug for UsdRecords {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UsdRecords")
+            .field("len", &self.len)
+            .field("data", &self.as_slice())
+            .finish()
+    }
 }
 
 impl Clone for UsdRecords {
