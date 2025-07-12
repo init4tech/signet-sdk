@@ -69,7 +69,7 @@ impl AggregateFills {
         amount: U256,
     ) -> Result<(), MarketError> {
         if self.filled(output_asset, recipient) < amount {
-            return Err(MarketError::InsufficientBalance {
+            return Err(MarketError::InsufficientFill {
                 chain_id: output_asset.0,
                 asset: output_asset.1,
                 recipient,
@@ -270,7 +270,7 @@ impl CombinedContext<'_, '_> {
         amount: U256,
     ) -> Result<(), MarketError> {
         if self.balance(output_asset, recipient) < amount {
-            return Err(MarketError::InsufficientBalance {
+            return Err(MarketError::InsufficientFill {
                 chain_id: output_asset.0,
                 asset: output_asset.1,
                 recipient,

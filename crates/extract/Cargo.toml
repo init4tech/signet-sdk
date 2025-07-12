@@ -17,3 +17,7 @@ alloy.workspace = true
 
 tracing.workspace = true
 
+
+[dev-dependencies]
+signet-constants = { workspace = true, features = ["test-utils"] }
+serde_json.workspace = true
