@@ -160,7 +160,7 @@ where
         // produce an UnsignedFill from the AggregateOrder
         let mut unsigned_fill = UnsignedFill::from(&agg);
         // populate the Order contract addresses for each chain
-        for chain_id in agg.destination_chain_ids() {
+        for chain_id in agg.target_chain_ids() {
             unsigned_fill = unsigned_fill.with_chain(
                 chain_id,
                 self.constants

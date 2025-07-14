@@ -97,15 +97,18 @@ impl AggregateOrders {
         }
     }
 
-    /// Get the unique destination chain ids for the aggregated outputs.
-    pub fn destination_chain_ids(&self) -> Vec<u64> {
+    /// Get the unique target chain ids for the aggregated outputs.
+    pub fn target_chain_ids(&self) -> Vec<u64> {
         HashSet::<u64>::from_iter(self.outputs.keys().map(|(chain_id, _)| *chain_id))
             .into_iter()
             .collect()
     }
 
-    /// Get the aggregated Outputs for a given chain id.
-    pub fn outputs_for(&self, target_chain_id: u64) -> Vec<RollupOrders::Output> {
+    /// Get the aggregated Outputs for a given target chain id.
+    /// # Warning ⚠️
+    /// All Orders in the AggregateOrders MUST have originated on the same rollup.
+    /// Otherwise, the aggregated Outputs will be incorrectly credited.
+    pub fn outputs_for(&self, target_chain_id: u64, ru_chain_id: u64) -> Vec<RollupOrders::Output> {
         let mut o = Vec::new();
         for ((chain_id, token), recipient_map) in &self.outputs {
             if *chain_id == target_chain_id {
@@ -114,7 +117,7 @@ impl AggregateOrders {
                         token: *token,
                         amount: U256::from(*amount),
                         recipient: *recipient,
-                        chainId: *chain_id as u32,
+                        chainId: ru_chain_id as u32,
                     });
                 }
             }
