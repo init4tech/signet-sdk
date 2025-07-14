@@ -112,11 +112,17 @@ impl From<&SignedFill> for FillPermit2 {
 /// An UnsignedFill is a helper type used to easily transform an AggregateOrder into a single SignedFill with correct permit2 semantics.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UnsignedFill<'a> {
+    /// The rollup chain id from which the Orders originated.
+    ru_chain_id: Option<u64>,
+    /// The set of Orders to fill. Multiple Orders can be aggregated into a single Fill,
+    /// but they MUST all originate on the same rollup chain indicated by `ru_chain_id`.
     orders: Cow<'a, AggregateOrders>,
+    /// The deadline for the Fill, after which it cannot be mined.
     deadline: Option<u64>,
+    /// The Permit2 nonce for the Fill, used to prevent replay attacks.
     nonce: Option<u64>,
-    destination_chains: HashMap<u64, Address>,
-    origin_chain_id: Option<u64>,
+    /// The (chain_id, order_contract_address) for each target chain on which Fills will be submitted.
+    target_chains: HashMap<u64, Address>,
 }
 
 impl<'a> From<&'a AggregateOrders> for UnsignedFill<'a> {
@@ -129,11 +135,11 @@ impl<'a> UnsignedFill<'a> {
     /// Get a new UnsignedFill from a set of AggregateOrders.
     pub fn new(orders: &'a AggregateOrders) -> Self {
         Self {
+            ru_chain_id: None,
             orders: orders.into(),
             deadline: None,
             nonce: None,
-            destination_chains: HashMap::new(),
-            origin_chain_id: None,
+            target_chains: HashMap::new(),
         }
     }
 
@@ -147,21 +153,21 @@ impl<'a> UnsignedFill<'a> {
         Self { deadline: Some(deadline), ..self }
     }
 
-    /// Add the origin chain id to the UnsignedFill.
+    /// Add the rollup chain id to the UnsignedFill.
     /// This is the rollup chain id from which the Orders originated,
     /// to which the Fill should be credited.
     /// MUST call this before signing, cannot be inferred.
-    pub fn with_origin_chain_id(self, origin_chain_id: u64) -> Self {
-        Self { origin_chain_id: Some(origin_chain_id), ..self }
+    pub fn with_ru_chain_id(self, ru_chain_id: u64) -> Self {
+        Self { ru_chain_id: Some(ru_chain_id), ..self }
     }
 
     /// Add the chain id and Order contract address to the UnsignedFill.
     pub fn with_chain(mut self, chain_id: u64, order_contract_address: Address) -> Self {
-        self.destination_chains.insert(chain_id, order_contract_address);
+        self.target_chains.insert(chain_id, order_contract_address);
         self
     }
 
-    /// Sign the UnsignedFill, generating a SignedFill for each destination chain.
+    /// Sign the UnsignedFill, generating a SignedFill for each target chain.
     /// Use if Filling Orders with the same signing key on every chain.
     pub async fn sign<S: Signer>(
         &self,
@@ -169,24 +175,24 @@ impl<'a> UnsignedFill<'a> {
     ) -> Result<HashMap<u64, SignedFill>, SigningError> {
         let mut fills = HashMap::new();
 
-        // loop through each destination chain and sign the fills
-        for destination_chain_id in self.orders.destination_chain_ids() {
-            let signed_fill = self.sign_for(destination_chain_id, signer).await?;
-            fills.insert(destination_chain_id, signed_fill);
+        // loop through each target chain and sign the fills
+        for target_chain_id in self.orders.target_chain_ids() {
+            let signed_fill = self.sign_for(target_chain_id, signer).await?;
+            fills.insert(target_chain_id, signed_fill);
         }
 
         // return the fills
         Ok(fills)
     }
 
-    /// Sign the UnsignedFill for a specific destination chain.
-    /// Use if Filling Orders with different signing keys on respective destination chains.
+    /// Sign the UnsignedFill for a specific target chain.
+    /// Use if Filling Orders with different signing keys on respective target chains.
     /// # Warning ⚠️
-    /// *All* Outputs MUST be filled on all destination chains, else the Order Inputs will not be transferred on the origin chain.
-    /// Take care when using this function to produce SignedFills for every destination chain.
+    /// *All* Outputs MUST be filled on all target chains, else the Order Inputs will not be transferred on the rollup.
+    /// Take care when using this function to produce SignedFills for every target chain.
     pub async fn sign_for<S: Signer>(
         &self,
-        destination_chain_id: u64,
+        target_chain_id: u64,
         signer: &S,
     ) -> Result<SignedFill, SigningError> {
         let now = Utc::now();
@@ -195,17 +201,17 @@ impl<'a> UnsignedFill<'a> {
         // if deadline is None, populate it as now + 12 seconds (can only mine within the current block)
         let deadline = self.deadline.unwrap_or(now.timestamp() as u64 + 12);
 
-        // get the destination order address
-        let destination_order_address = self
-            .destination_chains
-            .get(&destination_chain_id)
-            .ok_or(SigningError::MissingOrderContract(destination_chain_id))?;
+        // get the target order address
+        let target_order_address = self
+            .target_chains
+            .get(&target_chain_id)
+            .ok_or(SigningError::MissingOrderContract(target_chain_id))?;
 
-        // get the origin chain id, or throw an error if not set
-        let origin_chain_id = self.origin_chain_id.ok_or(SigningError::MissingOriginChainId)?;
+        // get the rollup chain id, or throw an error if not set
+        let ru_chain_id = self.ru_chain_id.ok_or(SigningError::MissingRollupChainId)?;
 
-        // get the outputs for the destination chain from the AggregateOrders
-        let outputs = self.orders.outputs_for(destination_chain_id, origin_chain_id);
+        // get the outputs for the target chain from the AggregateOrders
+        let outputs = self.orders.outputs_for(target_chain_id, ru_chain_id);
         // generate the permitted tokens from the Outputs
         let permitted: Vec<TokenPermissions> = outputs.iter().map(Into::into).collect();
 
@@ -215,8 +221,8 @@ impl<'a> UnsignedFill<'a> {
             permitted,
             deadline,
             nonce,
-            destination_chain_id,
-            *destination_order_address,
+            target_chain_id,
+            *target_order_address,
         );
 
         // sign it
