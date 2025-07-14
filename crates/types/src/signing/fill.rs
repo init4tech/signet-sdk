@@ -116,6 +116,7 @@ pub struct UnsignedFill<'a> {
     deadline: Option<u64>,
     nonce: Option<u64>,
     destination_chains: HashMap<u64, Address>,
+    origin_chain_id: Option<u64>,
 }
 
 impl<'a> From<&'a AggregateOrders> for UnsignedFill<'a> {
@@ -132,6 +133,7 @@ impl<'a> UnsignedFill<'a> {
             deadline: None,
             nonce: None,
             destination_chains: HashMap::new(),
+            origin_chain_id: None,
         }
     }
 
@@ -145,7 +147,15 @@ impl<'a> UnsignedFill<'a> {
         Self { deadline: Some(deadline), ..self }
     }
 
-    /// Add the chain id  and Order contract address to the UnsignedOrder.
+    /// Add the origin chain id to the UnsignedFill.
+    /// This is the rollup chain id from which the Orders originated,
+    /// to which the Fill should be credited.
+    /// MUST call this before signing, cannot be inferred.
+    pub fn with_origin_chain_id(self, origin_chain_id: u64) -> Self {
+        Self { origin_chain_id: Some(origin_chain_id), ..self }
+    }
+
+    /// Add the chain id and Order contract address to the UnsignedFill.
     pub fn with_chain(mut self, chain_id: u64, order_contract_address: Address) -> Self {
         self.destination_chains.insert(chain_id, order_contract_address);
         self
@@ -172,11 +182,11 @@ impl<'a> UnsignedFill<'a> {
     /// Sign the UnsignedFill for a specific destination chain.
     /// Use if Filling Orders with different signing keys on respective destination chains.
     /// # Warning ⚠️
-    /// *All* Outputs MUST be filled on all destination chains, else the Order Inputs will not be transferred.
+    /// *All* Outputs MUST be filled on all destination chains, else the Order Inputs will not be transferred on the origin chain.
     /// Take care when using this function to produce SignedFills for every destination chain.
     pub async fn sign_for<S: Signer>(
         &self,
-        chain_id: u64,
+        destination_chain_id: u64,
         signer: &S,
     ) -> Result<SignedFill, SigningError> {
         let now = Utc::now();
@@ -188,11 +198,14 @@ impl<'a> UnsignedFill<'a> {
         // get the destination order address
         let destination_order_address = self
             .destination_chains
-            .get(&chain_id)
-            .ok_or(SigningError::MissingOrderContract(chain_id))?;
+            .get(&destination_chain_id)
+            .ok_or(SigningError::MissingOrderContract(destination_chain_id))?;
 
-        // get the outputs for the chain from the AggregateOrders
-        let outputs = self.orders.outputs_for(chain_id);
+        // get the origin chain id, or throw an error if not set
+        let origin_chain_id = self.origin_chain_id.ok_or(SigningError::MissingOriginChainId)?;
+
+        // get the outputs for the destination chain from the AggregateOrders
+        let outputs = self.orders.outputs_for(destination_chain_id, origin_chain_id);
         // generate the permitted tokens from the Outputs
         let permitted: Vec<TokenPermissions> = outputs.iter().map(Into::into).collect();
 
@@ -202,7 +215,7 @@ impl<'a> UnsignedFill<'a> {
             permitted,
             deadline,
             nonce,
-            chain_id,
+            destination_chain_id,
             *destination_order_address,
         );
 

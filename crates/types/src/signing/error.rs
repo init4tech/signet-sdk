@@ -22,6 +22,11 @@ pub enum SigningError {
         "Target chain id is missing. Populate it by calling with_chain before attempting to sign"
     )]
     MissingChainId,
+    /// Missing origin chain id for a Fill.
+    #[error(
+        "Origin chain id is missing. Populate it by calling with_origin_chain_id before attempting to sign"
+    )]
+    MissingOriginChainId,
     /// Missing chain config for a specific chain.
     #[error("Target Order contract address is missing for chain id {0}. Populate it by calling with_chain before attempting to sign")]
     MissingOrderContract(u64),

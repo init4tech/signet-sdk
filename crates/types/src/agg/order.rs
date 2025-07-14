@@ -104,17 +104,23 @@ impl AggregateOrders {
             .collect()
     }
 
-    /// Get the aggregated Outputs for a given chain id.
-    pub fn outputs_for(&self, target_chain_id: u64) -> Vec<RollupOrders::Output> {
+    /// Get the aggregated Outputs for a given destination chain id.
+    /// NOTE it is assumed that all Orders in the AggregateOrders
+    /// are from the same origin chain id.
+    pub fn outputs_for(
+        &self,
+        destination_chain_id: u64,
+        origin_chain_id: u64,
+    ) -> Vec<RollupOrders::Output> {
         let mut o = Vec::new();
         for ((chain_id, token), recipient_map) in &self.outputs {
-            if *chain_id == target_chain_id {
+            if *chain_id == destination_chain_id {
                 for (recipient, amount) in recipient_map {
                     o.push(RollupOrders::Output {
                         token: *token,
                         amount: U256::from(*amount),
                         recipient: *recipient,
-                        chainId: *chain_id as u32,
+                        chainId: origin_chain_id as u32,
                     });
                 }
             }
