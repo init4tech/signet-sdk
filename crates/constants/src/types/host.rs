@@ -26,7 +26,9 @@ pub struct HostConstants {
     passage: Address,
     /// Host address for the transactor contract
     transactor: Address,
-    /// Host chain tokens that are predeployed on the rollup.
+    /// Host chain tokens that are special-cased on the rollup. This includes
+    /// USD tokens for the native asset, and permissioned tokens for bridged
+    /// assets.
     tokens: HostTokens,
 }
 
