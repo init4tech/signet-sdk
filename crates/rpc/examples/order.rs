@@ -5,7 +5,7 @@ use alloy::{
 };
 use chrono::Utc;
 use eyre::Error;
-use signet_constants::{SignetConstants, ETH_ADDRESS};
+use signet_constants::{SignetConstants, NATIVE_TOKEN_ADDRESS};
 use signet_tx_cache::client::TxCache;
 use signet_types::UnsignedOrder;
 use signet_zenith::RollupOrders::{Input, Order, Output};
@@ -66,7 +66,7 @@ where
         let amount = U256::from(GWEI_TO_WEI);
 
         // input is 1 USD on the rollup
-        let input = Input { token: ETH_ADDRESS, amount };
+        let input = Input { token: NATIVE_TOKEN_ADDRESS, amount };
 
         // output is 1 USDC on the host chain.
         // NB: decimals are important! USDC has 6 decimals, while Signet's USD

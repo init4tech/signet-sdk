@@ -1,4 +1,4 @@
-use crate::ETH_ADDRESS;
+use crate::NATIVE_TOKEN_ADDRESS;
 use alloy::primitives::Address;
 use core::fmt;
 use serde::ser::SerializeSeq;
@@ -101,7 +101,7 @@ impl HostTokens {
 
     /// Check if the address is WETH or ETH.
     pub fn is_eth(&self, address: Address) -> bool {
-        address == self.weth || address == ETH_ADDRESS
+        address == self.weth || address == NATIVE_TOKEN_ADDRESS
     }
 
     /// Get the decimals for the given address, if the address is a USD token.
@@ -119,7 +119,7 @@ impl HostTokens {
     pub fn token_for(&self, address: Address) -> Option<HostPermitted> {
         if address == self.wbtc {
             Some(HostPermitted::Wbtc)
-        } else if address == self.weth || address == ETH_ADDRESS {
+        } else if address == self.weth || address == NATIVE_TOKEN_ADDRESS {
             Some(HostPermitted::Weth)
         } else if let Some(record) = self.usd_record(address) {
             match record.ticker.as_ref() {
@@ -208,7 +208,7 @@ impl RollupTokens {
     pub const fn token_for(&self, address: Address) -> Option<RollupPermitted> {
         if address.const_eq(&self.wbtc) {
             Some(RollupPermitted::Wbtc)
-        } else if address.const_eq(&self.weth) || address.const_eq(&ETH_ADDRESS) {
+        } else if address.const_eq(&self.weth) || address.const_eq(&NATIVE_TOKEN_ADDRESS) {
             Some(RollupPermitted::Weth)
         } else {
             None
@@ -226,7 +226,7 @@ impl RollupTokens {
         match token {
             RollupPermitted::Wbtc => self.wbtc,
             RollupPermitted::Weth => self.weth,
-            RollupPermitted::Usd => ETH_ADDRESS,
+            RollupPermitted::Usd => NATIVE_TOKEN_ADDRESS,
         }
     }
 }
