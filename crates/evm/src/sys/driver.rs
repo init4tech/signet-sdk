@@ -47,7 +47,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     /// This will do the following:
     /// - Run the system action, allowing direct EVM state changes.
     /// - Produce the transaction using [`SysOutput::produce_transaction`].
-    /// - Produce the syslog eipt using [`SysOutput::produce_log`].
+    /// - Produce the syslog for the receipt using [`SysOutput::produce_log`].
     /// - Produce a receipt containing the gas used and logs.
     /// - Push the resulting transaction to the block.
     /// - Push the resulting receipt to the output.

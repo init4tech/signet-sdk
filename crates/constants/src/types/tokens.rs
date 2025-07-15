@@ -99,6 +99,11 @@ impl HostTokens {
         self.usd_record(address).is_some()
     }
 
+    /// Check if the address is WETH or ETH.
+    pub fn is_eth(&self, address: Address) -> bool {
+        address == self.weth || address == ETH_ADDRESS
+    }
+
     /// Get the decimals for the given address, if the address is a USD token.
     pub fn decimals_for(&self, address: Address) -> Option<u8> {
         self.usd_record(address).map(|r| r.decimals)
@@ -106,7 +111,7 @@ impl HostTokens {
 
     /// Returns true if the token is a permitted host token.
     pub fn is_host_token(&self, address: Address) -> bool {
-        address == self.wbtc || address == self.weth || self.usd_record(address).is_some()
+        address == self.wbtc || self.is_eth(address) || self.usd_record(address).is_some()
     }
 
     /// Get the [`HostPermitted`] for the given address, if it is a

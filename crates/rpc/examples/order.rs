@@ -62,6 +62,7 @@ where
 
     /// Get an example Order which swaps 1 USDC on the rollup for 1 USDC on the host.
     fn example_order(&self) -> Order {
+        // The native asset on the rollup has 18 decimals.
         let amount = U256::from(GWEI_TO_WEI);
 
         // input is 1 USD on the rollup
