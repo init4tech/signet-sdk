@@ -1,4 +1,4 @@
-use crate::types::{ConfigError, KnownChains, ParseChainError, PredeployTokens};
+use crate::types::{ConfigError, KnownChains, ParseChainError, RollupTokens};
 use alloy::{
     genesis::Genesis,
     primitives::{address, Address},
@@ -28,7 +28,7 @@ pub struct RollupConstants {
     /// Address of the base fee recipient.
     base_fee_recipient: Address,
     /// Address of the pre-deployed tokens.
-    tokens: PredeployTokens,
+    tokens: RollupTokens,
 }
 
 impl RollupConstants {
@@ -38,14 +38,9 @@ impl RollupConstants {
         orders: Address,
         passage: Address,
         base_fee_recipient: Address,
-        tokens: PredeployTokens,
+        tokens: RollupTokens,
     ) -> Self {
         Self { chain_id, orders, passage, base_fee_recipient, tokens }
-    }
-
-    /// Get the hard-coded pecorino rollup constants.
-    pub const fn pecorino() -> Self {
-        crate::chains::pecorino::ROLLUP
     }
 
     /// Get the hard-coded local test rollup constants.
@@ -97,7 +92,7 @@ impl RollupConstants {
     }
 
     /// Get the address of the pre-deployed tokens.
-    pub const fn tokens(&self) -> PredeployTokens {
+    pub const fn tokens(&self) -> RollupTokens {
         self.tokens
     }
 
@@ -113,7 +108,6 @@ impl FromStr for RollupConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }

@@ -6,7 +6,6 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
-use signet_constants::pecorino;
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
 
@@ -40,18 +39,6 @@ impl TxCache {
     pub fn new_from_string(url: &str) -> Result<Self, Error> {
         let url = reqwest::Url::parse(url)?;
         Ok(Self::new(url))
-    }
-
-    /// Connect to the Pecorino tx cache.
-    pub fn pecorino() -> Self {
-        Self::new_from_string(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid")
-    }
-
-    /// Connect to the Pecornio tx cache, using a specific [`Client`].
-    pub fn pecorino_with_client(client: reqwest::Client) -> Self {
-        let url =
-            reqwest::Url::parse(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL invalid");
-        Self::new_with_client(url, client)
     }
 
     /// Get the client used to send requests

@@ -1,4 +1,7 @@
-use crate::types::{ConfigError, KnownChains, ParseChainError, PredeployTokens};
+use crate::{
+    types::{ConfigError, HostTokens, KnownChains, ParseChainError},
+    HostUsdRecord,
+};
 use alloy::{genesis::Genesis, primitives::Address};
 use serde_json::Value;
 use std::str::FromStr;
@@ -8,7 +11,7 @@ use std::str::FromStr;
 /// These are system constants which may vary between chains, and are used to
 /// determine the behavior of the chain, such as which contracts the Signet
 /// node should listen to, and the addresses of system-priveleged tokens.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostConstants {
     /// Host chain ID.
@@ -23,8 +26,10 @@ pub struct HostConstants {
     passage: Address,
     /// Host address for the transactor contract
     transactor: Address,
-    /// Host chain tokens that are predeployed on the rollup.
-    tokens: PredeployTokens,
+    /// Host chain tokens that are special-cased on the rollup. This includes
+    /// USD tokens for the native asset, and permissioned tokens for bridged
+    /// assets.
+    tokens: HostTokens,
 }
 
 impl std::fmt::Display for HostConstants {
@@ -46,14 +51,9 @@ impl HostConstants {
         orders: Address,
         passage: Address,
         transactor: Address,
-        tokens: PredeployTokens,
+        tokens: HostTokens,
     ) -> Self {
         Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
-    }
-
-    /// Get the hard-coded pecorino host constants.
-    pub const fn pecorino() -> Self {
-        crate::chains::pecorino::HOST
     }
 
     /// Get the hard-coded local test host constants.
@@ -121,8 +121,18 @@ impl HostConstants {
     }
 
     /// Get the host tokens.
-    pub const fn tokens(&self) -> PredeployTokens {
-        self.tokens
+    pub const fn tokens(&self) -> &HostTokens {
+        &self.tokens
+    }
+
+    /// Get the host USD record for the given address, if it is a host USD.
+    pub fn usd_record(&self, address: Address) -> Option<&HostUsdRecord> {
+        self.tokens.usd_record(address)
+    }
+
+    /// Return true if the address is an approved USD token.
+    pub fn is_usd(&self, address: Address) -> bool {
+        self.tokens.is_usd(address)
     }
 }
 
@@ -132,7 +142,6 @@ impl FromStr for HostConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
-            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }

@@ -1,6 +1,6 @@
 use crate::{
     orders::SignetInspector, BlockResult, EvmNeedsTx, EvmTransacted, ExecutionOutcome, RunTxResult,
-    SignetLayered, BASE_GAS,
+    SignetLayered,
 };
 use alloy::{
     consensus::{
@@ -10,17 +10,15 @@ use alloy::{
     eips::eip1559::{BaseFeeParams, INITIAL_BASE_FEE as EIP1559_INITIAL_BASE_FEE},
     primitives::{Address, Bloom, U256},
 };
-use signet_extract::{Extractable, ExtractedEvent, Extracts};
+use signet_extract::{Extractable, Extracts};
 use signet_types::{
     constants::SignetSystemConstants,
     primitives::{BlockBody, RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
     AggregateFills, MarketError,
 };
-use signet_zenith::{Passage, Transactor, MINTER_ADDRESS};
-use std::collections::{HashSet, VecDeque};
-use tracing::{debug, debug_span, warn};
+use std::collections::VecDeque;
+use tracing::{debug, debug_span, info_span, warn};
 use trevm::{
-    fillers::{DisableGasChecks, DisableNonceCheck},
     helpers::Ctx,
     revm::{
         context::{
@@ -34,78 +32,8 @@ use trevm::{
     trevm_try, BlockDriver, BlockOutput, Tx,
 };
 
-macro_rules! run_tx {
-    ($self:ident, $trevm:ident, $tx:expr, $sender:expr) => {{
-        let trevm = $trevm.fill_tx($tx);
-
-        let _guard = tracing::trace_span!("run_tx", block_env = ?trevm.block(), tx = ?$tx, tx_env = ?trevm.tx(), spec_id = ?trevm.spec_id()).entered();
-
-        match trevm.run() {
-            Ok(t) => {
-                tracing::debug!("evm executed successfully");
-                ControlFlow::Keep(t)
-            },
-            Err(e) => {
-                if e.is_transaction_error() {
-                    tracing::debug!(
-                        err = %e.as_transaction_error().unwrap(),
-                        "Discarding outcome due to execution error"
-                    );
-                    ControlFlow::Discard(e.discard_error())
-                } else {
-                    return Err(e.err_into());
-                }
-            }
-        }
-    }};
-}
-
-macro_rules! run_tx_early_return {
-    ($self:ident, $trevm:ident, $tx:expr, $sender:expr) => {
-        match run_tx!($self, $trevm, $tx, $sender) {
-            ControlFlow::Discard(t) => return Ok(t),
-            ControlFlow::Keep(t) => t,
-        }
-    };
-}
-
-/// Shim to impl [`Tx`] for [`Passage::EnterToken`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct EnterTokenFiller<'a, 'b, R> {
-    /// The extracted event for the enter token event.
-    pub enter_token: &'a ExtractedEvent<'b, R, Passage::EnterToken>,
-    /// The nonce of the transaction.
-    pub nonce: u64,
-    /// The address of the token being minted.
-    pub token: Address,
-}
-
-impl<R: Sync> Tx for EnterTokenFiller<'_, '_, R> {
-    fn fill_tx_env(&self, tx_env: &mut TxEnv) {
-        self.enter_token.event.fill_tx_env(tx_env);
-        tx_env.kind = TransactTo::Call(self.token);
-        tx_env.nonce = self.nonce;
-    }
-}
-
-/// Shim to impl [`Tx`] for [`Transactor::Transact`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct TransactFiller<'a, 'b, R> {
-    /// The extracted event for the transact event.
-    pub transact: &'a ExtractedEvent<'b, R, Transactor::Transact>,
-    /// The nonce of the transaction.
-    pub nonce: u64,
-}
-
-impl<R: Sync> Tx for TransactFiller<'_, '_, R> {
-    fn fill_tx_env(&self, tx_env: &mut TxEnv) {
-        self.transact.event.fill_tx_env(tx_env);
-        tx_env.nonce = self.nonce;
-    }
-}
-
 /// Used internally to signal that the transaction should be discarded.
-enum ControlFlow<Db, Insp>
+pub(crate) enum ControlFlow<Db, Insp>
 where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
@@ -265,13 +193,13 @@ impl Tx for FillShim<'_> {
 #[derive(Debug)]
 pub struct SignetDriver<'a, 'b, C: Extractable> {
     /// The block extracts.
-    extracts: &'a Extracts<'b, C>,
+    pub(crate) extracts: &'a Extracts<'b, C>,
 
     /// Parent rollup block.
     parent: SealedHeader,
 
     /// Rollup constants, including pre-deploys
-    constants: SignetSystemConstants,
+    pub(crate) constants: SignetSystemConstants,
 
     /// The working context is a clone of the block's [`AggregateFills`] that
     /// is updated progessively as the block is evaluated.
@@ -281,10 +209,10 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     to_process: VecDeque<TransactionSigned>,
 
     /// Transactions that have been processed.
-    processed: Vec<TransactionSigned>,
+    pub(crate) processed: Vec<TransactionSigned>,
 
     /// Receipts and senders.
-    output: BlockOutput,
+    pub(crate) output: BlockOutput,
 
     /// Payable gas used in the block.
     payable_gas_used: u64,
@@ -414,18 +342,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         }
     }
 
-    /// Make a receipt for an enter.
-    fn make_enter_receipt(
-        &self,
-        enter: &ExtractedEvent<'_, C::Receipt, Passage::Enter>,
-    ) -> alloy::consensus::Receipt {
-        let cumulative_gas_used = self.cumulative_gas_used().saturating_add(BASE_GAS as u64);
-
-        let sys_log = crate::sys_log::Enter::from(enter).into();
-
-        alloy::consensus::Receipt { status: true.into(), cumulative_gas_used, logs: vec![sys_log] }
-    }
-
     /// Construct a block header for DB and evm execution.
     fn construct_header(&self) -> Header {
         Header {
@@ -460,12 +376,11 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// This path is used by
     /// - [`TransactionSigned`] objects
-    /// - [`Transact`] events
-    fn check_fills_and_accept<Db, Insp>(
+    /// - [`Transactor::Transact`] events
+    pub(crate) fn check_fills_and_accept<Db, Insp>(
         &mut self,
         mut trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
-        extract: Option<&ExtractedEvent<'_, C::Receipt, Transactor::Transact>>,
     ) -> RunTxResult<Self, Db, Insp>
     where
         Db: Database + DatabaseCommit,
@@ -483,14 +398,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             return Ok(trevm.reject());
         }
 
-        if let ExecutionResult::Success { logs, .. } = trevm.result_mut_unchecked() {
-            if let Some(extract) = extract {
-                // Push the sys_log to the outcome
-                let sys_log = crate::sys_log::Transact::from(extract).into();
-                logs.push(sys_log);
-            }
-        }
-
         // We track this separately from the cumulative gas used. Enters and
         // EnterTokens are not payable, so we don't want to include their gas
         // usage in the payable gas used.
@@ -504,9 +411,11 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// This path is used by
     /// - [`TransactionSigned`] objects
-    /// - [`Transact`] events
-    /// - [`Enter`] events
-    fn accept_tx<Db, Insp>(
+    /// - [`Transactor::Transact`] events
+    /// - [`Passage::Enter`] events
+    ///
+    /// [`Passage::Enter`]: signet_zenith::Passage::Enter
+    pub(crate) fn accept_tx<Db, Insp>(
         &mut self,
         trevm: EvmTransacted<Db, Insp>,
         tx: TransactionSigned,
@@ -563,7 +472,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             s.record("sender", sender.to_string());
             // Run the tx, returning from this function if there is a tx error
             let t = run_tx_early_return!(self, trevm, &FillShim(&tx, sender), sender);
-            trevm = self.check_fills_and_accept(t, tx, None)?;
+            trevm = self.check_fills_and_accept(t, tx)?;
         } else {
             warn!("Failed to recover signer for transaction");
         }
@@ -585,231 +494,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         }
 
         Ok(trevm)
-    }
-
-    /// Credit enters to the recipients. This is done in the middle of the
-    /// block, between transactions and transact events.
-    fn credit_enters<Insp, Db>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        let mut eth_minted = U256::ZERO;
-        let mut accts: HashSet<Address> = HashSet::with_capacity(self.extracts.enters.len());
-
-        // Increment the nonce for the minter address by the number of enters.
-        // Doing it this way is slightly more efficient than incrementing the
-        // nonce in the loop.
-        let nonce =
-            trevm_try!(trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database), trevm);
-        trevm_try!(
-            trevm
-                .try_set_nonce_unchecked(MINTER_ADDRESS, nonce + self.extracts.enters.len() as u64)
-                .map_err(EVMError::Database),
-            trevm
-        );
-
-        for enter in self.extracts.enters.iter() {
-            let recipient = enter.recipient();
-            let amount = enter.amount();
-
-            // Increase the balance
-            trevm_try!(
-                trevm.try_increase_balance_unchecked(recipient, amount).map_err(EVMError::Database),
-                trevm
-            );
-
-            // push receipt and transaction to the block
-            self.processed.push(enter.make_transaction(nonce));
-            self.output.push_result(
-                ReceiptEnvelope::Eip1559(self.make_enter_receipt(enter).into()),
-                MINTER_ADDRESS,
-            );
-
-            // Tracking for logging
-            accts.insert(recipient);
-            eth_minted += amount;
-        }
-
-        debug!(
-            accounts_touched = accts.len(),
-            %eth_minted,
-            enters_count = self.extracts.enters.len(),
-            "Crediting enters"
-        );
-
-        Ok(trevm)
-    }
-
-    /// Execute an [`EnterToken`] event.
-    ///
-    /// [`EnterToken`]: signet_zenith::Passage::EnterToken
-    fn execute_enter_token<Db, Insp>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-        idx: usize,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        let _span = {
-            let e = &self.extracts.enter_tokens[idx];
-            debug_span!("signet::evm::execute_enter_token", idx, host_tx = %e.tx_hash(), log_index = e.log_index).entered()
-        };
-
-        // Get the rollup token address from the host token address.
-        let ru_token_addr = self
-            .constants
-            .rollup_token_from_host_address(self.extracts.enter_tokens[idx].event.token)
-            .expect("token enters must be permissioned");
-
-        // Load the nonce as well
-        let nonce =
-            trevm_try!(trevm.try_read_nonce(MINTER_ADDRESS).map_err(EVMError::Database), trevm);
-
-        let extract = &self.extracts.enter_tokens[idx];
-
-        let filler = EnterTokenFiller { enter_token: extract, nonce, token: ru_token_addr };
-        let mut t = run_tx_early_return!(self, trevm, &filler, MINTER_ADDRESS);
-
-        // push a sys_log to the outcome
-        if let ExecutionResult::Success { logs, .. } = t.result_mut_unchecked() {
-            let sys_log = crate::sys_log::EnterToken::from(extract).into();
-            logs.push(sys_log)
-        }
-        let tx = extract.make_transaction(nonce, ru_token_addr);
-
-        // No need to check AggregateFills. This call cannot result in orders.
-        Ok(self.accept_tx(t, tx))
-    }
-
-    /// Execute all [`EnterToken`] events.
-    fn execute_all_enter_tokens<Db, Insp>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        trevm = trevm.try_with_cfg(&DisableGasChecks, |trevm| {
-            trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
-                for i in 0..self.extracts.enter_tokens.len() {
-                    trevm = self.execute_enter_token(trevm, i)?;
-                }
-                Ok(trevm)
-            })
-        })?;
-        Ok(trevm)
-    }
-
-    /// Execute a [`Transactor::Transact`] event.
-    ///
-    /// This function does the following:
-    /// - Run the transaction.
-    /// - Check the aggregate fills.
-    /// - Debit the sender's account for unused gas.
-    /// - Create a receipt.
-    /// - Create a transaction and push it to the block.
-    ///
-    /// [`Transactor::Transact`]: signet_zenith::Transactor::Transact
-    fn execute_transact_event<Db, Insp>(
-        &mut self,
-        mut trevm: EvmNeedsTx<Db, Insp>,
-        idx: usize,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        let _span = {
-            let e = &self.extracts.transacts[idx];
-            debug_span!("execute_transact_event", idx,
-                host_tx = %e.tx_hash(),
-                log_index = e.log_index,
-                sender = %e.event.sender,
-                gas_limit = e.event.gas(),
-            )
-            .entered()
-        };
-
-        let sender = self.extracts.transacts[idx].event.sender;
-        let nonce = trevm_try!(trevm.try_read_nonce(sender).map_err(EVMError::Database), trevm);
-
-        let transact = &self.extracts.transacts[idx];
-        let to_execute = TransactFiller { transact, nonce };
-
-        let mut t = run_tx_early_return!(self, trevm, &to_execute, sender);
-
-        {
-            // NB: This is a little sensitive.
-            // Although the EVM performs a check on the balance of the sender,
-            // to ensure they can pay the full price, that check may be
-            // invalidated by transaction execution. As a result, we have to
-            // perform the same check here, again.
-            let gas_used = t.result().gas_used();
-
-            // Set gas used to the transact gas limit
-            match t.result_mut_unchecked() {
-                ExecutionResult::Success { gas_used, .. }
-                | ExecutionResult::Revert { gas_used, .. }
-                | ExecutionResult::Halt { gas_used, .. } => {
-                    *gas_used = if transact.gas() >= u64::MAX as u128 {
-                        u64::MAX
-                    } else {
-                        transact.gas() as u64
-                    }
-                }
-            }
-
-            let unused_gas = transact.gas.saturating_sub(U256::from(gas_used));
-            let base_fee = t.block().basefee;
-            let to_debit = U256::from(base_fee) * unused_gas;
-
-            debug!(%base_fee, gas_used, %unused_gas, %to_debit, "Debiting unused transact gas");
-
-            let acct = t
-                .result_and_state_mut_unchecked()
-                .state
-                .get_mut(&transact.sender)
-                .expect("sender account must be in state, as it is touched by definition");
-
-            match acct.info.balance.checked_sub(to_debit) {
-                // If the balance is sufficient, debit the account.
-                Some(balance) => acct.info.balance = balance,
-                // If the balance is insufficient, discard the transaction.
-                None => {
-                    debug!("Discarding transact outcome due to insufficient balance to pay for unused transact gas");
-                    return Ok(t.reject());
-                }
-            }
-        }
-
-        // Convert the transact event into a transaction, and then check the
-        // aggregate fills
-        let tx = transact.make_transaction(nonce);
-        self.check_fills_and_accept(t, tx, Some(transact))
-    }
-
-    /// Execute all transact events.
-    fn execute_all_transacts<Db, Insp>(
-        &mut self,
-        trevm: EvmNeedsTx<Db, Insp>,
-    ) -> RunTxResult<Self, Db, Insp>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        trevm.try_with_cfg(&DisableNonceCheck, |mut trevm| {
-            for i in 0..self.extracts.transacts.len() {
-                trevm = self.execute_transact_event(trevm, i)?;
-            }
-            Ok(trevm)
-        })
     }
 
     /// Clear the balance of the rollup passage. This is run at the end of the
@@ -887,8 +571,8 @@ where
     }
 
     fn run_txns(&mut self, mut trevm: EvmNeedsTx<Db, Insp>) -> RunTxResult<Self, Db, Insp> {
-        let _span = debug_span!(
-            "run_txns",
+        let _span = info_span!(
+            "SignetDriver::run_txns",
             txn_count = self.to_process.len(),
             enter_count = self.extracts.enters.len(),
             enter_token_count = self.extracts.enter_tokens.len(),
@@ -913,13 +597,9 @@ where
         // Transaction gas is metered, and pays basefee
         trevm = self.execute_all_transactions(trevm)?;
 
-        // Credit enters to the recipients.
-        // Enter gas is unmetered, and does not pay basefee
-        trevm = self.credit_enters(trevm)?;
-
-        // Run the enter token events.
-        // Enter token gas is unmetered, and does not pay basefee
-        trevm = self.execute_all_enter_tokens(trevm)?;
+        // Run all Enter and EnterToken events
+        // Gas is unmetered, and does not pay basefee
+        trevm = self.run_all_mints(trevm)?;
 
         // Run the transact events.
         // Transact gas is metered, and pays basefee

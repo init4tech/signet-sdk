@@ -13,7 +13,6 @@ repository.workspace = true
 [dependencies]
 signet-bundle.workspace = true
 signet-types.workspace = true
-signet-constants.workspace = true
 
 alloy.workspace = true
 
