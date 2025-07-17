@@ -20,6 +20,8 @@ mod chains;
 #[cfg(any(test, feature = "test-utils"))]
 pub use chains::test_utils;
 
+pub use chains::pecorino;
+
 mod types;
 pub use types::{
     ConfigError, HostConstants, HostPermitted, HostTokens, HostUsdRecord, KnownChains,
