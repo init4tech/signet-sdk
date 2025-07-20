@@ -44,15 +44,22 @@ impl SignetEnvironmentConstants {
     }
 }
 
-impl FromStr for SignetEnvironmentConstants {
-    type Err = ParseChainError;
+impl TryFrom<KnownChains> for SignetEnvironmentConstants {
+    type Error = ParseChainError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let chain: KnownChains = s.parse()?;
+    fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
+    }
+}
+
+impl FromStr for SignetEnvironmentConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<KnownChains>()?.try_into()
     }
 }
 

@@ -406,14 +406,21 @@ impl HostBlockSpec {
     }
 }
 
+impl TryFrom<KnownChains> for HostBlockSpec {
+    type Error = ParseChainError;
+
+    fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
+        match chain {
+            KnownChains::Test => Ok(Self::test()),
+        }
+    }
+}
+
 impl FromStr for HostBlockSpec {
     type Err = ParseChainError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let chain: KnownChains = s.parse()?;
-        match chain {
-            KnownChains::Test => Ok(Self::test()),
-        }
+        s.parse::<KnownChains>()?.try_into()
     }
 }
 
