@@ -102,14 +102,21 @@ impl RollupConstants {
     }
 }
 
-impl FromStr for RollupConstants {
-    type Err = ParseChainError;
+impl TryFrom<KnownChains> for RollupConstants {
+    type Error = ParseChainError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let chain: KnownChains = s.parse()?;
+    fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
+    }
+}
+
+impl FromStr for RollupConstants {
+    type Err = ParseChainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<KnownChains>()?.try_into()
     }
 }
