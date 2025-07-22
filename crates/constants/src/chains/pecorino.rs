@@ -33,10 +33,8 @@ pub const HOST_WETH: Address = address!("0x572C4d72080ed9E9997509b583a22B785B70c
 
 /// USDC token record for the Pecorino testnet host chain.
 pub const HOST_USDC_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDC, Cow::Borrowed("USDC"), 6);
-
 /// USDT token record for the Pecorino testnet host chain.
 pub const HOST_USDT_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDT, Cow::Borrowed("USDT"), 6);
-
 /// Host USD records for the Pecorino testnet host chain.
 pub const HOST_USD_RECORDS: UsdRecords = {
     let mut records = UsdRecords::new();
@@ -44,6 +42,8 @@ pub const HOST_USD_RECORDS: UsdRecords = {
     records.push(HOST_USDT_RECORD);
     records
 };
+/// Host system tokens for Pecorino.
+pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
 
 /// Host system constants for Pecorino.
 pub const HOST: HostConstants = crate::HostConstants::new(
@@ -56,17 +56,15 @@ pub const HOST: HostConstants = crate::HostConstants::new(
     HOST_TOKENS,
 );
 
-/// Host system tokens for Pecorino.
-pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
-
 /// Name for the network.
 pub const RU_NAME: &str = "Pecorino";
+/// Chain ID for the Pecorino testnet RU chain.
+pub const RU_CHAIN_ID: u64 = 14174;
+
 /// WETH token for the Pecorino testnet RU chain.
 pub const RU_WETH: Address = address!("0x0000000000000000007369676e65742d77657468");
 /// WBTC token for the Pecorino testnet RU chain.
 pub const RU_WBTC: Address = address!("0x0000000000000000007369676e65742D77627463");
-/// Chain ID for the Pecorino testnet RU chain.
-pub const RU_CHAIN_ID: u64 = 14174;
 /// `Orders` contract address for the Pecorino testnet RU chain.
 pub const RU_ORDERS: Address = address!("0x000000000000007369676E65742D6f7264657273");
 /// `Passage` contract address for the Pecorino testnet RU chain.
@@ -75,11 +73,11 @@ pub const RU_PASSAGE: Address = address!("0x0000000000007369676E65742D7061737361
 /// The WETH9-based wrapped native USD token contract.
 /// This is signet's native token in wrapped form.
 pub const WRAPPED: Address = address!("0x0000000000000000007369676e65742D77757364");
+/// RU pre-approved system tokens for Pecorino.
+pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
+
 /// Base fee recipient address for the Pecorino testnet RU chain.
 pub const BASE_FEE_RECIPIENT: Address = address!("0xe0eDA3701D44511ce419344A4CeD30B52c9Ba231");
-
-/// RU system tokens for Pecorino.
-pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
 
 /// RU system constants for Pecorino.
 pub const ROLLUP: RollupConstants =
