@@ -56,6 +56,11 @@ impl HostConstants {
         Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
     }
 
+    /// Get the hard-coded Pecorino host constants.
+    pub const fn pecorino() -> Self {
+        crate::chains::pecorino::HOST
+    }
+
     /// Get the hard-coded local test host constants.
     #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
@@ -142,6 +147,7 @@ impl FromStr for HostConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
             #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
