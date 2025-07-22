@@ -1,7 +1,8 @@
 //! Constants for the Pecorino testnet.
 
 use crate::{
-    HostConstants, HostTokens, HostUsdRecord, RollupConstants, RollupTokens, SignetConstants, SignetEnvironmentConstants, SignetSystemConstants, UsdRecords
+    HostConstants, HostTokens, HostUsdRecord, RollupConstants, RollupTokens, SignetConstants,
+    SignetEnvironmentConstants, SignetSystemConstants, UsdRecords,
 };
 use alloy::primitives::{address, Address};
 use std::borrow::Cow;
@@ -27,22 +28,14 @@ pub const HOST_USDC: Address = address!("0x885F8DB528dC8a38aA3DDad9D3F619746B4a6
 pub const HOST_USDT: Address = address!("0x7970D259D4a96764Fa9B23FF0715A35f06f52D1A");
 /// WBTC token for the Pecorino testnet host chain.
 pub const HOST_WBTC: Address = address!("0x9aeDED4224f3dD31aD8A0B1FcD05E2d7829283a7");
-/// WETH token for the Pecorino testnet host chain (CURRENTLY A PLACERHOLDER).
-pub const HOST_WETH: Address = Address::repeat_byte(0xff);
+/// WETH token for the Pecorino testnet host chain.
+pub const HOST_WETH: Address = address!("0x572C4d72080ed9E9997509b583a22B785B70cB3f");
 
 /// USDC token record for the Pecorino testnet host chain.
-pub const HOST_USDC_RECORD: HostUsdRecord = HostUsdRecord::new(
-    HOST_USDC,
-    Cow::Borrowed("USDC"),
-    6
-);
+pub const HOST_USDC_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDC, Cow::Borrowed("USDC"), 6);
 
 /// USDT token record for the Pecorino testnet host chain.
-pub const HOST_USDT_RECORD: HostUsdRecord = HostUsdRecord::new(
-    HOST_USDT,
-    Cow::Borrowed("USDT"),
-    6
-);
+pub const HOST_USDT_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDT, Cow::Borrowed("USDT"), 6);
 
 /// Host USD records for the Pecorino testnet host chain.
 pub const HOST_USD_RECORDS: UsdRecords = {
@@ -51,34 +44,6 @@ pub const HOST_USD_RECORDS: UsdRecords = {
     records.push(HOST_USDT_RECORD);
     records
 };
-
-/// USDC token for the Pecorino testnet RU chain.
-/// This is currently a placeholder.
-pub const RU_WETH: Address = Address::repeat_byte(0xff);
-/// WBTC token for the Pecorino testnet RU chain.
-pub const RU_WBTC: Address = address!("0xE3d7066115f7d6b65F88Dff86288dB4756a7D733");
-
-/// Name for the network.
-pub const RU_NAME: &str = "Pecorino";
-/// Chain ID for the Pecorino testnet RU chain.
-pub const RU_CHAIN_ID: u64 = 14174;
-/// `Orders` contract address for the Pecorino testnet RU chain.
-pub const RU_ORDERS: Address = address!("0xC2D3Dac6B115564B10329697195656459BFb2c74");
-/// `Passage` contract address for the Pecorino testnet RU chain.
-/// This is currently a dummy value and will be replaced with the actual Passage contract address in the future.
-pub const RU_PASSAGE: Address = address!("0xB043BdD3d91376A76078c361bb82496Fdb809aE2");
-/// Base fee recipient address for the Pecorino testnet RU chain.
-pub const BASE_FEE_RECIPIENT: Address = address!("0xe0eDA3701D44511ce419344A4CeD30B52c9Ba231");
-
-/// Host system tokens for Pecorino.
-pub const HOST_TOKENS: HostTokens =
-    HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
-
-/// RU system tokens for Pecorino.
-pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
-
-/// The URL of the Transaction Cache endpoint.
-pub const TX_CACHE_URL: &str = "https://transactions.pecorino.signet.sh";
 
 /// Host system constants for Pecorino.
 pub const HOST: HostConstants = crate::HostConstants::new(
@@ -90,6 +55,31 @@ pub const HOST: HostConstants = crate::HostConstants::new(
     HOST_TRANSACTOR,
     HOST_TOKENS,
 );
+
+/// Host system tokens for Pecorino.
+pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
+
+/// Name for the network.
+pub const RU_NAME: &str = "Pecorino";
+/// WETH token for the Pecorino testnet RU chain.
+pub const RU_WETH: Address = address!("0x0000000000000000007369676e65742d77657468");
+/// WBTC token for the Pecorino testnet RU chain.
+pub const RU_WBTC: Address = address!("0x0000000000000000007369676e65742D77627463");
+/// Chain ID for the Pecorino testnet RU chain.
+pub const RU_CHAIN_ID: u64 = 14174;
+/// `Orders` contract address for the Pecorino testnet RU chain.
+pub const RU_ORDERS: Address = address!("0x000000000000007369676E65742D6f7264657273");
+/// `Passage` contract address for the Pecorino testnet RU chain.
+/// This is currently a dummy value and will be replaced with the actual Passage contract address in the future.
+pub const RU_PASSAGE: Address = address!("0x0000000000007369676E65742D70617373616765");
+/// The WETH9-based wrapped native USD token contract.
+/// This is signet's native token in wrapped form.
+pub const WRAPPED: Address = address!("0x0000000000000000007369676e65742D77757364");
+/// Base fee recipient address for the Pecorino testnet RU chain.
+pub const BASE_FEE_RECIPIENT: Address = address!("0xe0eDA3701D44511ce419344A4CeD30B52c9Ba231");
+
+/// RU system tokens for Pecorino.
+pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
 
 /// RU system constants for Pecorino.
 pub const ROLLUP: RollupConstants =
@@ -107,3 +97,6 @@ pub const PECORINO_ENV: SignetEnvironmentConstants = SignetEnvironmentConstants:
 
 /// Signet constants for Pecorino.
 pub const PECORINO: SignetConstants = SignetConstants::new(PECORINO_SYS, PECORINO_ENV);
+
+/// The URL of the Transaction Cache endpoint.
+pub const TX_CACHE_URL: &str = "https://transactions.pecorino.signet.sh";
