@@ -90,6 +90,11 @@ impl HostBlockSpec {
         }
     }
 
+    /// Make a new block spec with Pecorino constants.
+    pub const fn pecorino() -> Self {
+        Self::new(SignetSystemConstants::pecorino())
+    }
+
     /// Make a new block spec with test constants.
     pub const fn test() -> Self {
         Self::new(SignetSystemConstants::test())
@@ -411,6 +416,7 @@ impl TryFrom<KnownChains> for HostBlockSpec {
 
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
+            KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
     }
