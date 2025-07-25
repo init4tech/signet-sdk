@@ -29,6 +29,22 @@ mod zenith {
     impl Copy for Zenith::OnlySequencerAdmin {}
     impl Copy for Zenith::IncorrectHostBlock {}
 
+    impl Clone for Zenith::ZenithCalls {
+        fn clone(&self) -> Self {
+            use self::Zenith::ZenithCalls::*;
+            match self {
+                sequencerAdmin(call) => sequencerAdmin(call.clone()),
+                deployBlockNumber(call) => deployBlockNumber(call.clone()),
+                lastSubmittedAtBlock(call) => lastSubmittedAtBlock(call.clone()),
+                isSequencer(call) => isSequencer(call.clone()),
+                addSequencer(call) => addSequencer(call.clone()),
+                removeSequencer(call) => removeSequencer(call.clone()),
+                submitBlock(call) => submitBlock(call.clone()),
+                blockCommitment(call) => blockCommitment(call.clone()),
+            }
+        }
+    }
+
     impl Zenith::BlockSubmitted {
         /// Get the sequencer address that signed the block.
         pub const fn sequencer(&self) -> Address {
@@ -131,6 +147,26 @@ mod passage {
     impl Clone for Passage::PassageEvents {
         fn clone(&self) -> Self {
             *self
+        }
+    }
+
+    impl Clone for Passage::PassageCalls {
+        fn clone(&self) -> Self {
+            use self::Passage::PassageCalls::*;
+            match self {
+                canEnter(call) => canEnter(call.clone()),
+                configureEnter(call) => configureEnter(call.clone()),
+                defaultRollupChainId(call) => defaultRollupChainId(call.clone()),
+                enter_0(call) => enter_0(call.clone()),
+                enter_1(call) => enter_1(call.clone()),
+                enterToken_0(call) => enterToken_0(call.clone()),
+                enterToken_1(call) => enterToken_1(call.clone()),
+                enterTokenPermit2(call) => enterTokenPermit2(call.clone()),
+                enterWitness(call) => enterWitness(call.clone()),
+                exitWitness(call) => exitWitness(call.clone()),
+                tokenAdmin(call) => tokenAdmin(call.clone()),
+                withdraw(call) => withdraw(call.clone()),
+            }
         }
     }
 
@@ -243,6 +279,20 @@ mod orders {
                 Self::Order(event) => Self::Order(event.clone()),
                 Self::Sweep(event) => Self::Sweep(*event),
                 Self::Filled(event) => Self::Filled(event.clone()),
+            }
+        }
+    }
+
+    impl Clone for Orders::OrdersCalls {
+        fn clone(&self) -> Self {
+            use self::Orders::OrdersCalls::*;
+            match self {
+                fill(call) => fill(call.clone()),
+                fillPermit2(call) => fillPermit2(call.clone()),
+                initiate(call) => initiate(call.clone()),
+                initiatePermit2(call) => initiatePermit2(call.clone()),
+                outputWitness(call) => outputWitness(call.clone()),
+                sweep(call) => sweep(call.clone()),
             }
         }
     }
@@ -376,6 +426,24 @@ mod transactor {
         }
     }
 
+    impl Clone for Transactor::TransactorCalls {
+        fn clone(&self) -> Self {
+            use self::Transactor::TransactorCalls::*;
+            match self {
+                configureGas(call) => configureGas(call.clone()),
+                defaultRollupChainId(call) => defaultRollupChainId(call.clone()),
+                enterTransact(call) => enterTransact(call.clone()),
+                transact_0(call) => transact_0(call.clone()),
+                transact_1(call) => transact_1(call.clone()),
+                gasAdmin(call) => gasAdmin(call.clone()),
+                passage(call) => passage(call.clone()),
+                perBlockGasLimit(call) => perBlockGasLimit(call.clone()),
+                perTransactGasLimit(call) => perTransactGasLimit(call.clone()),
+                transactGasUsed(call) => transactGasUsed(call.clone()),
+            }
+        }
+    }
+
     impl Transactor::Transact {
         pub const fn rollup_chain_id(&self) -> u64 {
             self.rollupChainId.as_limbs()[0]
@@ -427,6 +495,19 @@ mod rollup_passage {
     impl Clone for RollupPassage::RollupPassageEvents {
         fn clone(&self) -> Self {
             *self
+        }
+    }
+
+    impl Clone for RollupPassage::RollupPassageCalls {
+        fn clone(&self) -> Self {
+            use self::RollupPassage::RollupPassageCalls::*;
+            match self {
+                exit(call) => exit(call.clone()),
+                exitToken(call) => exitToken(call.clone()),
+                enterWitness(call) => enterWitness(call.clone()),
+                exitTokenPermit2(call) => exitTokenPermit2(call.clone()),
+                exitWitness(call) => exitWitness(call.clone()),
+            }
         }
     }
 }
@@ -515,6 +596,17 @@ mod bundle_helper {
     impl From<crate::bindings::orders::ISignatureTransfer::TokenPermissions> for TokenPermissions {
         fn from(perm: HostOrders::TokenPermissions) -> TokenPermissions {
             TokenPermissions { token: perm.token, amount: perm.amount }
+        }
+    }
+
+    impl Clone for BundleHelper::BundleHelperCalls {
+        fn clone(&self) -> Self {
+            use self::BundleHelper::BundleHelperCalls::*;
+            match self {
+                submit(call) => submit(call.clone()),
+                zenith(call) => zenith(call.clone()),
+                orders(call) => orders(call.clone()),
+            }
         }
     }
 }
