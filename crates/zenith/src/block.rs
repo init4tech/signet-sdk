@@ -1,10 +1,11 @@
-use std::{marker::PhantomData, sync::OnceLock};
-
 use crate::Zenith::BlockHeader as ZenithHeader;
-use alloy::consensus::TxEnvelope;
-use alloy::eips::eip2718::{Decodable2718, Encodable2718};
-use alloy::primitives::{keccak256, Address, B256};
-use alloy::rlp::Decodable;
+use alloy::{
+    consensus::TxEnvelope,
+    eips::eip2718::{Decodable2718, Encodable2718},
+    primitives::{keccak256, Address, B256},
+    rlp::Decodable,
+};
+use std::{marker::PhantomData, sync::OnceLock};
 
 /// Zenith processes normal Ethereum txns.
 pub type ZenithTransaction = TxEnvelope;
@@ -44,7 +45,8 @@ impl Coder for Alloy2718Coder {
 }
 
 /// A Zenith block is just a list of transactions.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(bound = "C::Tx: serde::Serialize + serde::de::DeserializeOwned")]
 pub struct ZenithBlock<C: Coder = Alloy2718Coder> {
     /// The zenith block header, which may be extracted from a
     /// [`crate::Zenith::BlockSubmitted`] event.
@@ -53,12 +55,43 @@ pub struct ZenithBlock<C: Coder = Alloy2718Coder> {
     /// blob data.
     transactions: Vec<<C as Coder>::Tx>,
 
-    // memoization fields
+    // The encoded transactions, memoized to avoid re-encoding.
+    #[serde(skip)]
     encoded: OnceLock<Vec<u8>>,
+
+    /// The hash of the encoded transactions.
+    #[serde(with = "oncelock_as_opt")]
     block_data_hash: OnceLock<B256>,
 
     /// The coder
     _pd: std::marker::PhantomData<C>,
+}
+
+mod oncelock_as_opt {
+    use serde::{Deserialize, Serialize};
+    use std::sync::OnceLock;
+
+    /// Serialize a `OnceLock` as an optional value.
+    pub(crate) fn serialize<S, T>(value: &OnceLock<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        T: serde::Serialize,
+    {
+        value.get().serialize(serializer)
+    }
+
+    /// Deserialize a `OnceLock` from an optional value.
+    pub(crate) fn deserialize<'de, D, T>(deserializer: D) -> Result<OnceLock<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+        T: serde::Deserialize<'de>,
+    {
+        if let Some(item) = Option::<T>::deserialize(deserializer)? {
+            Ok(OnceLock::from(item))
+        } else {
+            Ok(OnceLock::new())
+        }
+    }
 }
 
 impl<C> ZenithBlock<C>
