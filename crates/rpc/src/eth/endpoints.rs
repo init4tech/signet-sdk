@@ -599,13 +599,13 @@ where
     Signet: Pnt,
 {
     let task = async move {
-        let (block, suggested) = tokio::try_join!(
-            ctx.signet().raw_block(BlockId::latest()),
+        let (header, suggested) = tokio::try_join!(
+            ctx.signet().raw_header(BlockId::latest()),
             ctx.signet().gas_oracle().suggest_tip_cap(),
         )
         .map_err(|e| e.to_string())?;
 
-        let base_fee = block.and_then(|b| b.1.header().base_fee_per_gas()).unwrap_or_default();
+        let base_fee = header.and_then(|b| b.1.base_fee_per_gas()).unwrap_or_default();
         Ok(suggested + U256::from(base_fee))
     };
 
