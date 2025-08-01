@@ -39,7 +39,6 @@ signet-constants = { version = "0.8.0", path = "crates/constants" }
 signet-evm = { version = "0.8.0", path = "crates/evm" }
 signet-extract = { version = "0.8.0", path = "crates/extract" }
 signet-node = { version = "0.8.0", path = "crates/node" }
-signet-rpc = { version = "0.8.0", path = "crates/rpc" }
 signet-sim = { version = "0.8.0", path = "crates/sim" }
 signet-types = { version = "0.8.0", path = "crates/types" }
 signet-tx-cache = { version = "0.8.0", path = "crates/tx-cache" }
@@ -62,25 +61,7 @@ alloy-contract = { version = "1.0.19", features = ["pubsub"] }
 
 # Reth
 reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-chainspec = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-db-common = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-eth-wire-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
 reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-exex-test-utils = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-network-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-network-peers = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-node-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-prune-types = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-rpc-eth-api = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-trie-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-
-# Foundry periphery
-foundry-blob-explorers = "0.17"
 
 # Async
 tokio = { version = "1.43.0", features = ["macros"] }
@@ -89,28 +70,15 @@ async-trait = "0.1.87"
 # Pinned for compatibility with reth
 parking_lot = "0.12"
 
-# Rpc
-jsonrpsee = "0.24.9"
-jsonrpsee-core = "0.24"
-jsonrpsee-http-client = "0.24"
-jsonrpsee-types = "0.24"
-
 # Misc
-clap = "4"
 eyre = "0.6.12"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 thiserror = "2.0.12"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.137"
-openssl = { version = "0.10", features = ["vendored"] }
 reqwest = "0.12.9"
-url = "2.5.4"
-proptest = "1.6.0"
 chrono = "0.4.38"
-hex = { package = "const-hex", version = "1.10", default-features = false, features = [
-    "alloc",
-] }
 uuid = "1.16.0"
 
 # Test Utils

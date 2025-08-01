@@ -488,8 +488,11 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Db: Database + DatabaseCommit,
         Insp: Inspector<Ctx<Db>>,
     {
-        while !self.to_process.is_empty() {
-            let tx = self.to_process.pop_front().expect("checked");
+        while let Some(tx) = self.to_process.pop_front() {
+            if tx.is_eip4844() {
+                warn!("EIP-4844 transactions are not allowed in Signet blocks");
+                continue;
+            }
             trevm = self.execute_transaction(trevm, tx)?;
         }
 
