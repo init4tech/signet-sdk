@@ -40,7 +40,7 @@ impl Coder for Alloy2718Coder {
     where
         Self: Sized,
     {
-        ZenithTransaction::decode_2718(buf).ok()
+        ZenithTransaction::decode_2718(buf).ok().filter(|tx| !tx.is_eip4844())
     }
 }
 
