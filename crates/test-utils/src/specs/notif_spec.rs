@@ -1,8 +1,29 @@
-use crate::{convert::ToRethPrimitive, specs::HostBlockSpec};
+use crate::{chain::Chain, specs::HostBlockSpec};
 use alloy::consensus::BlobTransactionSidecar;
-use reth_exex::ExExNotification;
 use signet_types::primitives::TransactionSigned;
 use std::{collections::BTreeMap, sync::Arc};
+
+/// A shim for reth_exex::ExExNotification that allows us to use it in tests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExExNotification {
+    /// Chain got committed without a reorg, and only the new chain is returned.
+    Committed {
+        /// The new chain after commit.
+        new: Arc<Chain>,
+    },
+    /// Chain got reorged, and both the old and the new chains are returned.
+    Reorged {
+        /// The old chain before reorg.
+        old: Arc<Chain>,
+        /// The new chain after reorg.
+        new: Arc<Chain>,
+    },
+    /// Chain got reverted, and only the old chain is returned.
+    Reverted {
+        /// The old chain before reversion.
+        old: Arc<Chain>,
+    },
+}
 
 /// A notification spec.
 #[derive(Debug, Default)]
@@ -86,22 +107,18 @@ impl NotificationSpec {
 
         match (old_chain, new_chain) {
             (Some(old_chain), Some(new_chain)) => NotificationWithSidecars {
-                notification: ExExNotification::ChainReorged {
-                    old: Arc::new(old_chain.to_reth()),
-                    new: Arc::new(new_chain.to_reth()),
+                notification: ExExNotification::Reorged {
+                    old: Arc::new(old_chain),
+                    new: Arc::new(new_chain),
                 },
                 sidecars,
             },
             (Some(old_chain), None) => NotificationWithSidecars {
-                notification: ExExNotification::ChainReverted {
-                    old: Arc::new(old_chain.to_reth()),
-                },
+                notification: ExExNotification::Reverted { old: Arc::new(old_chain) },
                 sidecars,
             },
             (None, Some(new_chain)) => NotificationWithSidecars {
-                notification: ExExNotification::ChainCommitted {
-                    new: Arc::new(new_chain.to_reth()),
-                },
+                notification: ExExNotification::Committed { new: Arc::new(new_chain) },
                 sidecars,
             },
             (None, None) => panic!("missing old and new chains"),
