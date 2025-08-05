@@ -59,10 +59,6 @@ alloy = { version = "1.0.19", features = [
 ] }
 alloy-contract = { version = "1.0.19", features = ["pubsub"] }
 
-# Reth
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-reth-exex = { git = "https://github.com/paradigmxyz/reth", tag = "v1.5.1" }
-
 # Async
 tokio = { version = "1.43.0", features = ["macros"] }
 async-trait = "0.1.87"

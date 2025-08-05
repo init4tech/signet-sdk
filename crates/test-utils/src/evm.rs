@@ -1,6 +1,7 @@
-use reth::revm::context::CfgEnv;
 use signet_constants::test_utils::*;
-use trevm::revm::{database::in_memory_db::InMemoryDB, primitives::hardfork::SpecId};
+use trevm::revm::{
+    context::CfgEnv, database::in_memory_db::InMemoryDB, primitives::hardfork::SpecId,
+};
 
 /// Create a new Signet EVM with an in-memory database for testing.
 pub fn test_signet_evm() -> signet_evm::EvmNeedsBlock<InMemoryDB> {
