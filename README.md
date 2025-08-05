@@ -33,8 +33,8 @@ See the [Signet docs] for more info.
   revm inspector for detecting orders, and Signet's block-execution logic.
 - **signet-bundle** - Types and utilities for simulating bundles of Signet
   transactions, and determining what fills would be required to include them.
-- **signet-rpc** - An Ethereum JSON-RPC Server for Signet nodes. Makes heavy
-  use of reth internals.
+- **signet-test-utils** - Utilities for testing Signet libraries and
+  applications.
 
 ### Contributing to the SDK
 
