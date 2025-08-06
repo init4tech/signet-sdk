@@ -1,5 +1,6 @@
 [package]
 name = "signet-test-utils"
+description = "Common utilities for testing Signet components"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
