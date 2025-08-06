@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.8.3"
+version = "0.8.4"
 edition = "2021"
 rust-version = "1.81"
 authors = ["init4"]
@@ -43,6 +43,7 @@ signet-sim = { version = "0.8.0", path = "crates/sim" }
 signet-types = { version = "0.8.0", path = "crates/types" }
 signet-tx-cache = { version = "0.8.0", path = "crates/tx-cache" }
 signet-zenith = { version = "0.8.0", path = "crates/zenith" }
+signet-test-utils = { version = "0.8.0", path = "crates/test-utils" }
 
 # ajj
 ajj = { version = "0.3.4" }
