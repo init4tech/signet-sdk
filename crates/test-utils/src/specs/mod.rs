@@ -2,7 +2,7 @@ mod host_spec;
 pub use host_spec::HostBlockSpec;
 
 mod notif_spec;
-pub use notif_spec::{NotificationSpec, NotificationWithSidecars};
+pub use notif_spec::{ExExNotification, NotificationSpec, NotificationWithSidecars};
 
 mod ru_spec;
 pub use ru_spec::RuBlockSpec;

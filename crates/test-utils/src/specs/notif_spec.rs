@@ -25,6 +25,26 @@ pub enum ExExNotification {
     },
 }
 
+impl ExExNotification {
+    /// Returns the committed chain, if any.
+    pub fn committed_chain(&self) -> Option<&Arc<Chain>> {
+        match self {
+            ExExNotification::Committed { new } => Some(new),
+            ExExNotification::Reorged { new, .. } => Some(new),
+            ExExNotification::Reverted { .. } => None,
+        }
+    }
+
+    /// Returns the reverted chain, if any.
+    pub fn reverted_chain(&self) -> Option<&Arc<Chain>> {
+        match self {
+            ExExNotification::Reorged { old, .. } => Some(old),
+            ExExNotification::Reverted { old } => Some(old),
+            ExExNotification::Committed { .. } => None,
+        }
+    }
+}
+
 /// A notification spec.
 #[derive(Debug, Default)]
 pub struct NotificationSpec {
