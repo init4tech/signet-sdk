@@ -1,7 +1,7 @@
-use crate::{journal::HostJournal, ExecutionOutcome};
+use crate::ExecutionOutcome;
 use alloy::{consensus::Header, primitives::B256};
 use signet_types::primitives::{RecoveredBlock, TransactionSigned};
-use trevm::journal::BundleStateIndex;
+use trevm::journal::{BlockUpdate, BundleStateIndex};
 
 /// Output of a block execution.
 ///
@@ -37,8 +37,8 @@ impl<T, H> BlockResult<T, H> {
     }
 
     /// Make a journal of the block result. This indexes the bundle state.
-    pub fn make_journal(&self, host_block: u64, prev_journal_hash: B256) -> HostJournal<'_> {
-        HostJournal::new(
+    pub fn make_journal(&self, host_block: u64, prev_journal_hash: B256) -> BlockUpdate<'_> {
+        BlockUpdate::new(
             host_block,
             prev_journal_hash,
             BundleStateIndex::from(self.execution_outcome.bundle()),

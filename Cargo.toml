@@ -80,3 +80,7 @@ uuid = "1.16.0"
 
 # Test Utils
 alloy-rlp = "0.3.11"
+
+
+[patch.crates-io]
+trevm = { path = "../trevm", version = "0.27.0" }
