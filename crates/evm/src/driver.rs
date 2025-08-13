@@ -592,6 +592,7 @@ where
         //   order.
         // - Process each enter event in order.
         // - Process each enter token event in order.
+        // - Run system built-in application logic
         // - Process each transact event in order.
         // - Set the balance of the rollup passage to zero.
         // - Credit the basefee to the basefee beneficiary.
