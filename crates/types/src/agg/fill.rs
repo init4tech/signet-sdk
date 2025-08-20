@@ -1,5 +1,6 @@
 use crate::AggregateOrders;
 use crate::MarketError;
+use crate::SignedFill;
 use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
 use signet_zenith::RollupOrders;
@@ -105,6 +106,17 @@ impl AggregateFills {
     /// This uses saturating arithmetic to avoid panics. If filling more than
     /// [`U256::MAX`], re-examine life choices and don't do that.
     pub fn add_fill(&mut self, chain_id: u64, fill: &RollupOrders::Filled) {
+        fill.outputs.iter().for_each(|o| self.add_fill_output(chain_id, o));
+    }
+
+    /// Ingest a [`SignedFill`] into the aggregate. The chain_id is the ID
+    /// of the chain which emitted the event.
+    ///
+    /// # Note:
+    ///
+    /// This uses saturating arithmetic to avoid panics. If filling more than
+    /// [`U256::MAX`], re-examine life choices and don't do that.
+    pub fn add_signed_fill(&mut self, chain_id: u64, fill: &SignedFill) {
         fill.outputs.iter().for_each(|o| self.add_fill_output(chain_id, o));
     }
 

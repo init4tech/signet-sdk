@@ -330,7 +330,8 @@ where
     where
         Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
     {
-        let mut driver = SignetEthBundleDriver::new(bundle, self.finish_by);
+        let mut driver =
+            SignetEthBundleDriver::new(bundle, self.constants.host_chain_id(), self.finish_by);
         let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
 
         // Run the bundle

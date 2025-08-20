@@ -1,14 +1,13 @@
 use crate::send::SignetEthBundle;
 use alloy::primitives::U256;
-use signet_evm::{DriveBundleResult, EvmNeedsTx, SignetLayered};
-use signet_types::SignedPermitError;
+use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, SignetInspector, SignetLayered};
+use signet_types::{AggregateFills, MarketError, SignedPermitError};
+use tracing::debug;
 use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
     revm::{
-        context::result::{EVMError, ExecutionResult, HaltReason},
-        inspector::InspectorEvmTr,
-        Database, DatabaseCommit, Inspector,
+        context::result::EVMError, inspector::InspectorEvmTr, Database, DatabaseCommit, Inspector,
     },
     trevm_bail, trevm_ensure, trevm_try, BundleDriver, BundleError,
 };
@@ -58,18 +57,42 @@ impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
 /// Driver for applying a Signet Ethereum bundle to an EVM.
 #[derive(Debug, Clone)]
 pub struct SignetEthBundleDriver<'a> {
+    /// The bundle to apply.
     bundle: &'a SignetEthBundle,
+
+    /// Execution deadline for this bundle. This limits the total WALLCLOCK
+    /// time spent simulating the bundle.
     deadline: std::time::Instant,
 
+    /// Aggregate fills derived from the bundle's host fills.
+    agg_fills: AggregateFills,
+
+    /// Total gas used by this bundle during execution, an output of the driver.
     total_gas_used: u64,
+    /// Beneficiary balance increase during execution, an output of the driver.
     beneficiary_balance_increase: U256,
 }
 
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
-    pub const fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
-        Self { bundle, deadline, total_gas_used: 0, beneficiary_balance_increase: U256::ZERO }
+    pub fn new(
+        bundle: &'a SignetEthBundle,
+        host_chain_id: u64,
+        deadline: std::time::Instant,
+    ) -> Self {
+        let mut agg_fills = AggregateFills::default();
+        if let Some(host_fills) = &bundle.host_fills {
+            agg_fills.add_signed_fill(host_chain_id, host_fills);
+        }
+
+        Self {
+            bundle,
+            deadline,
+            agg_fills,
+            total_gas_used: 0,
+            beneficiary_balance_increase: U256::ZERO,
+        }
     }
 
     /// Get a reference to the bundle.
@@ -90,6 +113,39 @@ impl<'a> SignetEthBundleDriver<'a> {
     /// Get the beneficiary balance increase for this driver during tx execution.
     pub const fn beneficiary_balance_increase(&self) -> U256 {
         self.beneficiary_balance_increase
+    }
+
+    /// Get the aggregate fills for this driver.
+    ///
+    /// This may be used to check that the bundle does not overfill, by
+    /// inspecting the agg fills after execution.
+    pub fn agg_fills(&self) -> &AggregateFills {
+        &self.agg_fills
+    }
+
+    /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate
+    /// payable gas and call [`Self::accept_tx`].
+    ///
+    /// This path is used by
+    /// - [`TransactionSigned`] objects
+    /// - [`Transactor::Transact`] events
+    pub(crate) fn check_fills<Db, Insp>(
+        &mut self,
+        trevm: &mut EvmTransacted<Db, Insp>,
+    ) -> Result<(), MarketError>
+    where
+        Db: Database + DatabaseCommit,
+        Insp: Inspector<Ctx<Db>>,
+    {
+        // Taking these clears the context for reuse.
+        let (agg_orders, agg_fills) =
+            trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
+
+        // We check the AggregateFills here, and if it fails, we discard the
+        // transaction outcome and push a failure receipt.
+        self.agg_fills.checked_remove_ru_tx_events(&agg_orders, &agg_fills).inspect_err(|err| {
+            debug!(%err, "Discarding transaction outcome due to market error");
+        })
     }
 }
 
@@ -150,33 +206,41 @@ where
 
             let tx_hash = tx.hash();
 
-            trevm = match trevm.run_tx(&tx) {
-                Ok(trevm) => {
-                    // Check if the transaction was reverted or halted
-                    let result = trevm.result();
+            // Temporary rebinding of trevm within each loop iteration.
+            // The type of t is `EvmTransacted`, while the type of trevm is
+            // `EvmNeedsTx`.
+            let mut t = trevm.run_tx(&tx).map_err(|err| err.err_into())?;
 
-                    match result {
-                        ExecutionResult::Success { gas_used, .. } => {
-                            self.total_gas_used = self.total_gas_used.saturating_add(*gas_used);
-                        }
-                        // `CallTooDeep` represents the timelimit being reached
-                        ExecutionResult::Halt { reason, .. }
-                            if *reason == HaltReason::CallTooDeep =>
-                        {
-                            return Err(trevm.errored(BundleError::BundleReverted.into()));
-                        }
-                        ExecutionResult::Halt { gas_used, .. }
-                        | ExecutionResult::Revert { gas_used, .. } => {
-                            if !self.bundle.reverting_tx_hashes().contains(tx_hash) {
-                                return Err(trevm.errored(BundleError::BundleReverted.into()));
-                            }
-                            self.total_gas_used = self.total_gas_used.saturating_add(*gas_used);
-                        }
-                    }
-                    trevm.accept_state()
+            // Check the result of the transaction.
+            let result = t.result();
+
+            let gas_used = result.gas_used();
+
+            // EVM Execution succeeded.
+            // We now check if the orders are valid with the bundle's fills. If
+            // not, and the tx is not marked as revertible by the bundle, we
+            // error our simulation.
+            if result.is_success() {
+                if self.check_fills(&mut t).is_err()
+                    && !self.bundle.reverting_tx_hashes().contains(tx_hash)
+                {
+                    return Err(t.errored(BundleError::BundleReverted.into()));
                 }
-                Err(err) => return Err(err.err_into()),
-            };
+
+                self.total_gas_used = self.total_gas_used.saturating_add(gas_used);
+            } else {
+                // If not success, we are in a revert or halt. If the tx is
+                // not marked as revertible by the bundle, we error our
+                // simulation.
+                if !self.bundle.reverting_tx_hashes().contains(tx_hash) {
+                    return Err(t.errored(BundleError::BundleReverted.into()));
+                }
+                self.total_gas_used = self.total_gas_used.saturating_add(gas_used);
+            }
+
+            // If we did not shortcut return, we accept the state changes
+            // from this transaction.
+            trevm = t.accept_state()
         }
 
         let beneficiary_balance =
