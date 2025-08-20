@@ -119,7 +119,7 @@ impl<'a> SignetEthBundleDriver<'a> {
     ///
     /// This may be used to check that the bundle does not overfill, by
     /// inspecting the agg fills after execution.
-    pub fn agg_fills(&self) -> &AggregateFills {
+    pub const fn agg_fills(&self) -> &AggregateFills {
         &self.agg_fills
     }
 
