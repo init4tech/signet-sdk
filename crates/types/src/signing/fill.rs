@@ -53,7 +53,8 @@ impl SignedFill {
     ///
     /// For it to be valid:
     /// - Deadline must be in the future.
-    /// - The permits must exactly match the ordering, token, and amount of the outputs.
+    /// - The permits must exactly match the ordering, token, and amount of the
+    ///   outputs.
     pub fn validate(&self, timestamp: u64) -> Result<(), SignedPermitError> {
         let deadline = self.permit.permit.deadline.saturating_to::<u64>();
         if timestamp > deadline {

@@ -110,6 +110,11 @@ impl SignetEthBundle {
 
     /// Check that this fill is valid on-chain as of the current block. This
     /// checks that the tokens can actually be transferred.
+    ///
+    /// # WARNING:
+    ///
+    /// This function will send an RPC request to the provider containing the
+    /// fills. It MUST NOT be used with an untrusted provider.
     pub async fn alloy_validate_fills_onchain<Db, P, N>(
         &self,
         orders: HostOrdersInstance<P, N>,
