@@ -1,7 +1,7 @@
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{
     network::TransactionBuilder,
-    primitives::{Address, B256},
+    primitives::{keccak256, Address, B256},
     rpc::types::TransactionRequest,
     signers::Signer,
     sol_types::{SolCall, SolValue},
@@ -77,25 +77,25 @@ impl SignedOrder {
     /// # Composition
     ///
     /// The order hash is composed of the following:
-    /// - The permit2 batch permit inputs, ABI encoded.
-    /// - The permit2 batch owner, ABI encoded.
-    /// - The order outputs, ABI encoded.
-    /// - The permit2 batch signature, normalized.
+    /// - The permit2 batch permit inputs, ABI encoded and hashed.
+    /// - The permit2 batch owner, ABI encoded and hashed.
+    /// - The order outputs, ABI encoded and hashed.
+    /// - The permit2 batch signature, normalized and hashed.
     ///
     /// The components are then hashed together.
     pub fn order_hash(&self) -> B256 {
         let mut buf = vec![];
 
-        buf.extend_from_slice(self.permit.permit.abi_encode().as_slice());
-        buf.extend_from_slice(self.permit.owner.abi_encode().as_slice());
-        buf.extend_from_slice(self.outputs.abi_encode().as_slice());
+        buf.extend_from_slice(keccak256(self.permit.permit.abi_encode()).as_slice());
+        buf.extend_from_slice(keccak256(self.permit.owner.abi_encode()).as_slice());
+        buf.extend_from_slice(keccak256(self.outputs.abi_encode()).as_slice());
 
         // Normalize the signature.
         let signature =
             alloy::primitives::Signature::from_raw(&self.permit.signature).unwrap().normalized_s();
-        buf.extend_from_slice(&signature.as_bytes());
+        buf.extend_from_slice(keccak256(signature.as_bytes()).as_slice());
 
-        alloy::primitives::keccak256(buf)
+        keccak256(buf)
     }
 }
 
