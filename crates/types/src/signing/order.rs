@@ -84,7 +84,15 @@ impl SignedOrder {
     ///
     /// The components are then hashed together.
     pub fn order_hash(&self) -> B256 {
-        let mut buf = vec![];
+        keccak256(self.order_hash_pre_image())
+    }
+
+    /// Get the pre-image for the order hash.
+    ///
+    /// This is the raw bytes that are hashed to produce the order hash.
+    fn order_hash_pre_image(&self) -> Vec<u8> {
+        // 4 * 32 bytes = 128 bytes
+        let mut buf = Vec::with_capacity(128);
 
         buf.extend_from_slice(keccak256(self.permit.permit.abi_encode()).as_slice());
         buf.extend_from_slice(keccak256(self.permit.owner.abi_encode()).as_slice());
@@ -95,7 +103,7 @@ impl SignedOrder {
             alloy::primitives::Signature::from_raw(&self.permit.signature).unwrap().normalized_s();
         buf.extend_from_slice(keccak256(signature.as_bytes()).as_slice());
 
-        keccak256(buf)
+        buf
     }
 }
 
