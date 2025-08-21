@@ -85,7 +85,8 @@ impl SignedOrder {
     pub fn order_hash(&self) -> B256 {
         let mut buf = vec![];
 
-        buf.extend_from_slice(self.permit.abi_encode().as_slice());
+        buf.extend_from_slice(self.permit.permit.abi_encode().as_slice());
+        buf.extend_from_slice(self.permit.owner.abi_encode().as_slice());
         buf.extend_from_slice(self.outputs.abi_encode().as_slice());
 
         // Normalize the signature.
