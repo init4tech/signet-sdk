@@ -209,6 +209,7 @@ fn test_an_enter() {
     assert_eq!(sealed_block.senders.len(), 1);
     assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&expected_tx]);
     assert_eq!(receipts.len(), 1);
+    dbg!(&receipts);
 
     let ReceiptEnvelope::Eip1559(ref receipt) = receipts[0] else {
         panic!("expected 1559 receipt")
