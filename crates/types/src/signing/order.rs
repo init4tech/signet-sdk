@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn test_order_hash() {
         // https://explorer.pecorino.signet.sh/tx/0xdc842ebcadf89f91c936ec4c4e6b16d2a7b9179f4d7aaefb664179d546c807ec
-        let order = r#"{"permit":{"permitted":[{"token":"0x0000000000000000007369676e65742d77657468","amount":"0x3b9aca00"}],"nonce":"0x63ce4972df028","deadline":"0x68a76d42"},"owner":"0x492e9c316f073fe4de9d665221568cdad1a7e95b","signature":"0xab7a30e9d211f1f75d9c0759e41d60b886eb0c7c80a471e292b244b78ac84ffa059b1bd281f278336e22d977d0cccaeaa81e0adf6714e579c03fe03e49d5b8611b","outputs":[{"token":"0xd03d085b78067a18155d3b29d64914df3d19a53c","amount":"0x3b9aca00","recipient":"0x492e9c316f073fe4de9d665221568cdad1a7e95b","chainId":3151908}]}"#;
+        let order = include_str!("../../../../tests/artifacts/order_hash.json");
         let order: SignedOrder = serde_json::from_str(order).unwrap();
         let hash = order.order_hash();
         let pre_image = order.order_hash_pre_image();
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(hash, keccak256(pre_image));
         assert_eq!(
             hash,
-            b256!("0x7e721875bb2bb9ea09a528992b13388e0b0566381e0f407daf8d797326728002")
+            b256!("0x4c74fe5a339b88fa909a43828a31466deba6b33cc6b6f522d1e8c5755a9fddcd")
         );
     }
 }
