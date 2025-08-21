@@ -77,8 +77,9 @@ impl SignedOrder {
     /// # Composition
     ///
     /// The order hash is composed of the following:
-    /// - The permit2 batch permit, ABI encoded.
-    /// - The permit2 batch outputs, ABI encoded.
+    /// - The permit2 batch permit inputs, ABI encoded.
+    /// - The permit2 batch owner, ABI encoded.
+    /// - The order outputs, ABI encoded.
     /// - The permit2 batch signature, normalized.
     ///
     /// The components are then hashed together.
