@@ -47,7 +47,13 @@ pub fn simple_send(to: Address, amount: U256, nonce: u64, ru_chain_id: u64) -> T
 }
 
 /// Make a simple contract call transaction.
-pub fn simple_call<T>(to: Address, input: &T, nonce: u64, ru_chain_id: u64) -> TypedTransaction
+pub fn simple_call<T>(
+    to: Address,
+    input: &T,
+    value: U256,
+    nonce: u64,
+    ru_chain_id: u64,
+) -> TypedTransaction
 where
     T: SolCall,
 {
@@ -55,7 +61,7 @@ where
         nonce,
         gas_limit: 2_100_000,
         to: TxKind::Call(to),
-        value: U256::ZERO,
+        value,
         chain_id: ru_chain_id,
         max_fee_per_gas: GWEI_TO_WEI as u128 * 100,
         max_priority_fee_per_gas: GWEI_TO_WEI as u128,

@@ -1,8 +1,10 @@
 use crate::send::SignetEthBundle;
 use alloy::primitives::U256;
-use signet_evm::{DriveBundleResult, EvmNeedsTx, EvmTransacted, SignetInspector, SignetLayered};
+use signet_evm::{
+    DriveBundleResult, EvmErrored, EvmNeedsTx, EvmTransacted, SignetInspector, SignetLayered,
+};
 use signet_types::{AggregateFills, MarketError, SignedPermitError};
-use tracing::debug;
+use tracing::{debug, error};
 use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
@@ -143,9 +145,7 @@ impl<'a> SignetEthBundleDriver<'a> {
 
         // We check the AggregateFills here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
-        self.agg_fills.checked_remove_ru_tx_events(&agg_orders, &agg_fills).inspect_err(|err| {
-            debug!(%err, "Discarding transaction outcome due to market error");
-        })
+        self.agg_fills.checked_remove_ru_tx_events(&agg_orders, &agg_fills)
     }
 }
 
@@ -200,6 +200,8 @@ where
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
 
         for tx in txs.into_iter() {
+            let _span = tracing::debug_span!("bundle_tx_loop", tx_hash = %tx.hash()).entered();
+
             // Update the inner deadline.
             let limit = trevm.inner_mut_unchecked().ctx_inspector().1.outer_mut().outer_mut();
             *limit = TimeLimit::new(self.deadline - std::time::Instant::now());
@@ -209,7 +211,10 @@ where
             // Temporary rebinding of trevm within each loop iteration.
             // The type of t is `EvmTransacted`, while the type of trevm is
             // `EvmNeedsTx`.
-            let mut t = trevm.run_tx(&tx).map_err(|err| err.err_into())?;
+            let mut t = trevm
+                .run_tx(&tx)
+                .map_err(EvmErrored::err_into)
+                .inspect_err(|err| error!(err = %err.error(), "error while running transaction"))?;
 
             // Check the result of the transaction.
             let result = t.result();
@@ -221,10 +226,14 @@ where
             // not, and the tx is not marked as revertible by the bundle, we
             // error our simulation.
             if result.is_success() {
-                if self.check_fills(&mut t).is_err()
-                    && !self.bundle.reverting_tx_hashes().contains(tx_hash)
-                {
-                    return Err(t.errored(BundleError::BundleReverted.into()));
+                if self.check_fills(&mut t).is_err() {
+                    debug!("transaction dropped due to insufficient fills");
+                    if self.bundle.reverting_tx_hashes().contains(tx_hash) {
+                        trevm = t.reject();
+                        continue;
+                    } else {
+                        return Err(t.errored(BundleError::BundleReverted.into()));
+                    }
                 }
 
                 self.total_gas_used = self.total_gas_used.saturating_add(gas_used);
@@ -233,13 +242,14 @@ where
                 // not marked as revertible by the bundle, we error our
                 // simulation.
                 if !self.bundle.reverting_tx_hashes().contains(tx_hash) {
+                    debug!("transaction reverted, not marked as revertible");
                     return Err(t.errored(BundleError::BundleReverted.into()));
                 }
                 self.total_gas_used = self.total_gas_used.saturating_add(gas_used);
             }
 
-            // If we did not shortcut return, we accept the state changes
-            // from this transaction.
+            // If we did not shortcut return/continue, we accept the state
+            // changes from this transaction.
             trevm = t.accept_state()
         }
 
