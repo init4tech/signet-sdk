@@ -38,10 +38,10 @@ use trevm::{
     BundleDriver, BundleError, NoopBlock,
 };
 
-const SENDER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[0]);
+static SENDER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[0]);
 
-const ORDERER: LazyLock<Address> = LazyLock::new(|| TEST_USERS[1]);
-const ORDERER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[1]);
+static ORDERER: LazyLock<Address> = LazyLock::new(|| TEST_USERS[1]);
+static ORDERER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[1]);
 
 const FILLER: Address = Address::repeat_byte(0x30);
 const TX_0_RECIPIENT: Address = Address::repeat_byte(0x31);
@@ -137,9 +137,9 @@ fn test_bundle(
     };
     let tx_3 = simple_send(TX_2_RECIPIENT, U256::ONE, 1, RU_CHAIN_ID);
 
-    let tx_1 = sign_tx_with_key_pair(&*SENDER_WALLET, tx_1);
-    let tx_2 = sign_tx_with_key_pair(&*ORDERER_WALLET, tx_2);
-    let tx_3 = sign_tx_with_key_pair(&*SENDER_WALLET, tx_3);
+    let tx_1 = sign_tx_with_key_pair(&SENDER_WALLET, tx_1);
+    let tx_2 = sign_tx_with_key_pair(&ORDERER_WALLET, tx_2);
+    let tx_3 = sign_tx_with_key_pair(&SENDER_WALLET, tx_3);
 
     simple_bundle(&[tx_1, tx_2, tx_3], host_fills, 0)
 }
