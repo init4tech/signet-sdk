@@ -1,22 +1,57 @@
-use signet_constants::test_utils::*;
-use trevm::revm::{
-    context::CfgEnv, database::in_memory_db::InMemoryDB, primitives::hardfork::SpecId,
-    state::Bytecode,
+use crate::{
+    contracts::{
+        counter::{COUNTER_BYTECODE, COUNTER_TEST_ADDRESS},
+        reverts::{REVERT_BYTECODE, REVERT_TEST_ADDRESS},
+        system::{RU_ORDERS_BYTECODE, RU_PASSAGE_BYTECODE},
+        token::{
+            MINTER, MINTER_SLOT, NAME_SLOT, SYMBOL_SLOT, TOKEN_BYTECODE, WBTC_NAME, WBTC_SYMBOL,
+            WETH_NAME, WETH_SYMBOL,
+        },
+    },
+    users::TEST_USERS,
 };
-
-use crate::contracts::{
-    counter::{COUNTER_BYTECODE, COUNTER_TEST_ADDRESS},
-    system::{RU_ORDERS_BYTECODE, RU_PASSAGE_BYTECODE},
-    token::{
-        MINTER, MINTER_SLOT, NAME_SLOT, SYMBOL_SLOT, TOKEN_BYTECODE, WBTC_NAME, WBTC_SYMBOL,
-        WETH_NAME, WETH_SYMBOL,
+use alloy::{consensus::constants::ETH_TO_WEI, primitives::U256};
+use signet_constants::test_utils::*;
+use trevm::{
+    helpers::Ctx,
+    revm::{
+        context::CfgEnv, database::in_memory_db::InMemoryDB, inspector::NoOpInspector,
+        primitives::hardfork::SpecId, state::Bytecode, Inspector,
     },
 };
 
-/// Create a new Signet EVM with an in-memory database for testing. Deploy
-/// system contracts and pre-deployed tokens.
+/// Create a new Signet EVM with an in-memory database for testing.
+///
+/// Performs initial setup to
+/// - Deploy [`RU_ORDERS`] and and [`RU_PASSAGE`] system contracts
+/// - Deploy a [`COUNTER`] contract for testing at [`COUNTER_TEST_ADDRESS`].
+/// - Deploy Token contracts for WBTC and WETH with their respective bytecodes
+///   and storage.
+/// - Deploy a `Revert` contract for testing at [`REVERT_TEST_ADDRESS`].
+/// - Fund the [`TEST_USERS`] with 1000 ETH each.
+///
+/// [`COUNTER`]: crate::contracts::counter::Counter
 pub fn test_signet_evm() -> signet_evm::EvmNeedsBlock<InMemoryDB> {
-    let mut evm = signet_evm::signet_evm(InMemoryDB::default(), TEST_SYS).fill_cfg(&TestCfg);
+    test_signet_evm_with_inspector(NoOpInspector)
+}
+
+/// Create a new Signet EVM with an in-memory database for testing.
+///
+/// Performs initial setup to
+/// - Deploy [`RU_ORDERS`] and and [`RU_PASSAGE`] system contracts
+/// - Deploy a [`COUNTER`] contract for testing at [`COUNTER_TEST_ADDRESS`].
+/// - Deploy Token contracts for WBTC and WETH with their respective bytecodes
+///   and storage.
+/// - Deploy a `Revert` contract for testing at [`REVERT_TEST_ADDRESS`].
+/// - Fund the [`TEST_USERS`] with 1000 ETH each.
+///
+/// [`COUNTER`]: crate::contracts::counter::Counter
+pub fn test_signet_evm_with_inspector<I>(inspector: I) -> signet_evm::EvmNeedsBlock<InMemoryDB, I>
+where
+    I: Inspector<Ctx<InMemoryDB>>,
+{
+    let mut evm = signet_evm::signet_evm_with_inspector(InMemoryDB::default(), inspector, TEST_SYS)
+        .fill_cfg(&TestCfg);
 
     // Set the bytecode for system contracts
     evm.set_bytecode_unchecked(TEST_SYS.ru_orders(), Bytecode::new_legacy(RU_ORDERS_BYTECODE));
@@ -36,6 +71,14 @@ pub fn test_signet_evm() -> signet_evm::EvmNeedsBlock<InMemoryDB> {
 
     // Set the bytecode for the Counter contract
     evm.set_bytecode_unchecked(COUNTER_TEST_ADDRESS, Bytecode::new_legacy(COUNTER_BYTECODE));
+
+    // Set the bytecode for the Revert contract
+    evm.set_bytecode_unchecked(REVERT_TEST_ADDRESS, Bytecode::new_legacy(REVERT_BYTECODE));
+
+    // increment the balance for each test signer
+    TEST_USERS.iter().copied().for_each(|user| {
+        evm.set_balance_unchecked(user, U256::from(1000 * ETH_TO_WEI));
+    });
 
     evm
 }

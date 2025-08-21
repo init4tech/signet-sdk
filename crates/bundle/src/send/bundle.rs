@@ -12,7 +12,14 @@ use alloy::{
 use serde::{Deserialize, Serialize};
 use signet_types::{SignedFill, SignedPermitError};
 use signet_zenith::HostOrders::HostOrdersInstance;
-use trevm::{revm::Database, BundleError};
+use trevm::{
+    inspectors::{Layered, TimeLimit},
+    revm::{inspector::NoOpInspector, Database},
+    BundleError,
+};
+
+/// The inspector type required by the Signet bundle driver.
+pub type BundleInspector<I = NoOpInspector> = Layered<TimeLimit, I>;
 
 /// Bundle of transactions for `signet_sendBundle`.
 ///

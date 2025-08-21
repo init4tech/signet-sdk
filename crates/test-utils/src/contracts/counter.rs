@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{b256, bytes, Address, Bytes, B256},
+    primitives::{b256, bytes, Address, Bytes, B256, U256},
     providers::Provider,
 };
 
@@ -13,6 +13,9 @@ alloy::sol! {
 
    }
 }
+
+/// The storage slot where the counter value is stored in the Counter contract.
+pub const COUNTER_SLOT: U256 = U256::ZERO;
 
 /// A test address for the Counter.sol contract, which will be pre-deployed in
 /// test EVMs.

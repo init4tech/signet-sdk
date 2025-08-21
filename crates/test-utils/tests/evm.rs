@@ -1,7 +1,7 @@
 use alloy::{
     consensus::{
         constants::{ETH_TO_WEI, GWEI_TO_WEI},
-        Header, ReceiptEnvelope, TxEip1559,
+        Header, ReceiptEnvelope, TxEip1559, TxEnvelope,
     },
     primitives::{Address, U256},
     signers::{local::PrivateKeySigner, Signature},
@@ -68,7 +68,7 @@ impl TestEnv {
         block
     }
 
-    fn signed_simple_send(&mut self, from: usize, to: Address, amount: U256) -> TransactionSigned {
+    fn signed_simple_send(&mut self, from: usize, to: Address, amount: U256) -> TxEnvelope {
         let wallet = &self.wallets[from];
         let tx = simple_send(to, amount, self.nonces[from], RU_CHAIN_ID);
         let tx = sign_tx_with_key_pair(wallet, tx);
@@ -88,7 +88,7 @@ fn test_simple_send() {
     // Setup the driver
     let block = context.next_block();
     let mut extracts = Extracts::<Chain>::empty(&block);
-    let mut driver = context.driver(&mut extracts, vec![tx.clone()]);
+    let mut driver = context.driver(&mut extracts, vec![tx.clone().into()]);
 
     // Run the EVM
     let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
@@ -96,7 +96,7 @@ fn test_simple_send() {
 
     // Assert that the EVM balance increased
     assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(sealed_block.block.body.transactions().next(), Some(&tx));
+    assert_eq!(sealed_block.block.body.transactions().next(), Some(&tx.clone().into()));
     assert_eq!(receipts.len(), 1);
 
     assert_eq!(trevm.read_balance(to), U256::from(100));
@@ -116,7 +116,7 @@ fn test_two_sends() {
     // Setup the driver
     let block = context.next_block();
     let mut extracts = Extracts::<Chain>::empty(&block);
-    let mut driver = context.driver(&mut extracts, vec![tx1.clone(), tx2.clone()]);
+    let mut driver = context.driver(&mut extracts, vec![tx1.clone().into(), tx2.clone().into()]);
 
     // Run the EVM
     let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
@@ -124,7 +124,10 @@ fn test_two_sends() {
 
     // Assert that the EVM balance increased
     assert_eq!(sealed_block.senders.len(), 2);
-    assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&tx1, &tx2]);
+    assert_eq!(
+        sealed_block.block.body.transactions().collect::<Vec<_>>(),
+        vec![&tx1.clone().into(), &tx2.clone().into()]
+    );
     assert_eq!(receipts.len(), 2);
 
     assert_eq!(trevm.read_balance(to), U256::from(100));
@@ -142,14 +145,17 @@ fn test_execute_two_blocks() {
     // Setup the driver
     let block = context.next_block();
     let mut extracts = Extracts::<Chain>::empty(&block);
-    let mut driver = context.driver(&mut extracts, vec![tx.clone()]);
+    let mut driver = context.driver(&mut extracts, vec![tx.clone().into()]);
 
     // Run the EVM
     let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
     assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&tx]);
+    assert_eq!(
+        sealed_block.block.body.transactions().collect::<Vec<_>>(),
+        vec![&tx.clone().into()]
+    );
     assert_eq!(receipts.len(), 1);
     assert_eq!(trevm.read_balance(to), U256::from(100));
     assert_eq!(trevm.read_nonce(sender), 1);
@@ -161,14 +167,17 @@ fn test_execute_two_blocks() {
     // Setup the driver
     let block = context.next_block();
     let mut extracts = Extracts::<Chain>::empty(&block);
-    let mut driver = context.driver(&mut extracts, vec![tx.clone()]);
+    let mut driver = context.driver(&mut extracts, vec![tx.clone().into()]);
 
     // Run the EVM
     let mut trevm = trevm.drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
     assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&tx]);
+    assert_eq!(
+        sealed_block.block.body.transactions().collect::<Vec<_>>(),
+        vec![&tx.clone().into()]
+    );
     assert_eq!(receipts.len(), 1);
     assert_eq!(trevm.read_balance(to), U256::from(200));
 }
