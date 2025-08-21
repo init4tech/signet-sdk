@@ -38,8 +38,10 @@ use trevm::{
     BundleDriver, BundleError, NoopBlock,
 };
 
-const SENDER: LazyLock<Address> = LazyLock::new(|| TEST_USERS[0]);
 const SENDER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[0]);
+
+const ORDERER: LazyLock<Address> = LazyLock::new(|| TEST_USERS[1]);
+const ORDERER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[1]);
 
 const FILLER: Address = Address::repeat_byte(0x30);
 const TX_0_RECIPIENT: Address = Address::repeat_byte(0x31);
@@ -129,14 +131,14 @@ fn test_bundle(
 
     let tx_1 = simple_send(TX_0_RECIPIENT, U256::ONE, 0, RU_CHAIN_ID);
     let tx_2 = if order {
-        simple_order(1)
+        simple_order(0)
     } else {
-        simple_call(call_addr, &Counter::incrementCall, U256::ZERO, 1, RU_CHAIN_ID)
+        simple_call(call_addr, &Counter::incrementCall, U256::ZERO, 0, RU_CHAIN_ID)
     };
-    let tx_3 = simple_send(TX_2_RECIPIENT, U256::ONE, 2, RU_CHAIN_ID);
+    let tx_3 = simple_send(TX_2_RECIPIENT, U256::ONE, 1, RU_CHAIN_ID);
 
     let tx_1 = sign_tx_with_key_pair(&*SENDER_WALLET, tx_1);
-    let tx_2 = sign_tx_with_key_pair(&*SENDER_WALLET, tx_2);
+    let tx_2 = sign_tx_with_key_pair(&*ORDERER_WALLET, tx_2);
     let tx_3 = sign_tx_with_key_pair(&*SENDER_WALLET, tx_3);
 
     simple_bundle(&[tx_1, tx_2, tx_3], host_fills, 0)
@@ -224,7 +226,7 @@ fn test_bundle_droppable() {
 fn test_order_bundle() {
     let trevm = bundle_evm();
 
-    let inital_balance = trevm.read_balance_ref(*SENDER);
+    let inital_balance = trevm.read_balance_ref(*ORDERER);
 
     let host_fills = host_fills(FILLER, U256::from(0));
 
@@ -241,7 +243,7 @@ fn test_order_bundle() {
 
     // Check the balance of the recipients increased, and the balance of the
     // sender decreased by at least the input amount.
-    let post_balance = trevm.read_balance_ref(*SENDER);
+    let post_balance = trevm.read_balance_ref(*ORDERER);
 
     assert_eq!(trevm.read_balance_ref(TX_0_RECIPIENT), U256::ONE);
     assert!(post_balance < inital_balance - INPUT_AMOUNT);
@@ -252,7 +254,7 @@ fn test_order_bundle() {
 fn test_order_bundle_revert() {
     let trevm = bundle_evm();
 
-    let inital_balance = trevm.read_balance_ref(*SENDER);
+    let inital_balance = trevm.read_balance_ref(*ORDERER);
 
     // This should cause the order to be invalid, as no fill is provided.
     let bundle = order_bundle(None);
@@ -269,7 +271,7 @@ fn test_order_bundle_revert() {
     // Erroring leaves the evm in a dirty state. The first txn was executed,
     // the second was dropped, and the third was not executed.
     assert_eq!(trevm.read_balance_ref(TX_0_RECIPIENT), U256::ONE);
-    assert_eq!(trevm.read_balance_ref(*SENDER), inital_balance - uint!(21000000000001_U256)); // less the value+gas of tx_0
+    assert_eq!(trevm.read_balance_ref(*ORDERER), inital_balance);
     assert_eq!(trevm.read_balance_ref(TX_2_RECIPIENT), U256::ZERO);
 }
 
@@ -277,17 +279,13 @@ fn test_order_bundle_revert() {
 fn test_order_bundle_droppable() {
     let trevm = bundle_evm();
 
-    let inital_balance = trevm.read_balance_ref(*SENDER);
+    let inital_balance = trevm.read_balance_ref(*ORDERER);
 
     let mut bundle = order_bundle(None);
 
     // Mark the second transaction as droppable.
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
-    // The 3rd transaction is a send to 0x3232..., which will become INVALID if
-    // the 2nd transaction is dropped, as the nonce will be too high.
-    // So we remove it.
-    bundle.bundle.txs.pop();
 
     let mut driver = SignetEthBundleDriver::new(
         &bundle,
@@ -298,9 +296,8 @@ fn test_order_bundle_droppable() {
     // We expect this to work and drop the second transaction.
     let trevm = driver.run_bundle(trevm).unwrap();
 
-    // Check that the balance of the prevert recipient increased, and the balance of the sender decreased by the right gas amount
-    let post_balance = trevm.read_balance_ref(*SENDER);
+    // The order tx was dropped, but both sends were executed.
     assert_eq!(trevm.read_balance_ref(TX_0_RECIPIENT), U256::ONE);
-    assert_eq!(post_balance, inital_balance - uint!(21000000000001_U256)); // less the value+gas of tx_0
-    assert_eq!(trevm.read_balance_ref(TX_2_RECIPIENT), U256::ZERO);
+    assert_eq!(trevm.read_balance_ref(*ORDERER), inital_balance);
+    assert_eq!(trevm.read_balance_ref(TX_2_RECIPIENT), U256::ONE);
 }
