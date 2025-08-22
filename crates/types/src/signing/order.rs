@@ -1,7 +1,10 @@
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{
-    network::TransactionBuilder, primitives::Address, rpc::types::TransactionRequest,
-    signers::Signer, sol_types::SolCall,
+    network::TransactionBuilder,
+    primitives::{keccak256, Address, B256},
+    rpc::types::TransactionRequest,
+    signers::Signer,
+    sol_types::{SolCall, SolValue},
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -67,6 +70,41 @@ impl SignedOrder {
 
         // construct an initiate tx request
         TransactionRequest::default().with_input(initiate_data).with_to(order_contract)
+    }
+
+    /// Get the hash of the order.
+    ///
+    /// # Composition
+    ///
+    /// The order hash is composed of the following:
+    /// - The permit2 batch permit inputs, ABI encoded and hashed.
+    /// - The permit2 batch owner, ABI encoded and hashed.
+    /// - The order outputs, ABI encoded and hashed.
+    /// - The permit2 batch signature, normalized and hashed.
+    ///
+    /// The components are then hashed together.
+    pub fn order_hash(&self) -> B256 {
+        keccak256(self.order_hash_pre_image())
+    }
+
+    /// Get the pre-image for the order hash.
+    ///
+    /// This is the raw bytes that are hashed to produce the order hash.
+    #[doc(hidden)]
+    pub fn order_hash_pre_image(&self) -> Vec<u8> {
+        // 4 * 32 bytes = 128 bytes
+        let mut buf = Vec::with_capacity(128);
+
+        buf.extend_from_slice(keccak256(self.permit.permit.abi_encode()).as_slice());
+        buf.extend_from_slice(keccak256(self.permit.owner.abi_encode()).as_slice());
+        buf.extend_from_slice(keccak256(self.outputs.abi_encode()).as_slice());
+
+        // Normalize the signature.
+        let signature =
+            alloy::primitives::Signature::from_raw(&self.permit.signature).unwrap().normalized_s();
+        buf.extend_from_slice(keccak256(signature.as_bytes()).as_slice());
+
+        buf
     }
 }
 
@@ -145,5 +183,46 @@ impl<'a> UnsignedOrder<'a> {
             },
             outputs: permit.outputs,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::primitives::{b256, Signature, U256};
+    use signet_zenith::HostOrders::{PermitBatchTransferFrom, TokenPermissions};
+
+    use super::*;
+
+    fn basic_order() -> SignedOrder {
+        SignedOrder::new(
+            Permit2Batch {
+                permit: PermitBatchTransferFrom {
+                    permitted: vec![TokenPermissions { token: Address::ZERO, amount: U256::ZERO }],
+                    nonce: U256::ZERO,
+                    deadline: U256::ZERO,
+                },
+                owner: Address::ZERO,
+                signature: Signature::test_signature().as_bytes().into(),
+            },
+            vec![Output {
+                token: Address::ZERO,
+                amount: U256::ZERO,
+                recipient: Address::ZERO,
+                chainId: 0,
+            }],
+        )
+    }
+
+    #[test]
+    fn test_order_hash() {
+        let order = basic_order();
+        let hash = order.order_hash();
+        let pre_image = order.order_hash_pre_image();
+
+        assert_eq!(hash, keccak256(pre_image));
+        assert_eq!(
+            hash,
+            b256!("0xba359dd4f891bed0a2cf87c306e59fb6ee099e02b5b0fa86584cdcc44bf6c272")
+        );
     }
 }
