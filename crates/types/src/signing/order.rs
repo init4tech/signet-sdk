@@ -188,22 +188,41 @@ impl<'a> UnsignedOrder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::b256;
+    use alloy::primitives::{b256, Signature, U256};
+    use signet_zenith::HostOrders::{PermitBatchTransferFrom, TokenPermissions};
 
     use super::*;
 
+    fn basic_order() -> SignedOrder {
+        SignedOrder::new(
+            Permit2Batch {
+                permit: PermitBatchTransferFrom {
+                    permitted: vec![TokenPermissions { token: Address::ZERO, amount: U256::ZERO }],
+                    nonce: U256::ZERO,
+                    deadline: U256::ZERO,
+                },
+                owner: Address::ZERO,
+                signature: Signature::test_signature().as_bytes().into(),
+            },
+            vec![Output {
+                token: Address::ZERO,
+                amount: U256::ZERO,
+                recipient: Address::ZERO,
+                chainId: 0,
+            }],
+        )
+    }
+
     #[test]
     fn test_order_hash() {
-        // https://explorer.pecorino.signet.sh/tx/0xdc842ebcadf89f91c936ec4c4e6b16d2a7b9179f4d7aaefb664179d546c807ec
-        let order = include_str!("../../../../tests/artifacts/order_hash.json");
-        let order: SignedOrder = serde_json::from_str(order).unwrap();
+        let order = basic_order();
         let hash = order.order_hash();
         let pre_image = order.order_hash_pre_image();
 
         assert_eq!(hash, keccak256(pre_image));
         assert_eq!(
             hash,
-            b256!("0x4c74fe5a339b88fa909a43828a31466deba6b33cc6b6f522d1e8c5755a9fddcd")
+            b256!("0xba359dd4f891bed0a2cf87c306e59fb6ee099e02b5b0fa86584cdcc44bf6c272")
         );
     }
 }
