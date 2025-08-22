@@ -85,6 +85,10 @@ pub async fn test_simulator() {
     dbg!(time.elapsed());
 }
 
+// utilities below this point are reproduced from other places, however,
+// because this test modifies the _db_ rather than the _evm_,
+// we need to handle them slightly differently here.
+
 /// Modify an account with a closure and commit the modified account.
 ///
 /// This code is reproduced and modified from trevm

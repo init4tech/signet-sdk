@@ -8,10 +8,7 @@ use alloy::{
 };
 use signet_constants::test_utils::*;
 use signet_extract::{Extractable, Extracts};
-use signet_types::{
-    constants::{KnownChains, ParseChainError, SignetSystemConstants},
-    primitives::TransactionSigned,
-};
+use signet_types::constants::{KnownChains, ParseChainError, SignetSystemConstants};
 use signet_zenith::Zenith::{self};
 use std::str::FromStr;
 
@@ -66,7 +63,7 @@ impl RuBlockSpec {
     }
 
     /// Add a transaction to the block.
-    pub fn add_tx(&mut self, tx: &TransactionSigned) {
+    pub fn add_tx(&mut self, tx: &TxEnvelope) {
         self.tx.push(tx.encoded_2718());
     }
 
@@ -81,7 +78,7 @@ impl RuBlockSpec {
     }
 
     /// Add a transaction to the block, returning self.
-    pub fn tx(mut self, tx: &TransactionSigned) -> Self {
+    pub fn tx(mut self, tx: &TxEnvelope) -> Self {
         self.add_tx(tx);
         self
     }
@@ -99,7 +96,7 @@ impl RuBlockSpec {
         to: Address,
         amount: U256,
         nonce: u64,
-    ) -> TransactionSigned {
+    ) -> TxEnvelope {
         let tx = sign_tx_with_key_pair(
             wallet,
             simple_send(to, amount, nonce, self.constants.ru_chain_id()),

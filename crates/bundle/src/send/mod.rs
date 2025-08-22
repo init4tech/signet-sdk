@@ -1,5 +1,5 @@
 mod bundle;
-pub use bundle::{SignetEthBundle, SignetEthBundleResponse};
+pub use bundle::{BundleInspector, SignetEthBundle, SignetEthBundleResponse};
 
 mod driver;
 pub use driver::{SignetEthBundleDriver, SignetEthBundleError, SignetEthBundleInsp};
