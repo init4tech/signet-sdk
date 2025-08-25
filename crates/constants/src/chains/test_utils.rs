@@ -18,7 +18,7 @@ pub const HOST_NAME: &str = "Test Host";
 /// Test chain id for the host chain.
 pub const HOST_CHAIN_ID: u64 = 1;
 /// Test deployment height.
-pub const DEPLOY_HEIGHT: u64 = 0;
+pub const DEPLOY_HEIGHT: u64 = 100;
 /// Test address for the host zenith.
 pub const HOST_ZENITH: Address = Address::repeat_byte(0x11);
 /// Test address for the host orders.
