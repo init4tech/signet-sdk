@@ -40,7 +40,7 @@ mod test {
     fn roundtrip<T: JournalDecode + JournalEncode + PartialEq>(expected: &T) {
         let enc = JournalEncode::encoded(expected);
         assert_eq!(enc.len(), expected.serialized_size(), "{}", core::any::type_name::<T>());
-        let dec = T::decode(&mut enc.as_slice()).expect("decoding failed");
+        let dec = T::decode(&mut enc.as_ref()).expect("decoding failed");
         assert_eq!(&dec, expected);
     }
 
