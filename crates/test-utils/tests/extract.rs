@@ -16,7 +16,7 @@ fn extraction() {
     ru_block.add_simple_send(&TEST_SIGNERS[0], TEST_USERS[1], U256::from(GWEI_TO_WEI), 0);
 
     let hbs = HostBlockSpec::test()
-        .with_block_number(1)
+        .with_block_number(TEST_SYS.host_deploy_height() + 1)
         .enter(TEST_USERS[0], (GWEI_TO_WEI * 4) as usize)
         .enter(TEST_USERS[1], (GWEI_TO_WEI * 2) as usize)
         .enter_token(TEST_USERS[2], 10_000_000, HOST_USDC)

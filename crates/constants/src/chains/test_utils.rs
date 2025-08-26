@@ -79,7 +79,7 @@ pub const TX_CACHE_URL: &str = "localhost:8080/txcache";
 /// Host config
 pub const HOST: HostConstants = HostConstants::new(
     HOST_CHAIN_ID,
-    0,
+    DEPLOY_HEIGHT,
     HOST_ZENITH,
     HOST_ORDERS,
     HOST_PASSAGE,
