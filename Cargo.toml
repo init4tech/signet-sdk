@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.9.4"
+version = "0.10.0"
 edition = "2021"
 rust-version = "1.81"
 authors = ["init4"]
@@ -34,31 +34,31 @@ debug = false
 incremental = false
 
 [workspace.dependencies]
-signet-bundle = { version = "0.9", path = "crates/bundle" }
-signet-constants = { version = "0.9", path = "crates/constants" }
-signet-evm = { version = "0.9", path = "crates/evm" }
-signet-extract = { version = "0.9", path = "crates/extract" }
-signet-node = { version = "0.9", path = "crates/node" }
-signet-sim = { version = "0.9", path = "crates/sim" }
-signet-types = { version = "0.9", path = "crates/types" }
-signet-tx-cache = { version = "0.9", path = "crates/tx-cache" }
-signet-zenith = { version = "0.9", path = "crates/zenith" }
-signet-test-utils = { version = "0.9", path = "crates/test-utils" }
+signet-bundle = { version = "0.10", path = "crates/bundle" }
+signet-constants = { version = "0.10", path = "crates/constants" }
+signet-evm = { version = "0.10", path = "crates/evm" }
+signet-extract = { version = "0.10", path = "crates/extract" }
+signet-node = { version = "0.10", path = "crates/node" }
+signet-sim = { version = "0.10", path = "crates/sim" }
+signet-types = { version = "0.10", path = "crates/types" }
+signet-tx-cache = { version = "0.10", path = "crates/tx-cache" }
+signet-zenith = { version = "0.10", path = "crates/zenith" }
+signet-test-utils = { version = "0.10", path = "crates/test-utils" }
 
 # ajj
 ajj = { version = "0.3.4" }
 
 # trevm
-trevm = { version = "0.27.1", features = ["full_env_cfg"] }
+trevm = { version = "0.27.8", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
-alloy = { version = "1.0.19", features = [
+alloy = { version = "1.0.25", features = [
     "full",
     "rpc-types-mev",
     "genesis",
     "arbitrary",
 ] }
-alloy-contract = { version = "1.0.19", features = ["pubsub"] }
+alloy-contract = { version = "1.0.25", features = ["pubsub"] }
 
 # Async
 tokio = { version = "1.43.0", features = ["macros"] }
