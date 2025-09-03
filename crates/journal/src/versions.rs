@@ -27,7 +27,7 @@ impl<'a> Journal<'a> {
     }
 
     /// Get the rollup block header.
-    pub const fn header(&self) -> &Header {
+    pub fn header(&self) -> &Header {
         match self {
             Journal::V1(journal) => journal.header(),
         }
@@ -48,7 +48,7 @@ impl<'a> Journal<'a> {
     }
 
     /// Get the rollup height.
-    pub const fn rollup_height(&self) -> u64 {
+    pub fn rollup_height(&self) -> u64 {
         match self {
             Journal::V1(journal) => journal.rollup_height(),
         }
@@ -91,11 +91,12 @@ impl JournalDecode for Journal<'static> {
 mod test {
     use super::*;
     use crate::{host::test::make_state_diff, JournalMeta};
+    use std::borrow::Cow;
 
     #[test]
     fn roundtrip() {
         let journal = Journal::V1(HostJournal::new(
-            JournalMeta::new(42, B256::repeat_byte(0x17), Header::default()),
+            JournalMeta::new(42, B256::repeat_byte(0x17), Cow::Owned(Header::default())),
             make_state_diff(),
         ));
         let mut buf = Vec::new();

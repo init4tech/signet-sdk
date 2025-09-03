@@ -320,8 +320,10 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Insp: Inspector<Ctx<State<Db>>>,
     {
         let ru_height = self.extracts.ru_height;
+        let host_height = self.extracts.host_block.number();
         let (sealed_block, receipts) = self.finish();
         BlockResult {
+            host_height,
             sealed_block,
             execution_outcome: ExecutionOutcome::new(trevm.finish(), vec![receipts], ru_height),
         }

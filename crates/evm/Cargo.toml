@@ -11,6 +11,7 @@ repository.workspace = true
 
 [dependencies]
 signet-extract.workspace = true
+signet-journal.workspace = true
 signet-types.workspace = true
 signet-zenith.workspace = true
 
