@@ -38,11 +38,13 @@ signet-bundle = { version = "0.10", path = "crates/bundle" }
 signet-constants = { version = "0.10", path = "crates/constants" }
 signet-evm = { version = "0.10", path = "crates/evm" }
 signet-extract = { version = "0.10", path = "crates/extract" }
+signet-journal = { version = "0.10", path = "crates/journal" }
 signet-node = { version = "0.10", path = "crates/node" }
 signet-sim = { version = "0.10", path = "crates/sim" }
 signet-types = { version = "0.10", path = "crates/types" }
 signet-tx-cache = { version = "0.10", path = "crates/tx-cache" }
 signet-zenith = { version = "0.10", path = "crates/zenith" }
+
 signet-test-utils = { version = "0.10", path = "crates/test-utils" }
 
 # ajj
