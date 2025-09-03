@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use alloy::{consensus::Header, primitives::B256};
 use trevm::journal::{JournalDecode, JournalDecodeError, JournalEncode};
 
 /// Metadata for a block journal. This includes the block header, the host
 /// height, and the hash of the previous journal.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JournalMeta {
+pub struct JournalMeta<'a> {
     /// The host height.
     host_height: u64,
 
@@ -12,18 +14,18 @@ pub struct JournalMeta {
     prev_journal_hash: B256,
 
     /// The rollup block header.
-    header: Header,
+    header: Cow<'a, Header>,
 }
 
-impl JournalMeta {
+impl<'a> JournalMeta<'a> {
     /// Create a new `JournalMeta`.
-    pub const fn new(host_height: u64, prev_journal_hash: B256, header: Header) -> Self {
+    pub const fn new(host_height: u64, prev_journal_hash: B256, header: Cow<'a, Header>) -> Self {
         Self { host_height, prev_journal_hash, header }
     }
 
     /// Deconstruct the `JournalMeta` into its parts.
     pub fn into_parts(self) -> (u64, B256, Header) {
-        (self.host_height, self.prev_journal_hash, self.header)
+        (self.host_height, self.prev_journal_hash, self.header.into_owned())
     }
 
     /// Get the host height.
@@ -37,17 +39,17 @@ impl JournalMeta {
     }
 
     /// Get the rollup block header.
-    pub const fn header(&self) -> &Header {
-        &self.header
+    pub fn header(&self) -> &Header {
+        self.header.as_ref()
     }
 
     /// Get the rollup height.
-    pub const fn rollup_height(&self) -> u64 {
+    pub fn rollup_height(&self) -> u64 {
         self.header.number
     }
 }
 
-impl JournalEncode for JournalMeta {
+impl JournalEncode for JournalMeta<'_> {
     fn serialized_size(&self) -> usize {
         8 + 32 + self.header.serialized_size()
     }
@@ -59,7 +61,7 @@ impl JournalEncode for JournalMeta {
     }
 }
 
-impl JournalDecode for JournalMeta {
+impl JournalDecode for JournalMeta<'static> {
     fn decode(buf: &mut &[u8]) -> Result<Self, JournalDecodeError> {
         let host_height = JournalDecode::decode(buf)?;
         let prev_journal_hash = JournalDecode::decode(buf)?;
@@ -78,7 +80,7 @@ mod test {
         let original = JournalMeta {
             host_height: 13871,
             prev_journal_hash: B256::repeat_byte(0x7),
-            header: Header::default(),
+            header: Cow::Owned(Header::default()),
         };
 
         let buf = original.encoded();

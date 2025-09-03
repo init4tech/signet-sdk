@@ -11,7 +11,7 @@ use trevm::journal::{BundleStateIndex, JournalDecode, JournalDecodeError, Journa
 #[derive(Debug, Clone)]
 pub struct HostJournal<'a> {
     /// The metadata
-    meta: JournalMeta,
+    meta: JournalMeta<'a>,
 
     /// The changes.
     journal: BundleStateIndex<'a>,
@@ -33,17 +33,17 @@ impl Eq for HostJournal<'_> {}
 
 impl<'a> HostJournal<'a> {
     /// Create a new journal.
-    pub const fn new(meta: JournalMeta, journal: BundleStateIndex<'a>) -> Self {
+    pub const fn new(meta: JournalMeta<'a>, journal: BundleStateIndex<'a>) -> Self {
         Self { meta, journal, serialized: OnceLock::new(), hash: OnceLock::new() }
     }
 
     /// Deconstruct the `HostJournal` into its parts.
-    pub fn into_parts(self) -> (JournalMeta, BundleStateIndex<'a>) {
+    pub fn into_parts(self) -> (JournalMeta<'a>, BundleStateIndex<'a>) {
         (self.meta, self.journal)
     }
 
     /// Get the journal meta.
-    pub const fn meta(&self) -> &JournalMeta {
+    pub const fn meta(&self) -> &JournalMeta<'a> {
         &self.meta
     }
 
@@ -63,12 +63,12 @@ impl<'a> HostJournal<'a> {
     }
 
     /// Get the rollup block header.
-    pub const fn header(&self) -> &Header {
+    pub fn header(&self) -> &Header {
         self.meta.header()
     }
 
     /// Get the rollup height.
-    pub const fn rollup_height(&self) -> u64 {
+    pub fn rollup_height(&self) -> u64 {
         self.meta.rollup_height()
     }
 
@@ -166,7 +166,7 @@ pub(crate) mod test {
     #[test]
     fn roundtrip() {
         let original = HostJournal::new(
-            JournalMeta::new(u64::MAX, B256::repeat_byte(0xff), Header::default()),
+            JournalMeta::new(u64::MAX, B256::repeat_byte(0xff), Cow::Owned(Header::default())),
             make_state_diff(),
         );
 

@@ -297,11 +297,15 @@ mod test {
     use super::*;
     use crate::{HostJournal, JournalMeta};
     use alloy::{consensus::Header, primitives::Bytes};
+    use std::borrow::Cow;
     use trevm::{journal::BundleStateIndex, revm::state::Bytecode};
 
     fn journal_at_heights(host: u64, rollup: u64, prev_hash: B256) -> Journal<'static> {
-        let meta =
-            JournalMeta::new(host, prev_hash, Header { number: rollup, ..Default::default() });
+        let meta = JournalMeta::new(
+            host,
+            prev_hash,
+            Cow::Owned(Header { number: rollup, ..Default::default() }),
+        );
         let host = HostJournal::new(meta, Default::default());
 
         Journal::V1(host)
@@ -389,7 +393,11 @@ mod test {
             std::borrow::Cow::Owned(Bytecode::new_legacy(Bytes::from_static(&[0, 1, 2, 3]))),
         );
         let j1_alt = Journal::V1(HostJournal::new(
-            JournalMeta::new(101, j0.journal_hash(), Header { number: 1, ..Default::default() }),
+            JournalMeta::new(
+                101,
+                j0.journal_hash(),
+                Cow::Owned(Header { number: 1, ..Default::default() }),
+            ),
             j1_alt_state,
         ));
 
