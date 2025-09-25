@@ -94,5 +94,6 @@ pub fn simple_bundle<'a>(
             extra_fields: Default::default(),
         },
         host_fills,
+        host_txs: vec![],
     }
 }

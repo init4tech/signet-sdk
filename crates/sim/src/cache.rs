@@ -307,6 +307,7 @@ mod test {
                 ..Default::default()
             },
             host_fills: None,
+            host_txs: vec![],
         }
     }
 

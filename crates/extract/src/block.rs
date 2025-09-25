@@ -46,7 +46,7 @@ impl<'a, C: Extractable> HostEvents<'a, C> {
     }
 
     /// Add a [`Zenith::BlockSubmitted`] event to the host events.
-    pub fn ingest_block_submitted(
+    pub const fn ingest_block_submitted(
         &mut self,
         event: ExtractedEvent<'a, C::Receipt, Zenith::BlockSubmitted>,
     ) {

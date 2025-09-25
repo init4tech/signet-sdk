@@ -224,7 +224,7 @@ impl AggregateFills {
     }
 
     /// Mutably borrow the current fill mapping
-    pub fn fills_mut(&mut self) -> &mut HashMap<(u64, Address), HashMap<Address, U256>> {
+    pub const fn fills_mut(&mut self) -> &mut HashMap<(u64, Address), HashMap<Address, U256>> {
         &mut self.fills
     }
 
