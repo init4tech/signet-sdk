@@ -189,7 +189,7 @@ impl<Db, Insp> SimEnv<Db, Insp> {
     }
 
     /// Get a reference to the database.
-    pub fn db_mut(&mut self) -> &mut InnerDb<Db> {
+    pub const fn db_mut(&mut self) -> &mut InnerDb<Db> {
         &mut self.db
     }
 
@@ -219,7 +219,7 @@ impl<Db, Insp> SimEnv<Db, Insp> {
     }
 
     /// Set the execution timeout.
-    pub fn set_finish_by(&mut self, timeout: std::time::Instant) {
+    pub const fn set_finish_by(&mut self, timeout: std::time::Instant) {
         self.finish_by = timeout;
     }
 }

@@ -41,6 +41,10 @@ pub struct SignetEthBundle {
     /// permit2 fill.
     #[serde(default)]
     pub host_fills: Option<SignedFill>,
+
+    /// Host transactions to be included in the host bundle.
+    #[serde(default)]
+    pub host_txs: Vec<Bytes>,
 }
 
 impl SignetEthBundle {
@@ -194,12 +198,46 @@ mod test {
                     chainId: 100,
                 }],
             }),
+            host_txs: vec![b"host_tx1".into(), b"host_tx2".into()],
         };
 
         let serialized = serde_json::to_string(&bundle).unwrap();
         let deserialized: SignetEthBundle = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(bundle, deserialized);
+    }
+
+    #[test]
+    fn send_bundle_ser_roundtrip_no_host_no_fills() {
+        let bundle = SignetEthBundle {
+            bundle: EthSendBundle {
+                txs: vec![b"tx1".into(), b"tx2".into()],
+                block_number: 1,
+                min_timestamp: Some(2),
+                max_timestamp: Some(3),
+                reverting_tx_hashes: vec![B256::repeat_byte(4), B256::repeat_byte(5)],
+                replacement_uuid: Some("uuid".to_owned()),
+                ..Default::default()
+            },
+            host_fills: None,
+            host_txs: vec![],
+        };
+
+        let serialized = serde_json::to_string(&bundle).unwrap();
+        let deserialized: SignetEthBundle = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(bundle, deserialized);
+    }
+
+    #[test]
+    fn test_deser_bundle_no_host_no_fills() {
+        let json = r#"
+        {"txs":["0x747831","0x747832"],"blockNumber":"0x1","minTimestamp":2,"maxTimestamp":3,"revertingTxHashes":["0x0404040404040404040404040404040404040404040404040404040404040404","0x0505050505050505050505050505050505050505050505050505050505050505"],"replacementUuid":"uuid"}"#;
+
+        let deserialized: SignetEthBundle = serde_json::from_str(json).unwrap();
+
+        assert!(deserialized.host_fills.is_none());
+        assert!(deserialized.host_txs.is_empty());
     }
 
     #[test]

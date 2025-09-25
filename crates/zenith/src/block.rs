@@ -182,7 +182,7 @@ where
     }
 
     /// Mutable access to the header.
-    pub fn header_mut(&mut self) -> &mut ZenithHeader {
+    pub const fn header_mut(&mut self) -> &mut ZenithHeader {
         &mut self.header
     }
 
