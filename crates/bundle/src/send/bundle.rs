@@ -39,11 +39,11 @@ pub struct SignetEthBundle {
     pub bundle: EthSendBundle,
     /// Host fills to be applied with the bundle, represented as a signed
     /// permit2 fill.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_fills: Option<SignedFill>,
 
     /// Host transactions to be included in the host bundle.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub host_txs: Vec<Bytes>,
 }
 
