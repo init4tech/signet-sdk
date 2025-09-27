@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.10.2"
+version = "0.11.0"
 edition = "2021"
 rust-version = "1.85"
 authors = ["init4"]
@@ -34,33 +34,33 @@ debug = false
 incremental = false
 
 [workspace.dependencies]
-signet-bundle = { version = "0.10", path = "crates/bundle" }
-signet-constants = { version = "0.10", path = "crates/constants" }
-signet-evm = { version = "0.10", path = "crates/evm" }
-signet-extract = { version = "0.10", path = "crates/extract" }
-signet-journal = { version = "0.10", path = "crates/journal" }
-signet-node = { version = "0.10", path = "crates/node" }
-signet-sim = { version = "0.10", path = "crates/sim" }
-signet-types = { version = "0.10", path = "crates/types" }
-signet-tx-cache = { version = "0.10", path = "crates/tx-cache" }
-signet-zenith = { version = "0.10", path = "crates/zenith" }
+signet-bundle = { version = "0.11", path = "crates/bundle" }
+signet-constants = { version = "0.11", path = "crates/constants" }
+signet-evm = { version = "0.11", path = "crates/evm" }
+signet-extract = { version = "0.11", path = "crates/extract" }
+signet-journal = { version = "0.11", path = "crates/journal" }
+signet-node = { version = "0.11", path = "crates/node" }
+signet-sim = { version = "0.11", path = "crates/sim" }
+signet-types = { version = "0.11", path = "crates/types" }
+signet-tx-cache = { version = "0.11", path = "crates/tx-cache" }
+signet-zenith = { version = "0.11", path = "crates/zenith" }
 
-signet-test-utils = { version = "0.10", path = "crates/test-utils" }
+signet-test-utils = { version = "0.11", path = "crates/test-utils" }
 
 # ajj
 ajj = { version = "0.3.4" }
 
 # trevm
-trevm = { version = "0.27.8", features = ["full_env_cfg"] }
+trevm = { version = "0.29.0", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
-alloy = { version = "1.0.25", features = [
+alloy = { version = "1.0.35", features = [
     "full",
     "rpc-types-mev",
     "genesis",
     "arbitrary",
 ] }
-alloy-contract = { version = "1.0.25", features = ["pubsub"] }
+alloy-contract = { version = "1.0.35", features = ["pubsub"] }
 
 # Async
 tokio = { version = "1.43.0", features = ["macros"] }
