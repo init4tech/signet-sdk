@@ -54,6 +54,7 @@ ajj = { version = "0.3.4" }
 trevm = { version = "0.29.0", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
+alloy-core = "1.4"
 alloy = { version = "1.0.35", features = [
     "full",
     "rpc-types-mev",
