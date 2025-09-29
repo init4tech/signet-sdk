@@ -53,7 +53,6 @@ impl SignetSystemConstants {
     }
 
     /// Get the hard-coded local test constants.
-    #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
         crate::chains::test_utils::TEST_SYS
     }
@@ -227,7 +226,6 @@ impl TryFrom<KnownChains> for SignetSystemConstants {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Pecorino => Ok(Self::pecorino()),
-            #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
     }
@@ -265,7 +263,6 @@ impl SignetConstants {
     }
 
     /// Get the hard-coded local test rollup constants.
-    #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
         crate::chains::test_utils::TEST
     }
@@ -297,7 +294,6 @@ impl TryFrom<KnownChains> for SignetConstants {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Pecorino => Ok(Self::pecorino()),
-            #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
     }

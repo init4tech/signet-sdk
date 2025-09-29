@@ -17,7 +17,6 @@ pub enum KnownChains {
     /// Pecorino chain.
     Pecorino,
     /// Test chain.
-    #[cfg(any(test, feature = "test-utils"))]
     Test,
 }
 
@@ -27,7 +26,6 @@ impl FromStr for KnownChains {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().to_lowercase();
         match s.as_str() {
-            #[cfg(any(test, feature = "test-utils"))]
             "test" => Ok(Self::Test),
             "pecorino" => Ok(Self::Pecorino),
             _ => Err(ParseChainError::ChainNotSupported(s)),
