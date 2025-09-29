@@ -72,7 +72,7 @@ pub async fn test_simulator() {
     .build()
     .await;
 
-    assert!(built.transactions().len() == 10);
+    assert_eq!(built.transactions().len(), 10);
 
     // This asserts that the builder has sorted the transactions by priority
     // fee.

@@ -27,6 +27,8 @@ use alloy::{
     providers::Provider,
 };
 
+use alloy_core as _;
+
 /// System address with permission to mint tokens on pre-deploys.
 /// "tokenadmin"
 pub const MINTER_ADDRESS: Address = address!("00000000000000000000746f6b656e61646d696e");
