@@ -17,7 +17,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod chains;
-#[cfg(any(test, feature = "test-utils"))]
 pub use chains::test_utils;
 
 pub use chains::pecorino;

@@ -62,7 +62,6 @@ impl HostConstants {
     }
 
     /// Get the hard-coded local test host constants.
-    #[cfg(any(test, feature = "test-utils"))]
     pub const fn test() -> Self {
         crate::chains::test_utils::HOST
     }
@@ -148,7 +147,6 @@ impl FromStr for HostConstants {
         let chain: KnownChains = s.parse()?;
         match chain {
             KnownChains::Pecorino => Ok(Self::pecorino()),
-            #[cfg(any(test, feature = "test-utils"))]
             KnownChains::Test => Ok(Self::test()),
         }
     }
