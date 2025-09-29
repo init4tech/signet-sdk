@@ -21,7 +21,7 @@ mod cache;
 pub use cache::SimCache;
 
 mod env;
-pub use env::{SharedSimEnv, SimEnv};
+pub use env::{HostEnv, RollupEnv, SharedSimEnv, SimEnv};
 
 mod error;
 pub use error::CacheError;
@@ -40,3 +40,6 @@ pub type InnerDb<Db> = std::sync::Arc<trevm::revm::database::CacheDB<Db>>;
 
 /// A type alias for the database used in the simulation.
 pub type SimDb<Db> = trevm::db::cow::CacheOnWrite<InnerDb<Db>>;
+
+/// A time-limited layered inspector.
+pub type TimeLimited<Insp> = trevm::inspectors::Layered<trevm::inspectors::TimeLimit, Insp>;

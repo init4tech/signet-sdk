@@ -1,4 +1,4 @@
-use crate::{env::SimEnv, BuiltBlock, SharedSimEnv, SimCache, SimDb};
+use crate::{env::SimEnv, BuiltBlock, RollupEnv, SharedSimEnv, SimCache, SimDb};
 use signet_types::constants::SignetSystemConstants;
 use std::time::Duration;
 use tokio::{select, time::Instant};
@@ -50,8 +50,7 @@ where
         B: Block,
     {
         let env = SimEnv::<Db, Insp>::new(
-            db,
-            constants,
+            RollupEnv::new(db, constants),
             cfg,
             block,
             finish_by,
