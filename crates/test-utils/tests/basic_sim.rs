@@ -56,8 +56,6 @@ pub async fn test_simulator() {
         );
     }
 
-    let time = std::time::Instant::now();
-
     // Set up the simulator
     let built = BlockBuild::<_, NoOpInspector>::new(
         db,
@@ -81,8 +79,6 @@ pub async fn test_simulator() {
         let tx2 = w[1].as_eip1559().unwrap().tx().max_priority_fee_per_gas;
         tx1 >= tx2
     }));
-
-    dbg!(time.elapsed());
 }
 
 // utilities below this point are reproduced from other places, however,
