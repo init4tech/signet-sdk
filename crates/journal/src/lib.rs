@@ -27,7 +27,12 @@ pub use set::JournalSet;
 mod versions;
 pub use versions::Journal;
 
+use alloy::primitives::{b256, B256};
 use futures_util::Stream;
+
+/// The genesis journal hash for the signet chain.
+pub const GENESIS_JOURNAL_HASH: B256 =
+    b256!("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
 
 /// Any [`Stream`] that produces [`Journal`]s.
 pub trait JournalStream<'a>: Stream<Item = Journal<'a>> {}
