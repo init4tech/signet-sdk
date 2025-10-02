@@ -1,135 +1,30 @@
-use crate::{outcome::SimulatedItem, InnerDb, SimCache, SimDb, SimItem, SimOutcomeWithCache};
+use crate::{env::RollupEnv, SimCache, SimDb, SimItem, SimOutcomeWithCache, TimeLimited};
 use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
-use signet_evm::SignetLayered;
 use signet_types::constants::SignetSystemConstants;
-use std::{convert::Infallible, marker::PhantomData, ops::Deref, sync::Arc, time::Instant};
-use tokio::{
-    select,
-    sync::{mpsc, watch},
-};
+use std::sync::Arc;
+use tokio::sync::{mpsc, watch};
 use tracing::{instrument, trace, trace_span};
 use trevm::{
-    db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
-    inspectors::{Layered, TimeLimit},
     revm::{
         context::{
             result::{EVMError, ExecutionResult},
             BlockEnv, CfgEnv,
         },
-        database::{Cache, CacheDB},
         inspector::NoOpInspector,
         DatabaseRef, Inspector,
     },
-    Block, BundleDriver, Cfg, DbConnect, EvmFactory,
+    Block, BundleDriver, Cfg,
 };
 
 /// A simulation environment.
-///
-/// Contains enough information to run a simulation.
-pub struct SharedSimEnv<Db, Insp = NoOpInspector> {
-    inner: Arc<SimEnv<Db, Insp>>,
-}
-
-impl<Db, Insp> fmt::Debug for SharedSimEnv<Db, Insp> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SimEnv")
-            .field("finish_by", &self.inner.finish_by)
-            .field("concurrency_limit", &self.inner.concurrency_limit)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<Db, Insp> Deref for SharedSimEnv<Db, Insp> {
-    type Target = SimEnv<Db, Insp>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<Db, Insp> From<SimEnv<Db, Insp>> for SharedSimEnv<Db, Insp>
-where
-    Db: DatabaseRef + Send + Sync + 'static,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
-{
-    fn from(inner: SimEnv<Db, Insp>) -> Self {
-        Self { inner: Arc::new(inner) }
-    }
-}
-
-impl<Db, Insp> SharedSimEnv<Db, Insp>
-where
-    Db: DatabaseRef + Send + Sync + 'static,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
-{
-    /// Creates a new `SimEnv` instance.
-    pub fn new<C, B>(
-        db: Db,
-        constants: SignetSystemConstants,
-        cfg: C,
-        block: B,
-        finish_by: std::time::Instant,
-        concurrency_limit: usize,
-        sim_items: SimCache,
-    ) -> Self
-    where
-        C: Cfg,
-        B: Block,
-    {
-        SimEnv::new(db, constants, cfg, block, finish_by, concurrency_limit, sim_items).into()
-    }
-
-    /// Run a simulation round, returning the best item.
-    #[instrument(skip(self))]
-    pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
-        let (best_tx, mut best_watcher) = watch::channel(None);
-
-        let this = self.inner.clone();
-
-        // Spawn a blocking task to run the simulations.
-        let sim_task = tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx));
-
-        // Either simulation is done, or we time out
-        select! {
-            _ = tokio::time::sleep_until(self.finish_by.into()) => {
-                trace!("Sim round timed out");
-            },
-            _ = sim_task => {
-                trace!("Sim round done");
-            },
-        }
-
-        // Check what the current best outcome is.
-        let best = best_watcher.borrow_and_update();
-        trace!(score = %best.as_ref().map(|candidate| candidate.score).unwrap_or_default(), "Read outcome from channel");
-        let outcome = best.as_ref()?;
-
-        // Remove the item from the cache.
-        let item = self.sim_items.remove(outcome.cache_rank)?;
-        // Accept the cache from the simulation.
-        Arc::get_mut(&mut self.inner)
-            .expect("sims dropped already")
-            .accept_cache_ref(&outcome.cache)
-            .ok()?;
-
-        Some(SimulatedItem { gas_used: outcome.gas_used, score: outcome.score, item })
-    }
-}
-
-/// A simulation environment.
-pub struct SimEnv<Db, Insp = NoOpInspector> {
-    /// The database to use for the simulation. This database will be wrapped
-    /// in [`CacheOnWrite`] databases for each simulation.
-    db: InnerDb<Db>,
+pub struct SimEnv<RuDb, RuInsp = NoOpInspector> {
+    rollup: RollupEnv<RuDb, RuInsp>,
 
     /// The cache of items to simulate.
     sim_items: SimCache,
-
-    /// The system constants for the Signet network.
-    constants: SignetSystemConstants,
 
     /// Chain cfg to use for the simulation.
     cfg: CfgEnv,
@@ -142,25 +37,21 @@ pub struct SimEnv<Db, Insp = NoOpInspector> {
 
     /// The maximum number of concurrent simulations to run.
     concurrency_limit: usize,
-
-    /// Spooky ghost inspector.
-    _pd: PhantomData<fn() -> Insp>,
 }
 
-impl<Db, Insp> fmt::Debug for SimEnv<Db, Insp> {
+impl<RuDb, RuInsp> fmt::Debug for SimEnv<RuDb, RuInsp> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SimEnvInner")
+        f.debug_struct("SimEnv")
             .field("finish_by", &self.finish_by)
             .field("concurrency_limit", &self.concurrency_limit)
             .finish_non_exhaustive()
     }
 }
 
-impl<Db, Insp> SimEnv<Db, Insp> {
+impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp> {
     /// Creates a new `SimFactory` instance.
     pub fn new<C, B>(
-        db: Db,
-        constants: SignetSystemConstants,
+        rollup: RollupEnv<RuDb, RuInsp>,
         cfg_ref: C,
         block_ref: B,
         finish_by: std::time::Instant,
@@ -176,26 +67,17 @@ impl<Db, Insp> SimEnv<Db, Insp> {
         let mut block = BlockEnv::default();
         block_ref.fill_block_env(&mut block);
 
-        Self {
-            db: Arc::new(CacheDB::new(db)),
-            constants,
-            cfg,
-            block,
-            finish_by,
-            concurrency_limit,
-            sim_items,
-            _pd: PhantomData,
-        }
+        Self { rollup, cfg, block, finish_by, concurrency_limit, sim_items }
     }
 
     /// Get a reference to the database.
-    pub const fn db_mut(&mut self) -> &mut InnerDb<Db> {
-        &mut self.db
+    pub const fn rollup_mut(&mut self) -> &mut RollupEnv<RuDb, RuInsp> {
+        &mut self.rollup
     }
 
     /// Get a reference to the system constants.
     pub const fn constants(&self) -> &SignetSystemConstants {
-        &self.constants
+        self.rollup.constants()
     }
 
     /// Get a reference to the cache of items to simulate.
@@ -222,44 +104,22 @@ impl<Db, Insp> SimEnv<Db, Insp> {
     pub const fn set_finish_by(&mut self, timeout: std::time::Instant) {
         self.finish_by = timeout;
     }
-}
 
-impl<Db, Insp> DbConnect for SimEnv<Db, Insp>
-where
-    Db: DatabaseRef + Send + Sync,
-    Insp: Sync,
-{
-    type Database = SimDb<Db>;
-
-    type Error = Infallible;
-
-    fn connect(&self) -> Result<Self::Database, Self::Error> {
-        Ok(CacheOnWrite::new(self.db.clone()))
+    /// Get the concurrency limit.
+    pub const fn concurrency_limit(&self) -> usize {
+        self.concurrency_limit
     }
 }
 
-impl<Db, Insp> EvmFactory for SimEnv<Db, Insp>
+impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp>
 where
-    Db: DatabaseRef + Send + Sync,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
+    RuDb: DatabaseRef + Send + Sync,
+    RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
 {
-    type Insp = SignetLayered<Layered<TimeLimit, Insp>>;
-
-    fn create(&self) -> Result<trevm::EvmNeedsCfg<Self::Database, Self::Insp>, Self::Error> {
-        let db = self.connect().unwrap();
-
-        let inspector =
-            Layered::new(TimeLimit::new(self.finish_by - Instant::now()), Insp::default());
-
-        Ok(signet_evm::signet_evm_with_inspector(db, inspector, self.constants.clone()))
+    fn rollup_evm(&self) -> signet_evm::EvmNeedsTx<SimDb<RuDb>, TimeLimited<RuInsp>> {
+        self.rollup.create_evm(self.finish_by).fill_cfg(&self.cfg).fill_block(&self.block)
     }
-}
 
-impl<Db, Insp> SimEnv<Db, Insp>
-where
-    Db: DatabaseRef + Send + Sync,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
-{
     /// Simulates a transaction in the context of a block.
     ///
     /// This function runs the simulation in a separate thread and waits for
@@ -269,8 +129,8 @@ where
         &self,
         cache_rank: u128,
         transaction: &TxEnvelope,
-    ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
-        let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
+    ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>> {
+        let trevm = self.rollup_evm();
 
         // Get the initial beneficiary balance
         let beneficiary = trevm.beneficiary();
@@ -326,13 +186,13 @@ where
         &self,
         cache_rank: u128,
         bundle: &SignetEthBundle,
-    ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>>
+    ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>>
     where
-        Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
+        RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
     {
         let mut driver =
-            SignetEthBundleDriver::new(bundle, self.constants.host_chain_id(), self.finish_by);
-        let trevm = self.create_with_block(&self.cfg, &self.block).unwrap();
+            SignetEthBundleDriver::new(bundle, self.constants().host_chain_id(), self.finish_by);
+        let trevm = self.rollup_evm();
 
         // Run the bundle
         let trevm = match driver.run_bundle(trevm) {
@@ -361,7 +221,7 @@ where
         &self,
         cache_rank: u128,
         item: &SimItem,
-    ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<Db>>> {
+    ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>> {
         match item {
             SimItem::Bundle(bundle) => self.simulate_bundle(cache_rank, bundle),
             SimItem::Tx(tx) => self.simulate_tx(cache_rank, tx),
@@ -369,7 +229,7 @@ where
     }
 
     #[instrument(skip_all)]
-    fn sim_round(
+    pub(crate) fn sim_round(
         self: Arc<Self>,
         max_gas: u64,
         best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
@@ -442,27 +302,5 @@ where
                 });
             }
         });
-    }
-}
-
-impl<Db, Insp> SimEnv<Db, Insp>
-where
-    Db: DatabaseRef,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
-{
-    /// Accepts a cache from the simulation and extends the database with it.
-    pub fn accept_cache(
-        &mut self,
-        cache: Cache,
-    ) -> Result<(), <InnerDb<Db> as TryCachingDb>::Error> {
-        self.db_mut().try_extend(cache)
-    }
-
-    /// Accepts a cache from the simulation and extends the database with it.
-    pub fn accept_cache_ref(
-        &mut self,
-        cache: &Cache,
-    ) -> Result<(), <InnerDb<Db> as TryCachingDb>::Error> {
-        self.db_mut().try_extend_ref(cache)
     }
 }
