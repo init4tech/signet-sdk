@@ -1,11 +1,14 @@
 use crate::agg::AggregateOrders;
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
+use crate::SignedOrder;
 use alloy::{
     network::TransactionBuilder, primitives::Address, rpc::types::TransactionRequest,
     signers::Signer, sol_types::SolCall,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use signet_constants::SignetSystemConstants;
+use signet_zenith::RollupOrders::Order;
 use signet_zenith::{
     BundleHelper::{FillPermit2, IOrders},
     RollupOrders::{fillPermit2Call, Output, Permit2Batch, TokenPermissions},
@@ -110,7 +113,8 @@ impl From<&SignedFill> for FillPermit2 {
     }
 }
 
-/// An UnsignedFill is a helper type used to easily transform an AggregateOrder into a single SignedFill with correct permit2 semantics.
+/// An [`UnsignedFill`] is a builder type used to easily transform [`Order`]s
+/// or [`AggregateOrders`] into a [`SignedFill`] with correct permit2 semantics.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UnsignedFill<'a> {
     /// The rollup chain id from which the Orders originated.
@@ -126,21 +130,77 @@ pub struct UnsignedFill<'a> {
     target_chains: HashMap<u64, Address>,
 }
 
+impl Default for UnsignedFill<'_> {
+    fn default() -> Self {
+        Self {
+            ru_chain_id: None,
+            orders: Cow::Owned(AggregateOrders::default()),
+            deadline: None,
+            nonce: None,
+            target_chains: HashMap::new(),
+        }
+    }
+}
+
 impl<'a> From<&'a AggregateOrders> for UnsignedFill<'a> {
     fn from(orders: &'a AggregateOrders) -> Self {
-        UnsignedFill::new(orders)
+        Self {
+            ru_chain_id: None,
+            orders: Cow::Borrowed(orders),
+            deadline: None,
+            nonce: None,
+            target_chains: HashMap::new(),
+        }
+    }
+}
+
+impl From<Order> for UnsignedFill<'static> {
+    fn from(order: Order) -> Self {
+        let mut aggregate_orders = AggregateOrders::default();
+        aggregate_orders.ingest(&order);
+        Self {
+            ru_chain_id: None,
+            orders: Cow::Owned(aggregate_orders),
+            deadline: None,
+            nonce: None,
+            target_chains: HashMap::new(),
+        }
     }
 }
 
 impl<'a> UnsignedFill<'a> {
-    /// Get a new UnsignedFill from a set of AggregateOrders.
-    pub fn new(orders: &'a AggregateOrders) -> Self {
+    /// Get a new UnsignedFill from a set of [`AggregateOrders`].
+    pub fn new() -> Self {
         Self {
             ru_chain_id: None,
-            orders: orders.into(),
+            orders: Cow::Owned(AggregateOrders::default()),
             deadline: None,
             nonce: None,
             target_chains: HashMap::new(),
+        }
+    }
+
+    /// Add an [`Order`] to the [`UnsignedFill`].
+    pub fn fill_raw(mut self, order: &Order) -> UnsignedFill<'static> {
+        self.orders.to_mut().ingest(order);
+        UnsignedFill {
+            ru_chain_id: self.ru_chain_id,
+            orders: Cow::Owned(self.orders.into_owned()),
+            deadline: self.deadline,
+            nonce: self.nonce,
+            target_chains: self.target_chains,
+        }
+    }
+
+    /// Add a [`SignedOrder`] to the [`UnsignedFill`].
+    pub fn fill(mut self, order: &SignedOrder) -> UnsignedFill<'static> {
+        self.orders.to_mut().ingest_signed(order);
+        UnsignedFill {
+            ru_chain_id: self.ru_chain_id,
+            orders: Cow::Owned(self.orders.into_owned()),
+            deadline: self.deadline,
+            nonce: self.nonce,
+            target_chains: self.target_chains,
         }
     }
 
@@ -163,8 +223,9 @@ impl<'a> UnsignedFill<'a> {
     }
 
     /// Add the chain id and Order contract address to the UnsignedFill.
-    pub fn with_chain(mut self, chain_id: u64, order_contract_address: Address) -> Self {
-        self.target_chains.insert(chain_id, order_contract_address);
+    pub fn with_chain(mut self, constants: SignetSystemConstants) -> Self {
+        self.target_chains.insert(constants.ru_chain_id(), constants.ru_orders());
+        self.target_chains.insert(constants.host_chain_id(), constants.host_orders());
         self
     }
 
