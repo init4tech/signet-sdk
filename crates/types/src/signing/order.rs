@@ -1,15 +1,16 @@
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{
     network::TransactionBuilder,
-    primitives::{keccak256, Address, B256},
+    primitives::{keccak256, Address, B256, U256},
     rpc::types::TransactionRequest,
     signers::Signer,
     sol_types::{SolCall, SolValue},
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use signet_constants::SignetSystemConstants;
 use signet_zenith::RollupOrders::{
-    initiatePermit2Call, Order, Output, Permit2Batch, TokenPermissions,
+    initiatePermit2Call, Input, Order, Output, Permit2Batch, TokenPermissions,
 };
 use std::borrow::Cow;
 
@@ -108,11 +109,12 @@ impl SignedOrder {
     }
 }
 
-/// An UnsignedOrder is a helper type used to easily transform an Order into a SignedOrder with correct permit2 semantics.
+/// An UnsignedOrder is a helper type used to easily transform an Order into a
+/// SignedOrder with correct permit2 semantics.
 /// Users can do:
 /// let signed_order = UnsignedOrder::from(order).with_chain(rollup_chain_id, rollup_order_address).sign(signer)?;
 /// TxCache::new(tx_cache_endpoint).forward_order(signed_order);
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
 pub struct UnsignedOrder<'a> {
     order: Cow<'a, Order>,
     nonce: Option<u64>,
@@ -122,14 +124,56 @@ pub struct UnsignedOrder<'a> {
 
 impl<'a> From<&'a Order> for UnsignedOrder<'a> {
     fn from(order: &'a Order) -> Self {
-        UnsignedOrder::new(order)
+        Self { order: Cow::Borrowed(order), ..Default::default() }
     }
 }
 
 impl<'a> UnsignedOrder<'a> {
     /// Get a new UnsignedOrder from an Order.
-    pub fn new(order: &'a Order) -> Self {
-        Self { order: order.into(), nonce: None, rollup_chain_id: None, rollup_order_address: None }
+    pub fn new() -> Self {
+        Self {
+            order: Cow::Owned(Order::default()),
+            nonce: None,
+            rollup_chain_id: None,
+            rollup_order_address: None,
+        }
+    }
+
+    /// Add an input to the UnsignedOrder.
+    pub fn with_raw_input(self, input: Input) -> UnsignedOrder<'static> {
+        let order = self.order.into_owned().with_input(input);
+
+        UnsignedOrder { order: Cow::Owned(order), ..self }
+    }
+
+    /// Add an input to the UnsignedOrder.
+    pub fn with_input(self, token: Address, amount: U256) -> UnsignedOrder<'static> {
+        self.with_raw_input(Input { token, amount })
+    }
+
+    /// Add an output to the UnsignedOrder.
+    pub fn with_raw_output(self, output: Output) -> UnsignedOrder<'static> {
+        let order = self.order.into_owned().with_output(output);
+
+        UnsignedOrder { order: Cow::Owned(order), ..self }
+    }
+
+    /// Add an output to the UnsignedOrder.
+    pub fn with_output(
+        self,
+        token: Address,
+        amount: U256,
+        recipient: Address,
+        chain_id: u32,
+    ) -> UnsignedOrder<'static> {
+        self.with_raw_output(Output { token, amount, recipient, chainId: chain_id })
+    }
+
+    /// Set the deadline on the UnsignedOrder.
+    pub fn with_deadline(self, deadline: u64) -> UnsignedOrder<'static> {
+        let order = self.order.into_owned().with_deadline(deadline);
+
+        UnsignedOrder { order: Cow::Owned(order), ..self }
     }
 
     /// Add a Permit2 nonce to the UnsignedOrder.
@@ -138,10 +182,10 @@ impl<'a> UnsignedOrder<'a> {
     }
 
     /// Add the chain id  and Order contract address to the UnsignedOrder.
-    pub fn with_chain(self, chain_id: u64, order_contract_address: Address) -> Self {
+    pub fn with_chain(self, constants: &SignetSystemConstants) -> Self {
         Self {
-            rollup_chain_id: Some(chain_id),
-            rollup_order_address: Some(order_contract_address),
+            rollup_chain_id: Some(constants.ru_chain_id()),
+            rollup_order_address: Some(constants.ru_orders()),
             ..self
         }
     }

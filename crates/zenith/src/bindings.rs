@@ -333,6 +333,32 @@ mod orders {
             self.outputs.as_slice()
         }
     }
+
+    impl Default for Orders::Order {
+        fn default() -> Self {
+            Self { inputs: Vec::new(), outputs: Vec::new(), deadline: U256::ZERO }
+        }
+    }
+
+    impl Orders::Order {
+        /// Add an input to the Order and return the modified Order.
+        pub fn with_input(mut self, input: IOrders::Input) -> Self {
+            self.inputs.push(input);
+            self
+        }
+
+        /// Add an output to the Order and return the modified Order.
+        pub fn with_output(mut self, output: IOrders::Output) -> Self {
+            self.outputs.push(output);
+            self
+        }
+
+        /// Set the deadline of the Order and return the modified Order.
+        pub fn with_deadline(mut self, deadline: u64) -> Self {
+            self.deadline = U256::from(deadline);
+            self
+        }
+    }
 }
 
 mod transactor {
