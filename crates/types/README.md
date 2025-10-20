@@ -7,9 +7,6 @@ honestly.
 
 ## What's in this crate?
 
-- `mod constants` - contains `SignetSystemConstants` a configuration object that
-  holds the system constants and is used by the extractor, the EVM, and the
-  node.
 - `AggregateFills` - a struct that holds the aggregate fill status for
   [conditional transactions].
 - `MagicSig` - a struct that holds magic signatures for Signet L1-driven
