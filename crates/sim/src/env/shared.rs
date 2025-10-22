@@ -97,6 +97,12 @@ where
             .rollup_mut()
             .accept_cache_ref(&outcome.cache)
             .ok()?;
+        // Accept the aggregate fills and orders.
+        Arc::get_mut(&mut self.inner)
+            .expect("sims dropped already")
+            .rollup_mut()
+            .accept_aggregates(&outcome.fills, &outcome.orders)
+            .expect("checked during simulation");
 
         Some(SimulatedItem { gas_used: outcome.gas_used, score: outcome.score, item })
     }

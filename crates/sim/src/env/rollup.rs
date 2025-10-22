@@ -1,6 +1,8 @@
 use crate::{InnerDb, SimDb, TimeLimited};
 use signet_evm::EvmNeedsCfg;
-use signet_types::constants::SignetSystemConstants;
+use signet_types::{
+    constants::SignetSystemConstants, AggregateFills, AggregateOrders, MarketError,
+};
 use std::{marker::PhantomData, sync::Arc, time::Instant};
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
@@ -18,19 +20,30 @@ use trevm::{
 pub struct RollupEnv<Db, Insp = NoOpInspector> {
     db: InnerDb<Db>,
     constants: SignetSystemConstants,
+    fill_state: AggregateFills,
     _pd: PhantomData<fn() -> Insp>,
 }
 
 impl<Db, Insp> Clone for RollupEnv<Db, Insp> {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone(), constants: self.constants.clone(), _pd: PhantomData }
+        Self {
+            db: self.db.clone(),
+            constants: self.constants.clone(),
+            fill_state: self.fill_state.clone(),
+            _pd: PhantomData,
+        }
     }
 }
 
 impl<Db, Insp> RollupEnv<Db, Insp> {
     /// Create a new rollup environment.
     pub fn new(db: Db, constants: SignetSystemConstants) -> Self {
-        Self { db: Arc::new(CacheDB::new(db)), constants, _pd: PhantomData }
+        Self {
+            db: Arc::new(CacheDB::new(db)),
+            constants,
+            fill_state: AggregateFills::default(),
+            _pd: PhantomData,
+        }
     }
 
     /// Get a mutable reference to the inner database.
@@ -41,6 +54,25 @@ impl<Db, Insp> RollupEnv<Db, Insp> {
     /// Get the constants for this environment.
     pub const fn constants(&self) -> &SignetSystemConstants {
         &self.constants
+    }
+
+    /// Get a reference to the fill state.
+    pub const fn fill_state(&self) -> &AggregateFills {
+        &self.fill_state
+    }
+
+    /// Get a mutable reference to the fill state.
+    pub const fn fill_state_mut(&mut self) -> &mut AggregateFills {
+        &mut self.fill_state
+    }
+
+    /// Accepts aggregate fills and orders, updating the fill state.
+    pub fn accept_aggregates(
+        &mut self,
+        fills: &AggregateFills,
+        orders: &AggregateOrders,
+    ) -> Result<(), MarketError> {
+        self.fill_state.checked_remove_ru_tx_events(fills, orders)
     }
 }
 

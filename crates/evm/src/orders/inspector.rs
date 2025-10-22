@@ -67,9 +67,9 @@ impl OrderDetector {
 
     /// Take the orders from the inspector, clearing it, and convert them to
     /// aggregate orders.
-    pub fn take_aggregates(&mut self) -> (AggregateOrders, AggregateFills) {
+    pub fn take_aggregates(&mut self) -> (AggregateFills, AggregateOrders) {
         let (orders, filleds) = self.take();
-        (orders.aggregate(), filleds.aggregate(self.chain_id()))
+        (filleds.aggregate(self.chain_id()), orders.aggregate())
     }
 
     /// Take the inner inspector and the framed events.

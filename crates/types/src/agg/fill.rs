@@ -121,7 +121,7 @@ impl AggregateFills {
     }
 
     /// Absorb the fills from another context.
-    fn absorb(&mut self, other: &Self) {
+    pub fn absorb(&mut self, other: &Self) {
         for (output_asset, recipients) in other.fills.iter() {
             let context_recipients = self.fills.entry(*output_asset).or_default();
             for (recipient, value) in recipients {
@@ -234,12 +234,12 @@ impl AggregateFills {
     pub fn check_ru_tx_events(
         &self,
         fills: &AggregateFills,
-        aggregate: &AggregateOrders,
+        orders: &AggregateOrders,
     ) -> Result<(), MarketError> {
         // Check the aggregate against the combined contexts.
         let combined = CombinedContext { context: self, extra: fills };
 
-        combined.check_aggregate(aggregate)?;
+        combined.check_aggregate(orders)?;
 
         Ok(())
     }
@@ -251,12 +251,24 @@ impl AggregateFills {
     /// This will process all fills first, and all orders second.
     pub fn checked_remove_ru_tx_events(
         &mut self,
-        aggregate: &AggregateOrders,
         fills: &AggregateFills,
+        orders: &AggregateOrders,
     ) -> Result<(), MarketError> {
-        self.check_ru_tx_events(fills, aggregate)?;
+        self.check_ru_tx_events(fills, orders)?;
         self.absorb(fills);
-        self.unchecked_remove_aggregate(aggregate)
+        self.unchecked_remove_aggregate(orders)
+    }
+
+    /// Check and remove the events emitted by a rollup transaction. This
+    /// function allows atomic ingestion of multiple Fills and Orders. **If
+    /// the check fails, the aggregate may be mutated.**
+    pub fn unchecked_remove_ru_tx_events(
+        &mut self,
+        fills: &AggregateFills,
+        orders: &AggregateOrders,
+    ) -> Result<(), MarketError> {
+        self.absorb(fills);
+        self.unchecked_remove_aggregate(orders)
     }
 }
 
