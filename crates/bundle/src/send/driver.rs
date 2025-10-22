@@ -1,9 +1,8 @@
 use crate::send::SignetEthBundle;
 use alloy::primitives::U256;
-use signet_evm::{
-    DriveBundleResult, EvmErrored, EvmNeedsTx, EvmTransacted, SignetInspector, SignetLayered,
-};
-use signet_types::{AggregateFills, MarketError, SignedPermitError};
+use signet_evm::{DriveBundleResult, EvmErrored, EvmNeedsTx, SignetInspector, SignetLayered};
+use signet_types::{AggregateFills, AggregateOrders, MarketError, SignedPermitError};
+use std::borrow::Cow;
 use tracing::{debug, error};
 use trevm::{
     helpers::Ctx,
@@ -23,28 +22,35 @@ pub type SignetEthBundleInsp<I> = Layered<TimeLimit, I>;
 pub enum SignetEthBundleError<Db: Database> {
     /// Bundle error.
     #[error(transparent)]
-    BundleError(#[from] BundleError<Db>),
+    Bundle(#[from] BundleError<Db>),
 
     /// SignedPermitError.
     #[error(transparent)]
-    SignedPermitError(#[from] SignedPermitError),
+    SignetPermit(#[from] SignedPermitError),
 
     /// Contract error.
     #[error(transparent)]
-    ContractError(#[from] alloy::contract::Error),
+    Contract(#[from] alloy::contract::Error),
+
+    /// Market error.
+    #[error(transparent)]
+    Market(#[from] MarketError),
 }
 
 impl<Db: Database> core::fmt::Debug for SignetEthBundleError<Db> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SignetEthBundleError::BundleError(bundle_error) => {
+            SignetEthBundleError::Bundle(bundle_error) => {
                 f.debug_tuple("BundleError").field(bundle_error).finish()
             }
-            SignetEthBundleError::SignedPermitError(signed_order_error) => {
+            SignetEthBundleError::SignetPermit(signed_order_error) => {
                 f.debug_tuple("SignedPermitError").field(signed_order_error).finish()
             }
-            SignetEthBundleError::ContractError(contract_error) => {
+            SignetEthBundleError::Contract(contract_error) => {
                 f.debug_tuple("ContractError").field(contract_error).finish()
+            }
+            SignetEthBundleError::Market(market_error) => {
+                f.debug_tuple("MarketError").field(market_error).finish()
             }
         }
     }
@@ -52,13 +58,13 @@ impl<Db: Database> core::fmt::Debug for SignetEthBundleError<Db> {
 
 impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
     fn from(err: EVMError<Db::Error>) -> Self {
-        Self::BundleError(BundleError::from(err))
+        Self::Bundle(BundleError::from(err))
     }
 }
 
 /// Driver for applying a Signet Ethereum bundle to an EVM.
 #[derive(Debug, Clone)]
-pub struct SignetEthBundleDriver<'a> {
+pub struct SignetEthBundleDriver<'a, 'b> {
     /// The bundle to apply.
     bundle: &'a SignetEthBundle,
 
@@ -66,37 +72,47 @@ pub struct SignetEthBundleDriver<'a> {
     /// time spent simulating the bundle.
     deadline: std::time::Instant,
 
-    /// Aggregate fills derived from the bundle's host fills.
-    agg_fills: AggregateFills,
+    /// Reference to the fill state to check against.
+    fill_state: Cow<'b, AggregateFills>,
 
+    // -- Accumulated outputs below here--
     /// Total gas used by this bundle during execution, an output of the driver.
     total_gas_used: u64,
+
     /// Beneficiary balance increase during execution, an output of the driver.
     beneficiary_balance_increase: U256,
+
+    /// Running aggregate of fills during execution.
+    bundle_fills: AggregateFills,
+
+    /// Running aggregate of orders during execution.
+    bundle_orders: AggregateOrders,
 }
 
-impl<'a> SignetEthBundleDriver<'a> {
+impl<'a, 'b> SignetEthBundleDriver<'a, 'b> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
     pub fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
-        Self::new_with_agg_fills(bundle, deadline, Default::default())
+        Self::new_with_fill_state(bundle, deadline, Default::default())
     }
 
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle,
     /// response, and aggregate fills.
     ///
     /// This is useful for testing, and for combined host-rollup simulation.
-    pub const fn new_with_agg_fills(
+    pub fn new_with_fill_state(
         bundle: &'a SignetEthBundle,
         deadline: std::time::Instant,
-        agg_fills: AggregateFills,
+        fill_state: Cow<'b, AggregateFills>,
     ) -> Self {
         Self {
             bundle,
             deadline,
-            agg_fills,
+            fill_state,
             total_gas_used: 0,
             beneficiary_balance_increase: U256::ZERO,
+            bundle_fills: AggregateFills::default(),
+            bundle_orders: AggregateOrders::default(),
         }
     }
 
@@ -120,48 +136,14 @@ impl<'a> SignetEthBundleDriver<'a> {
         self.beneficiary_balance_increase
     }
 
-    /// Get the aggregate fills for this driver.
-    ///
-    /// This may be used to check that the bundle does not overfill, by
-    /// inspecting the agg fills after execution.
-    pub const fn agg_fills(&self) -> &AggregateFills {
-        &self.agg_fills
-    }
-
-    /// Get a mutable reference to the aggregate fills for this driver.
-    ///
-    /// Accessing this is not recommended outside of testing or advanced
-    /// usage.
-    pub const fn agg_fills_mut(&mut self) -> &mut AggregateFills {
-        &mut self.agg_fills
-    }
-
-    /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate
-    /// payable gas and call [`Self::accept_tx`].
-    ///
-    /// This path is used by
-    /// - [`TransactionSigned`] objects
-    /// - [`Transactor::Transact`] events
-    pub(crate) fn check_fills<Db, Insp>(
-        &mut self,
-        trevm: &mut EvmTransacted<Db, Insp>,
-    ) -> Result<(), MarketError>
-    where
-        Db: Database + DatabaseCommit,
-        Insp: Inspector<Ctx<Db>>,
-    {
-        // Taking these clears the context for reuse.
-        let (agg_orders, agg_fills) =
-            trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
-
-        // We check the AggregateFills here, and if it fails, we discard the
-        // transaction outcome and push a failure receipt.
-        self.agg_fills.checked_remove_ru_tx_events(&agg_orders, &agg_fills)
+    /// Take the aggregate orders and fills from this driver.
+    pub fn take_aggregates(&mut self) -> (AggregateFills, AggregateOrders) {
+        (std::mem::take(&mut self.bundle_fills), std::mem::take(&mut self.bundle_orders))
     }
 }
 
 impl<Db, Insp> BundleDriver<Db, SignetLayered<Layered<TimeLimit, Insp>>>
-    for SignetEthBundleDriver<'_>
+    for SignetEthBundleDriver<'_, '_>
 where
     Db: Database + DatabaseCommit,
     Insp: Inspector<Ctx<Db>>,
@@ -205,6 +187,11 @@ where
         // Decode and validate the transactions in the bundle
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
 
+        // We'll maintain running aggregates of fills and orders across
+        // all transactions in the bundle.
+        let mut bundle_fills = AggregateFills::default();
+        let mut bundle_orders = AggregateOrders::default();
+
         for tx in txs.into_iter() {
             let _span = tracing::debug_span!("bundle_tx_loop", tx_hash = %tx.hash()).entered();
 
@@ -228,11 +215,22 @@ where
             let gas_used = result.gas_used();
 
             // EVM Execution succeeded.
-            // We now check if the orders are valid with the bundle's fills. If
-            // not, and the tx is not marked as revertible by the bundle, we
-            // error our simulation.
+            // We now check if the orders are valid with the bundle's fills
+            // state. If not, and the tx is not marked as revertible by the
+            // bundle, we error our simulation.
             if result.is_success() {
-                if self.check_fills(&mut t).is_err() {
+                // Taking these clears the context for reuse.
+                let (tx_fills, tx_orders) =
+                    t.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
+
+                // We accumulate the orders and fills from each transaction into
+                // our running bundle aggregates.
+                bundle_orders.absorb(&tx_orders);
+                bundle_fills.absorb(&tx_fills);
+
+                // Then we check that the fills are sufficient against the
+                // provided fill state.
+                if self.fill_state.check_ru_tx_events(&bundle_fills, &bundle_orders).is_err() {
                     debug!("transaction dropped due to insufficient fills");
                     if self.bundle.reverting_tx_hashes().contains(tx_hash) {
                         trevm = t.reject();
@@ -244,6 +242,7 @@ where
 
                 self.total_gas_used = self.total_gas_used.saturating_add(gas_used);
             } else {
+                // EVM Execution did not succeed.
                 // If not success, we are in a revert or halt. If the tx is
                 // not marked as revertible by the bundle, we error our
                 // simulation.

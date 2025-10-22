@@ -184,7 +184,7 @@ where
             self.response.bundle_hash = self.bundle.bundle_hash();
 
             // Taking these clears the order detector
-            let (orders, fills) =
+            let (fills, orders) =
                 trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
             self.response.orders = orders;
             self.response.fills = fills;

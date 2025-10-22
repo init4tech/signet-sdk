@@ -2,8 +2,9 @@ use crate::{env::RollupEnv, SimCache, SimDb, SimItem, SimOutcomeWithCache, TimeL
 use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
+use signet_evm::SignetInspector;
 use signet_types::constants::SignetSystemConstants;
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 use tokio::sync::{mpsc, watch};
 use tracing::{instrument, trace, trace_span};
 use trevm::{
@@ -21,6 +22,7 @@ use trevm::{
 
 /// A simulation environment.
 pub struct SimEnv<RuDb, RuInsp = NoOpInspector> {
+    /// The rollup environment.
     rollup: RollupEnv<RuDb, RuInsp>,
 
     /// The cache of items to simulate.
@@ -49,7 +51,7 @@ impl<RuDb, RuInsp> fmt::Debug for SimEnv<RuDb, RuInsp> {
 }
 
 impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp> {
-    /// Creates a new `SimFactory` instance.
+    /// Create a new `SimEnv` instance.
     pub fn new<C, B>(
         rollup: RollupEnv<RuDb, RuInsp>,
         cfg_ref: C,
@@ -139,7 +141,7 @@ where
 
         // If succesful, take the cache. If failed, return the error.
         match trevm.run_tx(transaction) {
-            Ok(trevm) => {
+            Ok(mut trevm) => {
                 // Get the simulation results
                 let gas_used = trevm.result().gas_used();
                 let success = trevm.result().is_success();
@@ -151,6 +153,16 @@ where
                     None
                 }
                 .cloned();
+
+                // We collect the orders and fills from the inspector, and check
+                // them against the provided fill state. If the fills are
+                // insufficient, we error out. Otherwise we'll return them as
+                // part of the `SimOutcomeWithCache`, to allow _later_ stages to
+                // process them (e.g., to update the fill state).
+                let (fills, orders) =
+                    trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
+
+                self.rollup.fill_state().check_ru_tx_events(&fills, &orders)?;
 
                 let cache = trevm.accept_state().into_db().into_cache();
 
@@ -164,7 +176,7 @@ where
                 trace!(
                     ?cache_rank,
                     tx_hash = %transaction.hash(),
-                    gas_used = gas_used,
+                    gas_used,
                     score = %score,
                     reverted = !success,
                     halted,
@@ -174,7 +186,7 @@ where
                 );
 
                 // Create the outcome
-                Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used })
+                Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used, fills, orders })
             }
             Err(e) => Err(SignetEthBundleError::from(e.into_error())),
         }
@@ -190,7 +202,12 @@ where
     where
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
     {
-        let mut driver = SignetEthBundleDriver::new(bundle, self.finish_by);
+        let mut driver = SignetEthBundleDriver::new_with_fill_state(
+            bundle,
+            self.finish_by,
+            Cow::Borrowed(self.rollup.fill_state()),
+        );
+
         let trevm = self.rollup_evm();
 
         // Run the bundle
@@ -203,7 +220,7 @@ where
         let score = driver.beneficiary_balance_increase();
         let gas_used = driver.total_gas_used();
         let cache = trevm.into_db().into_cache();
-
+        let (fills, orders) = driver.take_aggregates();
         trace!(
             ?cache_rank,
             uuid = %bundle.replacement_uuid().expect("Bundle must have a replacement UUID"),
@@ -212,7 +229,7 @@ where
             "Bundle simulation successful"
         );
 
-        Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used })
+        Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used, fills, orders })
     }
 
     /// Simulates a transaction or bundle in the context of a block.

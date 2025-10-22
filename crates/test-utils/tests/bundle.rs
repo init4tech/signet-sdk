@@ -27,6 +27,7 @@ use signet_test_utils::{
 use signet_types::AggregateFills;
 use signet_zenith::HostOrders::{initiateCall, Filled, Input, Output};
 use std::{
+    borrow::Cow,
     sync::LazyLock,
     time::{Duration, Instant},
 };
@@ -158,7 +159,7 @@ fn test_bundle_revert() {
     let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     let (err, trevm) = driver.run_bundle(trevm).unwrap_err().take_err();
-    assert!(matches!(err, SignetEthBundleError::BundleError(BundleError::BundleReverted)));
+    assert!(matches!(err, SignetEthBundleError::Bundle(BundleError::BundleReverted)));
 
     // Erroring leaves the evm in a dirty state. The first txn was executed,
     // the second reverted, and the third was not executed.
@@ -200,10 +201,10 @@ fn test_order_bundle() {
 
     let bundle = order_bundle(vec![]);
 
-    let mut driver = SignetEthBundleDriver::new_with_agg_fills(
+    let mut driver = SignetEthBundleDriver::new_with_fill_state(
         &bundle,
         Instant::now() + Duration::from_secs(5),
-        agg_fills,
+        Cow::Owned(agg_fills),
     );
 
     // We expect this to work and drop the second transaction.
@@ -233,7 +234,7 @@ fn test_order_bundle_revert() {
     let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     let (err, trevm) = driver.run_bundle(trevm).unwrap_err().take_err();
-    assert!(matches!(err, SignetEthBundleError::BundleError(BundleError::BundleReverted)));
+    assert!(matches!(err, SignetEthBundleError::Bundle(BundleError::BundleReverted)));
 
     // Erroring leaves the evm in a dirty state. The first txn was executed,
     // the second was dropped, and the third was not executed.

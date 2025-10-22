@@ -124,6 +124,19 @@ impl AggregateOrders {
         }
         o
     }
+
+    /// Absorb the orders from another context.
+    pub fn absorb(&mut self, other: &Self) {
+        for (address, amount) in other.inputs.iter() {
+            self.ingest_raw_input(*address, *amount);
+        }
+
+        for ((chain_id, output_asset), recipients) in other.outputs.iter() {
+            for (recipient, value) in recipients {
+                self.ingest_raw_output(*chain_id, *output_asset, *recipient, *value);
+            }
+        }
+    }
 }
 
 impl<'a> FromIterator<&'a RollupOrders::Order> for AggregateOrders {

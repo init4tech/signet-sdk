@@ -1,4 +1,5 @@
 use alloy::primitives::U256;
+use signet_types::{AggregateFills, AggregateOrders};
 use trevm::revm::database::Cache;
 
 use crate::SimItem;
@@ -14,12 +15,18 @@ pub struct SimOutcomeWithCache {
     /// increase in the beneficiary's balance.
     pub score: U256,
 
+    /// The total amount of gas used by the simulation.
+    pub gas_used: u64,
+
     /// The result of the simulation, a [`Cache`] containing state changes that
     /// can be applied.
     pub cache: Cache,
 
-    /// The total amount of gas used by the simulation.
-    pub gas_used: u64,
+    /// The aggregate fills after simulation.
+    pub fills: AggregateFills,
+
+    /// The aggregate orders after simulation.
+    pub orders: AggregateOrders,
 }
 
 /// An item after simulation, containing the score and gas used.
