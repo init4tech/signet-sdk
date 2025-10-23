@@ -401,6 +401,12 @@ pub struct PaginationParams {
     limit: Option<u32>,
 }
 
+impl From<PaginationInfo> for PaginationParams {
+    fn from(info: PaginationInfo) -> Self {
+        Self { cursor: info.into_next_cursor(), limit: None }
+    }
+}
+
 impl PaginationParams {
     /// Creates a new instance of [`PaginationParams`].
     pub const fn new(cursor: Option<String>, limit: Option<u32>) -> Self {
