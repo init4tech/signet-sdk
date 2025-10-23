@@ -1,6 +1,6 @@
 use crate::types::{
-    TxCacheOrdersResponse, TxCacheSendBundleResponse, TxCacheSendTransactionResponse,
-    TxCacheTransactionsResponse,
+    PaginationParams, TxCacheOrdersResponse, TxCacheSendBundleResponse,
+    TxCacheSendTransactionResponse, TxCacheTransactionsResponse,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -114,6 +114,38 @@ impl TxCache {
             .map_err(Into::into)
     }
 
+    async fn get_inner_with_query<T>(
+        &self,
+        join: &'static str,
+        query: PaginationParams,
+    ) -> Result<T, Error>
+    where
+        T: DeserializeOwned,
+    {
+        // Append the path to the URL.
+        let url = self
+            .url
+            .join(join)
+            .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
+
+        let mut request = self.client.get(url);
+
+        if let Some(cursor) = query.cursor() {
+            request = request.query(&[("cursor", cursor)]);
+        }
+        if let Some(limit) = query.limit() {
+            request = request.query(&[("limit", limit)]);
+        }
+
+        request
+            .send()
+            .await
+            .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache."))?
+            .json::<T>()
+            .await
+            .map_err(Into::into)
+    }
+
     /// Forwards a raw transaction to the URL.
     #[instrument(skip_all)]
     pub async fn forward_raw_transaction(
@@ -140,17 +172,27 @@ impl TxCache {
 
     /// Get transactions from the URL.
     #[instrument(skip_all)]
-    pub async fn get_transactions(&self) -> Result<Vec<TxEnvelope>, Error> {
-        let response: TxCacheTransactionsResponse =
-            self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await?;
-        Ok(response.transactions)
+    pub async fn get_transactions(
+        &self,
+        query: Option<PaginationParams>,
+    ) -> Result<TxCacheTransactionsResponse, Error> {
+        if let Some(query) = query {
+            self.get_inner_with_query::<TxCacheTransactionsResponse>(TRANSACTIONS, query).await
+        } else {
+            self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await
+        }
     }
 
     /// Get signed orders from the URL.
     #[instrument(skip_all)]
-    pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
-        let response: TxCacheOrdersResponse =
-            self.get_inner::<TxCacheOrdersResponse>(ORDERS).await?;
-        Ok(response.orders)
+    pub async fn get_orders(
+        &self,
+        query: Option<PaginationParams>,
+    ) -> Result<TxCacheOrdersResponse, Error> {
+        if let Some(query) = query {
+            self.get_inner_with_query::<TxCacheOrdersResponse>(ORDERS, query).await
+        } else {
+            self.get_inner::<TxCacheOrdersResponse>(ORDERS).await
+        }
     }
 }
