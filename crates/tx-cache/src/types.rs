@@ -90,11 +90,13 @@ impl TxCacheBundleResponse {
 pub struct TxCacheBundlesResponse {
     /// the list of bundles
     pub bundles: Vec<TxCacheBundle>,
+    /// The pagination info.
+    pub pagination: PaginationInfo,
 }
 
 impl From<Vec<TxCacheBundle>> for TxCacheBundlesResponse {
     fn from(bundles: Vec<TxCacheBundle>) -> Self {
-        Self { bundles }
+        Self { bundles, pagination: PaginationInfo::empty() }
     }
 }
 
@@ -104,22 +106,53 @@ impl From<TxCacheBundlesResponse> for Vec<TxCacheBundle> {
     }
 }
 
+impl From<(Vec<TxCacheBundle>, PaginationInfo)> for TxCacheBundlesResponse {
+    fn from((bundles, pagination): (Vec<TxCacheBundle>, PaginationInfo)) -> Self {
+        Self { bundles, pagination }
+    }
+}
+
 impl TxCacheBundlesResponse {
     /// Create a new bundle response from a list of bundles.
     pub const fn new(bundles: Vec<TxCacheBundle>) -> Self {
-        Self { bundles }
+        Self { bundles, pagination: PaginationInfo::empty() }
     }
 
     /// Create a new bundle response from a list of bundles.
     #[deprecated = "Use `From::from` instead, `Self::new` in const contexts"]
     pub const fn from_bundles(bundles: Vec<TxCacheBundle>) -> Self {
-        Self::new(bundles)
+        Self { bundles, pagination: PaginationInfo::empty() }
     }
 
     /// Convert the bundle response to a list of [`SignetEthBundle`].
     #[deprecated = "Use `this.bundles` instead."]
     pub fn into_bundles(self) -> Vec<TxCacheBundle> {
         self.bundles
+    }
+
+    /// Check if the response is empty (has no bundles).
+    pub fn is_empty(&self) -> bool {
+        self.bundles.is_empty()
+    }
+
+    /// Check if there is a next page in the response.
+    pub const fn has_next_page(&self) -> bool {
+        self.pagination.has_next_page()
+    }
+
+    /// Get the cursor for the next page.
+    pub fn next_cursor(&self) -> Option<&str> {
+        self.pagination.next_cursor()
+    }
+
+    /// Consume the response and return the next cursor.
+    pub fn into_next_cursor(self) -> Option<String> {
+        self.pagination.into_next_cursor()
+    }
+
+    /// Consume the response and return the parts.
+    pub fn into_parts(self) -> (Vec<TxCacheBundle>, PaginationInfo) {
+        (self.bundles, self.pagination)
     }
 }
 
@@ -154,11 +187,13 @@ impl From<TxCacheSendBundleResponse> for uuid::Uuid {
 pub struct TxCacheTransactionsResponse {
     /// The list of transactions.
     pub transactions: Vec<TxEnvelope>,
+    /// The pagination info.
+    pub pagination: PaginationInfo,
 }
 
 impl From<Vec<TxEnvelope>> for TxCacheTransactionsResponse {
     fn from(transactions: Vec<TxEnvelope>) -> Self {
-        Self { transactions }
+        Self { transactions, pagination: PaginationInfo::empty() }
     }
 }
 
@@ -168,22 +203,53 @@ impl From<TxCacheTransactionsResponse> for Vec<TxEnvelope> {
     }
 }
 
+impl From<(Vec<TxEnvelope>, PaginationInfo)> for TxCacheTransactionsResponse {
+    fn from((transactions, pagination): (Vec<TxEnvelope>, PaginationInfo)) -> Self {
+        Self { transactions, pagination }
+    }
+}
+
 impl TxCacheTransactionsResponse {
     /// Instantiate a new transaction response from a list of transactions.
     pub const fn new(transactions: Vec<TxEnvelope>) -> Self {
-        Self { transactions }
+        Self { transactions, pagination: PaginationInfo::empty() }
     }
 
     /// Create a new transaction response from a list of transactions.
     #[deprecated = "Use `From::from` instead, or `Self::new` in const contexts"]
     pub const fn from_transactions(transactions: Vec<TxEnvelope>) -> Self {
-        Self::new(transactions)
+        Self { transactions, pagination: PaginationInfo::empty() }
     }
 
     /// Convert the transaction response to a list of [`TxEnvelope`].
     #[deprecated = "Use `this.transactions` instead."]
     pub fn into_transactions(self) -> Vec<TxEnvelope> {
         self.transactions
+    }
+
+    /// Check if the response is empty (has no transactions).
+    pub fn is_empty(&self) -> bool {
+        self.transactions.is_empty()
+    }
+
+    /// Check if there is a next page in the response.
+    pub const fn has_next_page(&self) -> bool {
+        self.pagination.has_next_page()
+    }
+
+    /// Get the cursor for the next page.
+    pub fn next_cursor(&self) -> Option<&str> {
+        self.pagination.next_cursor()
+    }
+
+    /// Consume the response and return the next cursor.
+    pub fn into_next_cursor(self) -> Option<String> {
+        self.pagination.into_next_cursor()
+    }
+
+    /// Consume the response and return the parts.
+    pub fn into_parts(self) -> (Vec<TxEnvelope>, PaginationInfo) {
+        (self.transactions, self.pagination)
     }
 }
 
@@ -230,11 +296,13 @@ impl TxCacheSendTransactionResponse {
 pub struct TxCacheOrdersResponse {
     /// The list of signed orders.
     pub orders: Vec<SignedOrder>,
+    /// The pagination info.
+    pub pagination: PaginationInfo,
 }
 
 impl From<Vec<SignedOrder>> for TxCacheOrdersResponse {
     fn from(orders: Vec<SignedOrder>) -> Self {
-        Self { orders }
+        Self { orders, pagination: PaginationInfo::empty() }
     }
 }
 
@@ -244,21 +312,128 @@ impl From<TxCacheOrdersResponse> for Vec<SignedOrder> {
     }
 }
 
+impl From<(Vec<SignedOrder>, PaginationInfo)> for TxCacheOrdersResponse {
+    fn from((orders, pagination): (Vec<SignedOrder>, PaginationInfo)) -> Self {
+        Self { orders, pagination }
+    }
+}
+
 impl TxCacheOrdersResponse {
     /// Create a new order response from a list of orders.
     pub const fn new(orders: Vec<SignedOrder>) -> Self {
-        Self { orders }
+        Self { orders, pagination: PaginationInfo::empty() }
     }
 
     /// Create a new order response from a list of orders.
     #[deprecated = "Use `From::from` instead, `Self::new` in const contexts"]
     pub const fn from_orders(orders: Vec<SignedOrder>) -> Self {
-        Self { orders }
+        Self { orders, pagination: PaginationInfo::empty() }
     }
 
     /// Convert the order response to a list of [`SignedOrder`].
     #[deprecated = "Use `this.orders` instead."]
     pub fn into_orders(self) -> Vec<SignedOrder> {
         self.orders
+    }
+
+    /// Check if there is a next page in the response.
+    pub const fn has_next_page(&self) -> bool {
+        self.pagination.has_next_page()
+    }
+
+    /// Get the cursor for the next page.
+    pub fn next_cursor(&self) -> Option<&str> {
+        self.pagination.next_cursor()
+    }
+
+    /// Consume the response and return the next cursor.
+    pub fn into_next_cursor(self) -> Option<String> {
+        self.pagination.into_next_cursor()
+    }
+
+    /// Consume the response and return the parts.
+    pub fn into_parts(self) -> (Vec<SignedOrder>, PaginationInfo) {
+        (self.orders, self.pagination)
+    }
+}
+
+/// Represents the pagination information from a transaction cache response.
+/// This applies to all GET endpoints that return a list of items.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationInfo {
+    next_cursor: Option<String>,
+    has_next_page: bool,
+}
+
+impl PaginationInfo {
+    /// Create a new [`PaginationInfo`].
+    pub const fn new(next_cursor: Option<String>, has_next_page: bool) -> Self {
+        Self { next_cursor, has_next_page }
+    }
+
+    /// Create an empty [`PaginationInfo`].
+    pub const fn empty() -> Self {
+        Self { next_cursor: None, has_next_page: false }
+    }
+
+    /// Get the next cursor.
+    pub fn next_cursor(&self) -> Option<&str> {
+        self.next_cursor.as_deref()
+    }
+
+    /// Consume the [`PaginationInfo`] and return the next cursor.
+    pub fn into_next_cursor(self) -> Option<String> {
+        self.next_cursor
+    }
+
+    /// Check if there is a next page in the response.
+    pub const fn has_next_page(&self) -> bool {
+        self.has_next_page
+    }
+}
+
+/// A query for pagination.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct PaginationParams {
+    /// The cursor to start from.
+    cursor: Option<String>,
+    /// The number of items to return.
+    limit: Option<u32>,
+}
+
+impl PaginationParams {
+    /// Creates a new instance of [`PaginationParams`].
+    pub const fn new(cursor: Option<String>, limit: Option<u32>) -> Self {
+        Self { cursor, limit }
+    }
+
+    /// Get the cursor to start from.
+    pub fn cursor(&self) -> Option<&str> {
+        self.cursor.as_deref()
+    }
+
+    /// Consumes the [`PaginationParams`] and returns the cursor.
+    pub fn into_cursor(self) -> Option<String> {
+        self.cursor
+    }
+
+    /// Get the number of items to return.
+    pub const fn limit(&self) -> Option<u32> {
+        self.limit
+    }
+
+    /// Check if the query has a cursor.
+    pub const fn has_cursor(&self) -> bool {
+        self.cursor.is_some()
+    }
+
+    /// Check if the query has a limit.
+    pub const fn has_limit(&self) -> bool {
+        self.limit.is_some()
+    }
+
+    /// Check if the query is empty (has no cursor and no limit).
+    pub const fn is_empty(&self) -> bool {
+        !self.has_cursor() && !self.has_limit()
     }
 }
