@@ -150,6 +150,11 @@ impl TxCacheBundlesResponse {
         self.pagination.into_next_cursor()
     }
 
+    /// Consume the response and return the pagination info.
+    pub fn into_pagination_info(self) -> PaginationInfo {
+        self.pagination
+    }
+
     /// Consume the response and return the parts.
     pub fn into_parts(self) -> (Vec<TxCacheBundle>, PaginationInfo) {
         (self.bundles, self.pagination)
@@ -245,6 +250,11 @@ impl TxCacheTransactionsResponse {
     /// Consume the response and return the next cursor.
     pub fn into_next_cursor(self) -> Option<String> {
         self.pagination.into_next_cursor()
+    }
+
+    /// Consume the response and return the pagination info.
+    pub fn into_pagination_info(self) -> PaginationInfo {
+        self.pagination
     }
 
     /// Consume the response and return the parts.
@@ -351,6 +361,11 @@ impl TxCacheOrdersResponse {
         self.pagination.into_next_cursor()
     }
 
+    /// Consume the response and return the pagination info.
+    pub fn into_pagination_info(self) -> PaginationInfo {
+        self.pagination
+    }
+
     /// Consume the response and return the parts.
     pub fn into_parts(self) -> (Vec<SignedOrder>, PaginationInfo) {
         (self.orders, self.pagination)
@@ -421,6 +436,16 @@ impl PaginationParams {
     /// Consumes the [`PaginationParams`] and returns the cursor.
     pub fn into_cursor(self) -> Option<String> {
         self.cursor
+    }
+
+    /// Set the limit for the pagination params.
+    pub fn with_limit(self, limit: u32) -> Self {
+        Self { limit: Some(limit), cursor: self.cursor }
+    }
+
+    /// Set the cursor for the pagination params.
+    pub fn with_cursor(self, cursor: Option<String>) -> Self {
+        Self { cursor, limit: self.limit }
     }
 
     /// Get the number of items to return.
