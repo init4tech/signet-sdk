@@ -20,7 +20,11 @@ pub struct SimOutcomeWithCache {
 
     /// The result of the simulation, a [`Cache`] containing state changes that
     /// can be applied.
-    pub cache: Cache,
+    pub rollup_cache: Cache,
+
+    /// The result of the bundle host simulation a [`Cache`] containing state
+    /// changes that can be applied.
+    pub host_cache: Cache,
 
     /// The aggregate fills after simulation.
     pub fills: AggregateFills,

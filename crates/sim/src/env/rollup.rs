@@ -1,5 +1,5 @@
 use crate::{InnerDb, SimDb, TimeLimited};
-use signet_evm::EvmNeedsCfg;
+use signet_evm::EvmNeedsTx;
 use signet_types::{
     constants::SignetSystemConstants, AggregateFills, AggregateOrders, MarketError,
 };
@@ -9,10 +9,12 @@ use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
     revm::{
+        context::{BlockEnv, CfgEnv},
         database::{Cache, CacheDB},
         inspector::NoOpInspector,
         DatabaseRef, Inspector,
     },
+    Block, Cfg,
 };
 
 /// A rollup simulation environment.
@@ -21,6 +23,10 @@ pub struct RollupEnv<Db, Insp = NoOpInspector> {
     db: InnerDb<Db>,
     constants: SignetSystemConstants,
     fill_state: AggregateFills,
+
+    cfg: CfgEnv,
+    block: BlockEnv,
+
     _pd: PhantomData<fn() -> Insp>,
 }
 
@@ -30,6 +36,8 @@ impl<Db, Insp> Clone for RollupEnv<Db, Insp> {
             db: self.db.clone(),
             constants: self.constants.clone(),
             fill_state: self.fill_state.clone(),
+            cfg: self.cfg.clone(),
+            block: self.block.clone(),
             _pd: PhantomData,
         }
     }
@@ -37,11 +45,22 @@ impl<Db, Insp> Clone for RollupEnv<Db, Insp> {
 
 impl<Db, Insp> RollupEnv<Db, Insp> {
     /// Create a new rollup environment.
-    pub fn new(db: Db, constants: SignetSystemConstants) -> Self {
+    pub fn new<C, B>(db: Db, constants: SignetSystemConstants, cfg_ref: &C, block_ref: &B) -> Self
+    where
+        C: Cfg,
+        B: Block,
+    {
+        let mut cfg = CfgEnv::default();
+        cfg_ref.fill_cfg_env(&mut cfg);
+        let mut block = BlockEnv::default();
+        block_ref.fill_block_env(&mut block);
+
         Self {
             db: Arc::new(CacheDB::new(db)),
             constants,
             fill_state: AggregateFills::default(),
+            cfg,
+            block,
             _pd: PhantomData,
         }
     }
@@ -74,6 +93,26 @@ impl<Db, Insp> RollupEnv<Db, Insp> {
     ) -> Result<(), MarketError> {
         self.fill_state.checked_remove_ru_tx_events(fills, orders)
     }
+
+    /// Get a reference to the [`CfgEnv`].
+    pub const fn cfg(&self) -> &CfgEnv {
+        &self.cfg
+    }
+
+    /// Get a mutable reference to the [`CfgEnv`].
+    pub const fn cfg_mut(&mut self) -> &mut CfgEnv {
+        &mut self.cfg
+    }
+
+    /// Get a reference to the [`BlockEnv`].
+    pub const fn block(&self) -> &BlockEnv {
+        &self.block
+    }
+
+    /// Get a mutable reference to the [`BlockEnv`].
+    pub const fn block_mut(&mut self) -> &mut BlockEnv {
+        &mut self.block
+    }
 }
 
 impl<Db, Insp> RollupEnv<Db, Insp>
@@ -88,12 +127,14 @@ where
 
     /// Create a new EVM for the rollup environment that will finish by the
     /// given instant.
-    pub fn create_evm(&self, finish_by: Instant) -> EvmNeedsCfg<SimDb<Db>, TimeLimited<Insp>> {
+    pub fn create_evm(&self, finish_by: Instant) -> EvmNeedsTx<SimDb<Db>, TimeLimited<Insp>> {
         let db = self.sim_db();
 
         let inspector = Layered::new(TimeLimit::new(finish_by - Instant::now()), Insp::default());
 
         signet_evm::signet_evm_with_inspector(db, inspector, self.constants.clone())
+            .fill_cfg(&self.cfg)
+            .fill_block(&self.block)
     }
 }
 

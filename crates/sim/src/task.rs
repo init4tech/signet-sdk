@@ -1,12 +1,10 @@
-use crate::{env::SimEnv, BuiltBlock, RollupEnv, SharedSimEnv, SimCache, SimDb};
-use signet_types::constants::SignetSystemConstants;
+use crate::{env::SimEnv, BuiltBlock, HostEnv, RollupEnv, SharedSimEnv, SimCache, SimDb};
 use std::time::Duration;
 use tokio::{select, time::Instant};
 use tracing::{debug, info_span, trace, Instrument};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
-    Block, Cfg,
 };
 
 /// The amount of time to sleep between simulation rounds when there are no items to simulate.
@@ -14,9 +12,9 @@ pub(crate) const SIM_SLEEP_MS: u64 = 50;
 
 /// Builds a single block by repeatedly invoking [`SimEnv`].
 #[derive(Debug)]
-pub struct BlockBuild<Db, Insp = NoOpInspector> {
+pub struct BlockBuild<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspector> {
     /// The simulation environment.
-    env: SharedSimEnv<Db, Insp>,
+    env: SharedSimEnv<RuDb, HostDb, RuInsp, HostInsp>,
 
     /// The block being built.
     block: BuiltBlock,
@@ -28,37 +26,32 @@ pub struct BlockBuild<Db, Insp = NoOpInspector> {
     max_gas: u64,
 }
 
-impl<Db, Insp> BlockBuild<Db, Insp>
+impl<RuDb, HostDb, RuInsp, HostInsp> BlockBuild<RuDb, HostDb, RuInsp, HostInsp>
 where
-    Db: DatabaseRef + Send + Sync + 'static,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
+    RuDb: DatabaseRef + Send + Sync + 'static,
+    RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync + 'static,
+    HostDb: DatabaseRef + Send + Sync + 'static,
+    HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync + 'static,
 {
     /// Create a new block building process.
-    #[allow(clippy::too_many_arguments)] // sadge but.
-    pub fn new<C, B>(
-        db: Db,
-        constants: SignetSystemConstants,
-        cfg: C,
-        block: B,
+    pub fn new(
+        rollup: RollupEnv<RuDb, RuInsp>,
+        host: HostEnv<HostDb, HostInsp>,
         finish_by: std::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
         max_gas: u64,
-    ) -> Self
-    where
-        C: Cfg,
-        B: Block,
-    {
-        let env = SimEnv::<Db, Insp>::new(
-            RollupEnv::new(db, constants),
-            cfg,
-            block,
+    ) -> Self {
+        let number = rollup.block().number;
+
+        let env = SimEnv::<RuDb, HostDb, RuInsp, HostInsp>::new(
+            rollup,
+            host,
             finish_by,
             concurrency_limit,
             sim_items,
         );
         let finish_by = env.finish_by();
-        let number = env.block().number;
         Self { env: env.into(), block: BuiltBlock::new(number.to()), finish_by, max_gas }
     }
 
@@ -128,10 +121,13 @@ mod test {
 
     /// Compile-time check to ensure that the block building process is
     /// `Send`.
-    fn _build_fut_is_send<Db, Insp>(b: BlockBuild<Db, Insp>)
-    where
-        Db: DatabaseRef + Send + Sync + 'static,
-        Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
+    fn _build_fut_is_send<RuDb, HostDb, RuInsp, HostInsp>(
+        b: BlockBuild<RuDb, HostDb, RuInsp, HostInsp>,
+    ) where
+        RuDb: DatabaseRef + Send + Sync + 'static,
+        RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync + 'static,
+        HostDb: DatabaseRef + Send + Sync + 'static,
+        HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync + 'static,
     {
         let _: Box<dyn Future<Output = BuiltBlock> + Send> = Box::new(b.build());
     }

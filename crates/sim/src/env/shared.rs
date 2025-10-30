@@ -1,4 +1,4 @@
-use crate::{env::RollupEnv, outcome::SimulatedItem, SimCache, SimDb, SimEnv};
+use crate::{env::RollupEnv, outcome::SimulatedItem, HostEnv, SimCache, SimDb, SimEnv};
 use core::fmt;
 use std::{ops::Deref, sync::Arc};
 use tokio::{select, sync::watch};
@@ -6,17 +6,16 @@ use tracing::{instrument, trace};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
-    Block, Cfg,
 };
 
 /// A simulation environment.
 ///
 /// Contains enough information to run a simulation.
-pub struct SharedSimEnv<Db, Insp = NoOpInspector> {
-    inner: Arc<SimEnv<Db, Insp>>,
+pub struct SharedSimEnv<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspector> {
+    inner: Arc<SimEnv<RuDb, HostDb, RuInsp, HostInsp>>,
 }
 
-impl<Db, Insp> fmt::Debug for SharedSimEnv<Db, Insp> {
+impl<RuDb, HostDb, RuInsp, HostInsp> fmt::Debug for SharedSimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SharedSimEnv")
             .field("finish_by", &self.inner.finish_by())
@@ -25,43 +24,43 @@ impl<Db, Insp> fmt::Debug for SharedSimEnv<Db, Insp> {
     }
 }
 
-impl<Db, Insp> Deref for SharedSimEnv<Db, Insp> {
-    type Target = SimEnv<Db, Insp>;
+impl<RuDb, HostDb, RuInsp, HostInsp> Deref for SharedSimEnv<RuDb, HostDb, RuInsp, HostInsp> {
+    type Target = SimEnv<RuDb, HostDb, RuInsp, HostInsp>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<Db, Insp> From<SimEnv<Db, Insp>> for SharedSimEnv<Db, Insp>
+impl<RuDb, HostDb, RuInsp, HostInsp> From<SimEnv<RuDb, HostDb, RuInsp, HostInsp>>
+    for SharedSimEnv<RuDb, HostDb, RuInsp, HostInsp>
 where
-    Db: DatabaseRef + Send + Sync + 'static,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
+    RuDb: DatabaseRef + Send + Sync + 'static,
+    RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync + 'static,
+    HostDb: DatabaseRef + Send + Sync + 'static,
+    HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync + 'static,
 {
-    fn from(inner: SimEnv<Db, Insp>) -> Self {
+    fn from(inner: SimEnv<RuDb, HostDb, RuInsp, HostInsp>) -> Self {
         Self { inner: Arc::new(inner) }
     }
 }
 
-impl<Db, Insp> SharedSimEnv<Db, Insp>
+impl<RuDb, HostDb, RuInsp, HostInsp> SharedSimEnv<RuDb, HostDb, RuInsp, HostInsp>
 where
-    Db: DatabaseRef + Send + Sync + 'static,
-    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync + 'static,
+    RuDb: DatabaseRef + Send + Sync + 'static,
+    RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync + 'static,
+    HostDb: DatabaseRef + Send + Sync + 'static,
+    HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync + 'static,
 {
     /// Creates a new `SimEnv` instance.
-    pub fn new<C, B>(
-        rollup: RollupEnv<Db, Insp>,
-        cfg: C,
-        block: B,
+    pub fn new(
+        rollup: RollupEnv<RuDb, RuInsp>,
+        host: HostEnv<HostDb, HostInsp>,
         finish_by: std::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
-    ) -> Self
-    where
-        C: Cfg,
-        B: Block,
-    {
-        SimEnv::new(rollup, cfg, block, finish_by, concurrency_limit, sim_items).into()
+    ) -> Self {
+        SimEnv::new(rollup, host, finish_by, concurrency_limit, sim_items).into()
     }
 
     /// Run a simulation round, returning the best item.
@@ -95,7 +94,7 @@ where
         Arc::get_mut(&mut self.inner)
             .expect("sims dropped already")
             .rollup_mut()
-            .accept_cache_ref(&outcome.cache)
+            .accept_cache_ref(&outcome.rollup_cache)
             .ok()?;
         // Accept the aggregate fills and orders.
         Arc::get_mut(&mut self.inner)
