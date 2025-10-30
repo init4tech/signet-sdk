@@ -79,10 +79,22 @@ impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
     pub fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
+        Self::new_with_agg_fills(bundle, deadline, Default::default())
+    }
+
+    /// Creates a new [`SignetEthBundleDriver`] with the given bundle,
+    /// response, and aggregate fills.
+    ///
+    /// This is useful for testing, and for combined host-rollup simulation.
+    pub fn new_with_agg_fills(
+        bundle: &'a SignetEthBundle,
+        deadline: std::time::Instant,
+        agg_fills: AggregateFills,
+    ) -> Self {
         Self {
             bundle,
             deadline,
-            agg_fills: Default::default(),
+            agg_fills,
             total_gas_used: 0,
             beneficiary_balance_increase: U256::ZERO,
         }
@@ -114,6 +126,14 @@ impl<'a> SignetEthBundleDriver<'a> {
     /// inspecting the agg fills after execution.
     pub const fn agg_fills(&self) -> &AggregateFills {
         &self.agg_fills
+    }
+
+    /// Get a mutable reference to the aggregate fills for this driver.
+    ///
+    /// Accessing this is not recommended outside of testing or advanced
+    /// usage.
+    pub const fn agg_fills_mut(&mut self) -> &mut AggregateFills {
+        &mut self.agg_fills
     }
 
     /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate

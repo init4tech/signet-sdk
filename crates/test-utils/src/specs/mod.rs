@@ -71,9 +71,9 @@ where
 }
 
 /// Create a simple bundle from a list of transactions.
-pub fn simple_bundle<'a>(
-    txs: impl IntoIterator<Item = &'a TxEnvelope>,
-    host_txs: impl IntoIterator<Item = &'a TxEnvelope>,
+pub fn simple_bundle(
+    txs: Vec<TxEnvelope>,
+    host_txs: Vec<TxEnvelope>,
     block_number: u64,
 ) -> SignetEthBundle {
     let txs = txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
