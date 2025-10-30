@@ -1,8 +1,7 @@
+use crate::SimItem;
 use alloy::primitives::U256;
 use signet_types::{AggregateFills, AggregateOrders};
 use trevm::revm::database::Cache;
-
-use crate::SimItem;
 
 /// A simulation outcome that includes the score, gas used, and a cache of
 /// state changes.
@@ -27,10 +26,10 @@ pub struct SimOutcomeWithCache {
     pub host_cache: Cache,
 
     /// The aggregate fills after simulation.
-    pub fills: AggregateFills,
+    pub bundle_fills: AggregateFills,
 
     /// The aggregate orders after simulation.
-    pub orders: AggregateOrders,
+    pub bundle_orders: AggregateOrders,
 }
 
 /// An item after simulation, containing the score and gas used.

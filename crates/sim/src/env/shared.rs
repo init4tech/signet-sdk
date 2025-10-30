@@ -100,7 +100,7 @@ where
         Arc::get_mut(&mut self.inner)
             .expect("sims dropped already")
             .rollup_mut()
-            .accept_aggregates(&outcome.fills, &outcome.orders)
+            .accept_aggregates(&outcome.bundle_fills, &outcome.bundle_orders)
             .expect("checked during simulation");
 
         Some(SimulatedItem { gas_used: outcome.gas_used, score: outcome.score, item })

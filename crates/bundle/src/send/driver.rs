@@ -40,22 +40,6 @@ where
     pub bundle_orders: AggregateOrders,
 }
 
-impl<Db, Insp> From<signet_evm::EvmNeedsTx<Db, Insp>> for DriverOutput<Db, Insp>
-where
-    Db: Database,
-    Insp: Inspector<Ctx<Db>>,
-{
-    fn from(evm: signet_evm::EvmNeedsTx<Db, Insp>) -> Self {
-        Self {
-            host_evm: Some(evm),
-            total_gas_used: 0,
-            beneficiary_balance_increase: U256::ZERO,
-            bundle_fills: AggregateFills::default(),
-            bundle_orders: AggregateOrders::default(),
-        }
-    }
-}
-
 impl<Db, Insp> DriverOutput<Db, Insp>
 where
     Db: Database,
@@ -141,9 +125,8 @@ where
     /// The bundle to apply.
     bundle: &'a SignetEthBundle,
 
-    /// Reference to the fill state to check against. When we modify it, we'll
-    /// clone and take a running total.
-    fill_state: Cow<'b, AggregateFills>,
+    /// Reference to the fill state to check against.
+    pub fill_state: Cow<'b, AggregateFills>,
 
     /// Execution deadline for this bundle. This limits the total WALLCLOCK
     /// time spent simulating the bundle.
@@ -178,7 +161,18 @@ where
         deadline: std::time::Instant,
         fill_state: Cow<'b, AggregateFills>,
     ) -> Self {
-        Self { bundle, fill_state, deadline, output: host_evm.into() }
+        Self {
+            bundle,
+            fill_state,
+            deadline,
+            output: DriverOutput {
+                host_evm: Some(host_evm),
+                total_gas_used: 0,
+                beneficiary_balance_increase: U256::ZERO,
+                bundle_fills: AggregateFills::default(),
+                bundle_orders: AggregateOrders::default(),
+            },
+        }
     }
 
     /// Get a reference to the bundle.
@@ -258,7 +252,6 @@ where
         // We simply run all host transactions first, accumulating their state
         // changes into the host_evm's state. If any reverts, we error out the
         // simulation.
-        let mut host_bundle_fills = AggregateFills::default();
         for tx in host_txs.into_iter() {
             self.output.host_evm = Some(trevm_try!(
                 self.output
@@ -275,13 +268,14 @@ where
                             EVMError::Custom("host transaction reverted".to_string())
                         );
 
+                        // The host fills go in the bundle fills.
                         let host_fills = htrevm
                             .inner_mut_unchecked()
                             .inspector
                             .as_mut_detector()
                             .take_aggregates()
                             .0;
-                        host_bundle_fills.absorb(&host_fills);
+                        self.output.bundle_fills.absorb(&host_fills);
 
                         Ok(htrevm.accept_state())
                     })
@@ -292,8 +286,6 @@ where
                 trevm
             ));
         }
-        // Absorb the host fills into our running total.
-        self.fill_state.to_mut().absorb(&host_bundle_fills);
 
         // -- ROLLUP PORTION --
         for tx in txs.into_iter() {
@@ -324,13 +316,18 @@ where
                 let (tx_fills, tx_orders) =
                     t.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
 
+                // These clones are inefficient. We can optimize later if
+                // needed.
+                let mut candidate_fills = self.output.bundle_fills.clone();
+                let mut candidate_orders = self.output.bundle_orders.clone();
+
+                // The candidate is the updated
+                candidate_fills.absorb(&tx_fills);
+                candidate_orders.absorb(&tx_orders);
+
                 // Then we check that the fills are sufficient against the
                 // provided fill state. This does nothing on error.
-                if self
-                    .fill_state
-                    .to_mut()
-                    .checked_remove_ru_tx_events(&tx_fills, &tx_orders)
-                    .is_err()
+                if self.fill_state.check_ru_tx_events(&candidate_fills, &candidate_orders).is_err()
                 {
                     if self.bundle.reverting_tx_hashes().contains(tx_hash) {
                         debug!("transaction marked as revertible, reverting");
@@ -342,9 +339,9 @@ where
                     }
                 }
 
-                // now we absorb the fills and orders into our running totals.
-                self.output.absorb(&tx_fills, &tx_orders);
-                self.output.use_gas(gas_used);
+                // Now we accept the fills and order candidates
+                self.output.bundle_fills = candidate_fills;
+                self.output.bundle_orders = candidate_orders;
             } else {
                 // EVM Execution did not succeed.
                 // If not success, we are in a revert or halt. If the tx is
@@ -354,11 +351,11 @@ where
                     debug!("transaction reverted, not marked as revertible");
                     return Err(t.errored(BundleError::BundleReverted.into()));
                 }
-                self.output.use_gas(gas_used);
             }
 
             // If we did not shortcut return/continue, we accept the state
             // changes from this transaction.
+            self.output.use_gas(gas_used);
             trevm = t.accept_state()
         }
 

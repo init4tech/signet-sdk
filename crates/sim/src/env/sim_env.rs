@@ -136,10 +136,10 @@ where
                 // insufficient, we error out. Otherwise we'll return them as
                 // part of the `SimOutcomeWithCache`, to allow _later_ stages to
                 // process them (e.g., to update the fill state).
-                let (fills, orders) =
+                let (bundle_fills, bundle_orders) =
                     trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
 
-                self.rollup.fill_state().check_ru_tx_events(&fills, &orders)?;
+                self.rollup.fill_state().check_ru_tx_events(&bundle_fills, &bundle_orders)?;
 
                 // We will later commit these to the trevm DB when the
                 // SimOutcome is accepted.
@@ -169,8 +169,8 @@ where
                     rollup_cache: cache,
                     host_cache: Default::default(),
                     gas_used,
-                    fills,
-                    orders,
+                    bundle_fills,
+                    bundle_orders,
                 })
             }
             Err(e) => Err(SignetEthBundleError::from(e.into_error())),
@@ -206,7 +206,12 @@ where
         let score = driver.beneficiary_balance_increase();
         let outputs = driver.into_outputs();
 
-        let rollup_cache = trevm.into_db().into_cache();
+        // This is redundant with the driver, however, we double check here.
+        // If perf is hit too much we can remove.
+        self.rollup
+            .fill_state()
+            .check_ru_tx_events(&outputs.bundle_fills, &outputs.bundle_orders)?;
+
         let host_cache = outputs.host_evm.map(|evm| evm.into_db().into_cache()).unwrap_or_default();
         trace!(
             gas_used = outputs.total_gas_used,
@@ -217,11 +222,11 @@ where
         Ok(SimOutcomeWithCache {
             cache_rank,
             score: score.to(),
-            rollup_cache,
+            rollup_cache: trevm.into_db().into_cache(),
             host_cache,
             gas_used: outputs.total_gas_used,
-            fills: outputs.bundle_fills,
-            orders: outputs.bundle_orders,
+            bundle_fills: outputs.bundle_fills,
+            bundle_orders: outputs.bundle_orders,
         })
     }
 
@@ -254,13 +259,13 @@ where
         let _og = outer.enter();
 
         // to be used in the scope
-        let this_ref = &self;
+        let this_ref = self.clone();
 
-        std::thread::scope(move |scope| {
+        std::thread::scope(|scope| {
             // Spawn a thread per bundle to simulate.
             for (cache_rank, item) in active_sim.into_iter() {
                 let c = candidates.clone();
-
+                let this_ref = this_ref.clone();
                 scope.spawn(move || {
                     let identifier = item.identifier();
                     let _ig = trace_span!(parent: outer_ref, "sim_task", %identifier).entered();
@@ -288,7 +293,6 @@ where
             // Drop the TX so that the channel is closed when all threads
             // are done.
             drop(candidates);
-
             // Wait for each thread to finish. Find the best outcome.
             while let Some(candidate) = candidates_rx.blocking_recv() {
                 // Update the best score and send it to the channel.
