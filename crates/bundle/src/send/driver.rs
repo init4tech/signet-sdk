@@ -67,9 +67,9 @@ where
     }
 
     /// Absorb fills and orders into the running totals.
-    pub fn absorb(&mut self, fills: AggregateFills, orders: AggregateOrders) {
-        self.bundle_fills.absorb(&fills);
-        self.bundle_orders.absorb(&orders);
+    pub fn absorb(&mut self, fills: &AggregateFills, orders: &AggregateOrders) {
+        self.bundle_fills.absorb(fills);
+        self.bundle_orders.absorb(orders);
     }
 
     /// Record an increase in the beneficiary balance.
@@ -141,8 +141,9 @@ where
     /// The bundle to apply.
     bundle: &'a SignetEthBundle,
 
-    /// Reference to the fill state to check against.
-    host_fills: Cow<'b, AggregateFills>,
+    /// Reference to the fill state to check against. When we modify it, we'll
+    /// clone and take a running total.
+    fill_state: Cow<'b, AggregateFills>,
 
     /// Execution deadline for this bundle. This limits the total WALLCLOCK
     /// time spent simulating the bundle.
@@ -177,7 +178,7 @@ where
         deadline: std::time::Instant,
         fill_state: Cow<'b, AggregateFills>,
     ) -> Self {
-        Self { bundle, host_fills: fill_state, deadline, output: host_evm.into() }
+        Self { bundle, fill_state, deadline, output: host_evm.into() }
     }
 
     /// Get a reference to the bundle.
@@ -262,9 +263,9 @@ where
                 self.output
                     .host_evm
                     .take()
-                    .expect("host_evm taken")
+                    .expect("host_evm missing")
                     .run_tx(&tx)
-                    .and_then(|htrevm| {
+                    .and_then(|mut htrevm| {
                         let result = htrevm.result();
 
                         trevm_ensure!(
@@ -272,6 +273,14 @@ where
                             htrevm,
                             EVMError::Custom("host transaction reverted".to_string())
                         );
+
+                        let host_fills = htrevm
+                            .inner_mut_unchecked()
+                            .inspector
+                            .as_mut_detector()
+                            .take_aggregates()
+                            .0;
+                        self.fill_state.to_mut().absorb(&host_fills);
 
                         Ok(htrevm.accept_state())
                     })
@@ -310,30 +319,29 @@ where
             // state. If not, and the tx is not marked as revertible by the
             // bundle, we error our simulation.
             if result.is_success() {
-                // Taking these clears the context for reuse.
                 let (tx_fills, tx_orders) =
                     t.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
 
-                // We accumulate the orders and fills from each transaction into
-                // our running bundle aggregates.
-                self.output.absorb(tx_fills, tx_orders);
-
                 // Then we check that the fills are sufficient against the
-                // provided fill state.
+                // provided fill state. This does nothing on error.
                 if self
-                    .host_fills
-                    .check_ru_tx_events(&self.output.bundle_fills, &self.output.bundle_orders)
+                    .fill_state
+                    .to_mut()
+                    .checked_remove_ru_tx_events(&tx_fills, &tx_orders)
                     .is_err()
                 {
-                    debug!("transaction dropped due to insufficient fills");
                     if self.bundle.reverting_tx_hashes().contains(tx_hash) {
+                        debug!("transaction marked as revertible, reverting");
                         trevm = t.reject();
                         continue;
                     } else {
+                        debug!("transaction dropped due to insufficient fills, not marked as revertible");
                         return Err(t.errored(BundleError::BundleReverted.into()));
                     }
                 }
 
+                // now we absorb the fills and orders into our running totals.
+                self.output.absorb(&tx_fills, &tx_orders);
                 self.output.use_gas(gas_used);
             } else {
                 // EVM Execution did not succeed.
