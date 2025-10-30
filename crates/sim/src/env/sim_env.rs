@@ -1,4 +1,4 @@
-use crate::{env::RollupEnv, SimCache, SimDb, SimItem, SimOutcomeWithCache, TimeLimited};
+use crate::{env::RollupEnv, HostEnv, SimCache, SimDb, SimItem, SimOutcomeWithCache};
 use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
 use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
@@ -10,29 +10,23 @@ use tracing::{instrument, trace, trace_span};
 use trevm::{
     helpers::Ctx,
     revm::{
-        context::{
-            result::{EVMError, ExecutionResult},
-            BlockEnv, CfgEnv,
-        },
+        context::result::{EVMError, ExecutionResult},
         inspector::NoOpInspector,
         DatabaseRef, Inspector,
     },
-    Block, BundleDriver, Cfg,
+    BundleDriver,
 };
 
 /// A simulation environment.
-pub struct SimEnv<RuDb, RuInsp = NoOpInspector> {
+pub struct SimEnv<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspector> {
     /// The rollup environment.
     rollup: RollupEnv<RuDb, RuInsp>,
 
+    /// The host environment.
+    host: HostEnv<HostDb, HostInsp>,
+
     /// The cache of items to simulate.
     sim_items: SimCache,
-
-    /// Chain cfg to use for the simulation.
-    cfg: CfgEnv,
-
-    /// Block to use for the simulation.
-    block: BlockEnv,
 
     /// The instant by which the simulation should finish.
     finish_by: std::time::Instant,
@@ -41,7 +35,7 @@ pub struct SimEnv<RuDb, RuInsp = NoOpInspector> {
     concurrency_limit: usize,
 }
 
-impl<RuDb, RuInsp> fmt::Debug for SimEnv<RuDb, RuInsp> {
+impl<RuDb, HostDb, RuInsp, HostInsp> fmt::Debug for SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimEnv")
             .field("finish_by", &self.finish_by)
@@ -50,29 +44,24 @@ impl<RuDb, RuInsp> fmt::Debug for SimEnv<RuDb, RuInsp> {
     }
 }
 
-impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp> {
+impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     /// Create a new `SimEnv` instance.
-    pub fn new<C, B>(
+    pub const fn new(
         rollup: RollupEnv<RuDb, RuInsp>,
-        cfg_ref: C,
-        block_ref: B,
+        host: HostEnv<HostDb, HostInsp>,
         finish_by: std::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
-    ) -> Self
-    where
-        C: Cfg,
-        B: Block,
-    {
-        let mut cfg = CfgEnv::default();
-        cfg_ref.fill_cfg_env(&mut cfg);
-        let mut block = BlockEnv::default();
-        block_ref.fill_block_env(&mut block);
-
-        Self { rollup, cfg, block, finish_by, concurrency_limit, sim_items }
+    ) -> Self {
+        Self { rollup, host, finish_by, concurrency_limit, sim_items }
     }
 
-    /// Get a reference to the database.
+    /// Get a reference to the rollup environment.
+    pub const fn rollup(&self) -> &RollupEnv<RuDb, RuInsp> {
+        &self.rollup
+    }
+
+    /// Get a mutable reference to the rollup environment.
     pub const fn rollup_mut(&mut self) -> &mut RollupEnv<RuDb, RuInsp> {
         &mut self.rollup
     }
@@ -85,16 +74,6 @@ impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp> {
     /// Get a reference to the cache of items to simulate.
     pub const fn sim_items(&self) -> &SimCache {
         &self.sim_items
-    }
-
-    /// Get a reference to the chain cfg.
-    pub const fn cfg(&self) -> &CfgEnv {
-        &self.cfg
-    }
-
-    /// Get a reference to the block.
-    pub const fn block(&self) -> &BlockEnv {
-        &self.block
     }
 
     /// Get the exectuion timeout.
@@ -113,15 +92,13 @@ impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp> {
     }
 }
 
-impl<RuDb, RuInsp> SimEnv<RuDb, RuInsp>
+impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp>
 where
     RuDb: DatabaseRef + Send + Sync,
     RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
+    HostDb: DatabaseRef + Send + Sync,
+    HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync,
 {
-    fn rollup_evm(&self) -> signet_evm::EvmNeedsTx<SimDb<RuDb>, TimeLimited<RuInsp>> {
-        self.rollup.create_evm(self.finish_by).fill_cfg(&self.cfg).fill_block(&self.block)
-    }
-
     /// Simulates a transaction in the context of a block.
     ///
     /// This function runs the simulation in a separate thread and waits for
@@ -132,7 +109,7 @@ where
         cache_rank: u128,
         transaction: &TxEnvelope,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>> {
-        let trevm = self.rollup_evm();
+        let trevm = self.rollup.create_evm(self.finish_by);
 
         // Get the initial beneficiary balance
         let beneficiary = trevm.beneficiary();
@@ -164,6 +141,8 @@ where
 
                 self.rollup.fill_state().check_ru_tx_events(&fills, &orders)?;
 
+                // We will later commit these to the trevm DB when the
+                // SimOutcome is accepted.
                 let cache = trevm.accept_state().into_db().into_cache();
 
                 let beneficiary_balance = cache
@@ -174,8 +153,6 @@ where
                 let score = beneficiary_balance.saturating_sub(initial_beneficiary_balance);
 
                 trace!(
-                    ?cache_rank,
-                    tx_hash = %transaction.hash(),
                     gas_used,
                     score = %score,
                     reverted = !success,
@@ -186,7 +163,15 @@ where
                 );
 
                 // Create the outcome
-                Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used, fills, orders })
+                Ok(SimOutcomeWithCache {
+                    cache_rank,
+                    score,
+                    rollup_cache: cache,
+                    host_cache: Default::default(),
+                    gas_used,
+                    fills,
+                    orders,
+                })
             }
             Err(e) => Err(SignetEthBundleError::from(e.into_error())),
         }
@@ -202,13 +187,14 @@ where
     where
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
     {
+        let trevm = self.rollup.create_evm(self.finish_by);
+
         let mut driver = SignetEthBundleDriver::new_with_fill_state(
             bundle,
+            self.host.create_evm(self.finish_by),
             self.finish_by,
             Cow::Borrowed(self.rollup.fill_state()),
         );
-
-        let trevm = self.rollup_evm();
 
         // Run the bundle
         let trevm = match driver.run_bundle(trevm) {
@@ -218,18 +204,25 @@ where
 
         // Build the SimOutcome
         let score = driver.beneficiary_balance_increase();
-        let gas_used = driver.total_gas_used();
-        let cache = trevm.into_db().into_cache();
-        let (fills, orders) = driver.take_aggregates();
+        let outputs = driver.into_outputs();
+
+        let rollup_cache = trevm.into_db().into_cache();
+        let host_cache = outputs.host_evm.map(|evm| evm.into_db().into_cache()).unwrap_or_default();
         trace!(
-            ?cache_rank,
-            uuid = %bundle.replacement_uuid().expect("Bundle must have a replacement UUID"),
-            gas_used = gas_used,
-            score = %score,
+            gas_used = outputs.total_gas_used,
+            %score,
             "Bundle simulation successful"
         );
 
-        Ok(SimOutcomeWithCache { cache_rank, score, cache, gas_used, fills, orders })
+        Ok(SimOutcomeWithCache {
+            cache_rank,
+            score: score.to(),
+            rollup_cache,
+            host_cache,
+            gas_used: outputs.total_gas_used,
+            fills: outputs.bundle_fills,
+            orders: outputs.bundle_orders,
+        })
     }
 
     /// Simulates a transaction or bundle in the context of a block.

@@ -49,6 +49,10 @@ const INPUT_AMOUNT: U256 = uint!(100_000_000_000_000_000_000_U256);
 const OUTPUT_WBTC: U256 = uint!(100_U256);
 const OUTPUT_WETH: U256 = uint!(200_U256);
 
+fn host_evm() -> EvmNeedsTx<InMemoryDB, NoOpInspector> {
+    test_signet_evm_with_inspector(NoOpInspector).fill_block(&NoopBlock)
+}
+
 fn bundle_evm() -> EvmNeedsTx<InMemoryDB, BundleInspector> {
     let inspector: BundleInspector<_> =
         Layered::new(TimeLimit::new(Duration::from_secs(5)), NoOpInspector);
@@ -137,7 +141,8 @@ fn test_bundle_ok() {
 
     let bundle = counter_bundle(false);
 
-    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
+    let mut driver =
+        SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
     // We expect this to work.
     let trevm = driver.run_bundle(trevm).unwrap();
@@ -156,7 +161,8 @@ fn test_bundle_revert() {
 
     let bundle = counter_bundle(true);
 
-    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
+    let mut driver =
+        SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
     let (err, trevm) = driver.run_bundle(trevm).unwrap_err().take_err();
     assert!(matches!(err, SignetEthBundleError::Bundle(BundleError::BundleReverted)));
@@ -178,7 +184,8 @@ fn test_bundle_droppable() {
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
 
-    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
+    let mut driver =
+        SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
     // We expect this to work and drop the second transaction.
     let trevm = driver.run_bundle(trevm).unwrap();
@@ -203,6 +210,7 @@ fn test_order_bundle() {
 
     let mut driver = SignetEthBundleDriver::new_with_fill_state(
         &bundle,
+        host_evm(),
         Instant::now() + Duration::from_secs(5),
         Cow::Owned(agg_fills),
     );
@@ -231,7 +239,8 @@ fn test_order_bundle_revert() {
     // This should cause the order to be invalid, as no fill is provided.
     let bundle = order_bundle(vec![]);
 
-    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
+    let mut driver =
+        SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
     let (err, trevm) = driver.run_bundle(trevm).unwrap_err().take_err();
     assert!(matches!(err, SignetEthBundleError::Bundle(BundleError::BundleReverted)));
@@ -255,7 +264,8 @@ fn test_order_bundle_droppable() {
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
 
-    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
+    let mut driver =
+        SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
     // We expect this to work and drop the second transaction.
     let trevm = driver.run_bundle(trevm).unwrap();
