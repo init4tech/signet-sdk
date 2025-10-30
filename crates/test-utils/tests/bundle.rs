@@ -254,6 +254,8 @@ fn test_order_bundle_revert() {
 
 #[test]
 fn test_order_bundle_droppable() {
+    tracing_subscriber::fmt::init();
+
     let trevm = bundle_evm();
 
     let inital_balance = trevm.read_balance_ref(*ORDERER);
@@ -263,12 +265,16 @@ fn test_order_bundle_droppable() {
     // Mark the second transaction as droppable.
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
+    dbg!(hash);
 
     let mut driver =
         SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
     // We expect this to work and drop the second transaction.
-    let trevm = driver.run_bundle(trevm).unwrap();
+    let trevm = match driver.run_bundle(trevm) {
+        Ok(t) => t,
+        Err(err) => panic!("unexpected error running droppable order bundle: {:?}", err.error()),
+    };
 
     // The order tx was dropped, but both sends were executed.
     assert_eq!(trevm.read_balance_ref(TX_0_RECIPIENT), U256::ONE);
