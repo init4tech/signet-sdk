@@ -1,6 +1,6 @@
 use crate::{FramedFilleds, FramedOrders};
 use alloy::{
-    primitives::{Address, Log, U256},
+    primitives::{map::HashSet, Address, Log, U256},
     sol_types::SolEvent,
 };
 use signet_types::{constants::SignetSystemConstants, AggregateFills, AggregateOrders};
@@ -36,28 +36,62 @@ use trevm::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderDetector {
     /// The signet system constants.
-    constants: SignetSystemConstants,
+    contracts: HashSet<Address>,
+
+    /// True if only detecting fills
+    fills_only: bool,
+
+    /// The chain ID.
+    chain_id: u64,
+
     /// Orders detected so far, account for EVM reverts
     orders: FramedOrders,
+
     /// Fills detected so far, accounting for EVM reverts
     filleds: FramedFilleds,
 }
 
 impl OrderDetector {
-    /// Create a new [`OrderDetector`] with the given `orders` contract address
-    /// and `outputs` mapping.
-    pub fn new(constants: SignetSystemConstants) -> OrderDetector {
-        OrderDetector { constants, orders: Default::default(), filleds: Default::default() }
+    /// Create a new [`OrderDetector`] with the given `contracts` addresses,
+    /// `chain_id`, and `fills_only` flag.
+    pub fn new(contracts: HashSet<Address>, chain_id: u64, fills_only: bool) -> Self {
+        Self {
+            contracts,
+            chain_id,
+            fills_only,
+            orders: Default::default(),
+            filleds: Default::default(),
+        }
+    }
+
+    /// Create a new [`OrderDetector`] for the rollup environment. This detector
+    /// will detect both orders and fills.
+    pub fn for_rollup(constants: SignetSystemConstants) -> OrderDetector {
+        Self::new(
+            std::iter::once(constants.rollup().orders()).collect(),
+            constants.ru_chain_id(),
+            false,
+        )
+    }
+
+    /// Create a new [`OrderDetector`] for the host environment. This detector
+    /// will only detect fills.
+    pub fn for_host(constants: SignetSystemConstants) -> OrderDetector {
+        Self::new(
+            std::iter::once(constants.host().orders()).collect(),
+            constants.host_chain_id(),
+            true,
+        )
     }
 
     /// Get the address of the orders contract.
-    pub const fn contract(&self) -> Address {
-        self.constants.rollup().orders()
+    pub fn is_contract(&self, address: Address) -> bool {
+        self.contracts.contains(&address)
     }
 
     /// Get the chain ID.
     pub const fn chain_id(&self) -> u64 {
-        self.constants.ru_chain_id()
+        self.chain_id
     }
 
     /// Take the orders from the inspector, clearing it.
@@ -67,9 +101,9 @@ impl OrderDetector {
 
     /// Take the orders from the inspector, clearing it, and convert them to
     /// aggregate orders.
-    pub fn take_aggregates(&mut self) -> (AggregateOrders, AggregateFills) {
+    pub fn take_aggregates(&mut self) -> (AggregateFills, AggregateOrders) {
         let (orders, filleds) = self.take();
-        (orders.aggregate(), filleds.aggregate(self.chain_id()))
+        (filleds.aggregate(self.chain_id()), orders.aggregate())
     }
 
     /// Take the inner inspector and the framed events.
@@ -94,15 +128,28 @@ where
     Int: InterpreterTypes,
 {
     fn log(&mut self, _interp: &mut Interpreter<Int>, _context: &mut Ctx<Db>, log: Log) {
-        // skip if the log is not from the orders contract
-        if log.address != self.contract() {
+        // skip if the log is not from a configured orders contract
+        if !self.is_contract(log.address) {
             return;
         }
 
-        if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log) {
-            self.orders.add(data);
-        } else if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log) {
+        // Try to decode as a filled first
+        if let Ok(Log { data, .. }) = RollupOrders::Filled::decode_log(&log) {
             self.filleds.add(data);
+            return;
+        }
+
+        // Skip any other logs if we're only tracking fills
+        if self.fills_only {
+            return;
+        }
+
+        // Try to decode as an order next
+        if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log) {
+            if self.fills_only {
+                return;
+            }
+            self.orders.add(data);
         }
     }
 

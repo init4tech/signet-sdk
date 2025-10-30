@@ -389,12 +389,12 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Insp: Inspector<Ctx<Db>>,
     {
         // Taking these clears the context for reuse.
-        let (agg_orders, agg_fills) =
+        let (agg_fills, agg_orders) =
             trevm.inner_mut_unchecked().inspector.as_mut_detector().take_aggregates();
 
         // We check the AggregateFills here, and if it fails, we discard the
         // transaction outcome and push a failure receipt.
-        if let Err(err) = self.working_context.checked_remove_ru_tx_events(&agg_orders, &agg_fills)
+        if let Err(err) = self.working_context.checked_remove_ru_tx_events(&agg_fills, &agg_orders)
         {
             debug!(%err, "Discarding transaction outcome due to market error");
             return Ok(trevm.reject());

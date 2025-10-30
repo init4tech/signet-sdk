@@ -51,7 +51,7 @@ pub fn signet_evm<Db: Database + DatabaseCommit>(
 ) -> EvmNeedsCfg<Db> {
     TrevmBuilder::new()
         .with_db(db)
-        .with_insp(Layered::new(NoOpInspector, OrderDetector::new(constants)))
+        .with_insp(Layered::new(NoOpInspector, OrderDetector::for_rollup(constants)))
         .with_precompiles(signet_precompiles())
         .build_trevm()
         .expect("db set")
@@ -67,7 +67,7 @@ where
     I: Inspector<Ctx<Db>>,
     Db: Database + DatabaseCommit,
 {
-    let inspector = SignetLayered::new(inner, OrderDetector::new(constants));
+    let inspector = SignetLayered::new(inner, OrderDetector::for_rollup(constants));
 
     TrevmBuilder::new()
         .with_db(db)

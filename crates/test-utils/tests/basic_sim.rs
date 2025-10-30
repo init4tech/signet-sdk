@@ -7,7 +7,7 @@ use alloy::{
     primitives::{Address, TxKind, U256},
     signers::Signature,
 };
-use signet_sim::{BlockBuild, SimCache};
+use signet_sim::{BlockBuild, HostEnv, RollupEnv, SimCache};
 use signet_test_utils::{
     evm::TestCfg,
     test_constants::*,
@@ -32,14 +32,25 @@ pub async fn test_simulator() {
     let registry = tracing_subscriber::registry().with(fmt);
     registry.try_init().unwrap();
 
-    let mut db = InMemoryDB::default();
+    let mut ru_db = InMemoryDB::default();
 
     // increment the balance for each test signer
     TEST_USERS.iter().copied().for_each(|user| {
-        modify_account(&mut db, user, |acct| acct.balance = U256::from(1000 * ETH_TO_WEI)).unwrap();
+        modify_account(&mut ru_db, user, |acct| acct.balance = U256::from(1000 * ETH_TO_WEI))
+            .unwrap();
     });
 
-    let db = Arc::new(db);
+    let ru_db = Arc::new(ru_db);
+
+    let mut host_db = InMemoryDB::default();
+
+    // increment the balance for each test signer
+    TEST_USERS.iter().copied().for_each(|user| {
+        modify_account(&mut host_db, user, |acct| acct.balance = U256::from(1000 * ETH_TO_WEI))
+            .unwrap();
+    });
+
+    let host_db = Arc::new(host_db);
 
     // Set up 10 simple sends with escalating priority fee
     let sim_cache = SimCache::new();
@@ -56,12 +67,13 @@ pub async fn test_simulator() {
         );
     }
 
+    let rollup = RollupEnv::new(ru_db, TEST_SYS, &TestCfg, &NoopBlock);
+    let host = HostEnv::new(host_db, TEST_SYS, &TestCfg, &NoopBlock);
+
     // Set up the simulator
-    let built = BlockBuild::<_, NoOpInspector>::new(
-        db,
-        TEST_SYS,
-        TestCfg,
-        NoopBlock,
+    let built = BlockBuild::<_, _, NoOpInspector, NoOpInspector>::new(
+        rollup,
+        host,
         std::time::Instant::now() + std::time::Duration::from_millis(200),
         10,
         sim_cache,

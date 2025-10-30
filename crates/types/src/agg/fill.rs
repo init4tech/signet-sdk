@@ -121,7 +121,7 @@ impl AggregateFills {
     }
 
     /// Absorb the fills from another context.
-    fn absorb(&mut self, other: &Self) {
+    pub fn absorb(&mut self, other: &Self) {
         for (output_asset, recipients) in other.fills.iter() {
             let context_recipients = self.fills.entry(*output_asset).or_default();
             for (recipient, value) in recipients {
@@ -129,6 +129,26 @@ impl AggregateFills {
                 *filled = filled.saturating_add(*value);
             }
         }
+    }
+
+    /// Unabsorb the fills from another context.
+    pub fn unchecked_unabsorb(&mut self, other: &Self) -> Result<(), MarketError> {
+        for (output_asset, recipients) in other.fills.iter() {
+            if let Some(context_recipients) = self.fills.get_mut(output_asset) {
+                for (recipient, value) in recipients {
+                    if let Some(filled) = context_recipients.get_mut(recipient) {
+                        *filled =
+                            filled.checked_sub(*value).ok_or(MarketError::InsufficientBalance {
+                                chain_id: output_asset.0,
+                                asset: output_asset.1,
+                                recipient: *recipient,
+                                amount: *value,
+                            })?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Check that the context can remove the aggregate.
@@ -234,12 +254,12 @@ impl AggregateFills {
     pub fn check_ru_tx_events(
         &self,
         fills: &AggregateFills,
-        aggregate: &AggregateOrders,
+        orders: &AggregateOrders,
     ) -> Result<(), MarketError> {
         // Check the aggregate against the combined contexts.
         let combined = CombinedContext { context: self, extra: fills };
 
-        combined.check_aggregate(aggregate)?;
+        combined.check_aggregate(orders)?;
 
         Ok(())
     }
@@ -251,12 +271,24 @@ impl AggregateFills {
     /// This will process all fills first, and all orders second.
     pub fn checked_remove_ru_tx_events(
         &mut self,
-        aggregate: &AggregateOrders,
         fills: &AggregateFills,
+        orders: &AggregateOrders,
     ) -> Result<(), MarketError> {
-        self.check_ru_tx_events(fills, aggregate)?;
+        self.check_ru_tx_events(fills, orders)?;
         self.absorb(fills);
-        self.unchecked_remove_aggregate(aggregate)
+        self.unchecked_remove_aggregate(orders)
+    }
+
+    /// Check and remove the events emitted by a rollup transaction. This
+    /// function allows atomic ingestion of multiple Fills and Orders. **If
+    /// the check fails, the aggregate may be mutated.**
+    pub fn unchecked_remove_ru_tx_events(
+        &mut self,
+        fills: &AggregateFills,
+        orders: &AggregateOrders,
+    ) -> Result<(), MarketError> {
+        self.absorb(fills);
+        self.unchecked_remove_aggregate(orders)
     }
 }
 
@@ -360,5 +392,29 @@ mod test {
             context.fills().get(&(1, asset_a)).unwrap().get(&user_b).unwrap(),
             &U256::from(0)
         );
+    }
+
+    // Empty removal should work
+    #[test]
+    fn empty_everything() {
+        AggregateFills::default()
+            .checked_remove_ru_tx_events(&Default::default(), &Default::default())
+            .unwrap();
+    }
+
+    #[test]
+    fn absorb_unabsorb() {
+        let mut context_a = AggregateFills::default();
+        let mut context_b = AggregateFills::default();
+        let user = Address::with_last_byte(1);
+        let asset = Address::with_last_byte(2);
+        context_a.add_raw_fill(1, asset, user, U256::from(100));
+        context_b.add_raw_fill(1, asset, user, U256::from(200));
+
+        let pre_absorb = context_a.clone();
+        context_a.absorb(&context_b);
+        assert_eq!(context_a.filled(&(1, asset), user), U256::from(300));
+        context_a.unchecked_unabsorb(&context_b).unwrap();
+        assert_eq!(context_a, pre_absorb);
     }
 }
