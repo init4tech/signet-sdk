@@ -86,7 +86,7 @@ impl<'a> SignetEthBundleDriver<'a> {
     /// response, and aggregate fills.
     ///
     /// This is useful for testing, and for combined host-rollup simulation.
-    pub fn new_with_agg_fills(
+    pub const fn new_with_agg_fills(
         bundle: &'a SignetEthBundle,
         deadline: std::time::Instant,
         agg_fills: AggregateFills,
