@@ -258,6 +258,7 @@ where
         // We simply run all host transactions first, accumulating their state
         // changes into the host_evm's state. If any reverts, we error out the
         // simulation.
+        let mut host_bundle_fills = AggregateFills::default();
         for tx in host_txs.into_iter() {
             self.output.host_evm = Some(trevm_try!(
                 self.output
@@ -280,7 +281,7 @@ where
                             .as_mut_detector()
                             .take_aggregates()
                             .0;
-                        self.fill_state.to_mut().absorb(&host_fills);
+                        host_bundle_fills.absorb(&host_fills);
 
                         Ok(htrevm.accept_state())
                     })
@@ -291,9 +292,10 @@ where
                 trevm
             ));
         }
+        // Absorb the host fills into our running total.
+        self.fill_state.to_mut().absorb(&host_bundle_fills);
 
         // -- ROLLUP PORTION --
-
         for tx in txs.into_iter() {
             let _span = tracing::debug_span!("bundle_tx_loop", tx_hash = %tx.hash()).entered();
 
