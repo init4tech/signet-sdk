@@ -78,20 +78,11 @@ pub struct SignetEthBundleDriver<'a> {
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
-    pub fn new(
-        bundle: &'a SignetEthBundle,
-        host_chain_id: u64,
-        deadline: std::time::Instant,
-    ) -> Self {
-        let mut agg_fills = AggregateFills::default();
-        if let Some(host_fills) = &bundle.host_fills {
-            agg_fills.add_signed_fill(host_chain_id, host_fills);
-        }
-
+    pub fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
         Self {
             bundle,
             deadline,
-            agg_fills,
+            agg_fills: Default::default(),
             total_gas_used: 0,
             beneficiary_balance_increase: U256::ZERO,
         }
@@ -190,11 +181,6 @@ where
             trevm,
             BundleError::TimestampOutOfRange.into()
         );
-
-        // Check that the `SignedFill` is valid at the timestamp.
-        if self.bundle().validate_fills_offchain(timestamp.to()).is_err() {
-            return Err(trevm.errored(BundleError::BundleReverted.into()));
-        }
 
         // Decode and validate the transactions in the bundle
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);

@@ -138,10 +138,6 @@ impl BuiltBlock {
             // As this builder does not provide bundles landing "top of block", its fine to just extend.
             self.transactions.extend(txs);
             self.host_txns.extend(bundle.host_txs);
-
-            if let Some(host_fills) = bundle.host_fills {
-                self.host_fills.push(host_fills);
-            }
         } else {
             error!("failed to decode bundle. dropping");
         }

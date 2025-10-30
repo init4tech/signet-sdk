@@ -306,7 +306,6 @@ mod test {
                 replacement_uuid: Some(replacement_uuid),
                 ..Default::default()
             },
-            host_fills: None,
             host_txs: vec![],
         }
     }
