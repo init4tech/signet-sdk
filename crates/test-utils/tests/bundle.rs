@@ -4,7 +4,7 @@
 //! - Txns must not be dropped by market rules, unless marked as droppable.
 
 use alloy::{
-    consensus::TypedTransaction,
+    consensus::{TxEnvelope, TypedTransaction},
     primitives::{keccak256, Address, U256},
     signers::local::PrivateKeySigner,
     uint,
@@ -15,7 +15,7 @@ use signet_bundle::{
 use signet_constants::pecorino::{HOST_WBTC, HOST_WETH};
 use signet_evm::EvmNeedsTx;
 use signet_test_utils::{
-    chain::{HOST_CHAIN_ID, RU_CHAIN_ID, RU_ORDERS, TEST_SYS},
+    chain::{HOST_CHAIN_ID, RU_CHAIN_ID, RU_ORDERS},
     contracts::{
         counter::{Counter, COUNTER_SLOT, COUNTER_TEST_ADDRESS},
         reverts::REVERT_TEST_ADDRESS,
@@ -24,10 +24,8 @@ use signet_test_utils::{
     specs::{sign_tx_with_key_pair, simple_bundle, simple_call, simple_send},
     users::{TEST_SIGNERS, TEST_USERS},
 };
-use signet_types::SignedFill;
-use signet_zenith::HostOrders::{
-    initiateCall, Input, Output, Permit2Batch, PermitBatchTransferFrom, TokenPermissions,
-};
+use signet_types::AggregateFills;
+use signet_zenith::HostOrders::{initiateCall, Filled, Input, Output};
 use std::{
     sync::LazyLock,
     time::{Duration, Instant},
@@ -43,7 +41,6 @@ static SENDER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNE
 static ORDERER: LazyLock<Address> = LazyLock::new(|| TEST_USERS[1]);
 static ORDERER_WALLET: LazyLock<&PrivateKeySigner> = LazyLock::new(|| &TEST_SIGNERS[1]);
 
-const FILLER: Address = Address::repeat_byte(0x30);
 const TX_0_RECIPIENT: Address = Address::repeat_byte(0x31);
 const TX_2_RECIPIENT: Address = Address::repeat_byte(0x32);
 
@@ -57,38 +54,23 @@ fn bundle_evm() -> EvmNeedsTx<InMemoryDB, BundleInspector> {
     test_signet_evm_with_inspector(inspector).fill_block(&NoopBlock)
 }
 
-fn permit_2_batch(owner: Address, nonce: U256) -> Permit2Batch {
-    Permit2Batch {
-        permit: PermitBatchTransferFrom {
-            permitted: vec![
-                TokenPermissions { token: HOST_WBTC, amount: OUTPUT_WBTC },
-                TokenPermissions { token: HOST_WETH, amount: OUTPUT_WETH },
-            ],
-            nonce,
-            deadline: U256::MAX,
-        },
-        owner,
-        signature: Default::default(),
+fn host_fills() -> Filled {
+    Filled {
+        outputs: vec![
+            Output {
+                token: HOST_WBTC,
+                amount: OUTPUT_WBTC,
+                recipient: TX_0_RECIPIENT,
+                chainId: RU_CHAIN_ID as u32,
+            },
+            Output {
+                token: HOST_WETH,
+                amount: OUTPUT_WETH,
+                recipient: TX_2_RECIPIENT,
+                chainId: RU_CHAIN_ID as u32,
+            },
+        ],
     }
-}
-
-fn host_fills(owner: Address, nonce: U256) -> SignedFill {
-    let permit = permit_2_batch(owner, nonce);
-    let outputs = vec![
-        Output {
-            token: HOST_WBTC,
-            amount: OUTPUT_WBTC,
-            recipient: TX_0_RECIPIENT,
-            chainId: RU_CHAIN_ID as u32,
-        },
-        Output {
-            token: HOST_WETH,
-            amount: OUTPUT_WETH,
-            recipient: TX_2_RECIPIENT,
-            chainId: RU_CHAIN_ID as u32,
-        },
-    ];
-    SignedFill { permit, outputs }
 }
 
 fn simple_order(nonce: u64) -> TypedTransaction {
@@ -122,11 +104,7 @@ fn simple_order(nonce: u64) -> TypedTransaction {
 // 1. A simple send from user 0 to 0x3131....
 // 2. A call to the Counter contract to increment the counter.
 // 3. A simple send from user 0 to 0x3232....
-fn test_bundle(
-    counter_reverts: bool,
-    order: bool,
-    host_fills: Option<SignedFill>,
-) -> SignetEthBundle {
+fn test_bundle(counter_reverts: bool, order: bool, host_txs: Vec<TxEnvelope>) -> SignetEthBundle {
     let call_addr = if counter_reverts { REVERT_TEST_ADDRESS } else { COUNTER_TEST_ADDRESS };
 
     let tx_1 = simple_send(TX_0_RECIPIENT, U256::ONE, 0, RU_CHAIN_ID);
@@ -141,15 +119,15 @@ fn test_bundle(
     let tx_2 = sign_tx_with_key_pair(&ORDERER_WALLET, tx_2);
     let tx_3 = sign_tx_with_key_pair(&SENDER_WALLET, tx_3);
 
-    simple_bundle(&[tx_1, tx_2, tx_3], host_fills, 0)
+    simple_bundle(vec![tx_1, tx_2, tx_3], host_txs, 0)
 }
 
-fn order_bundle(host_fills: Option<SignedFill>) -> SignetEthBundle {
-    test_bundle(false, true, host_fills)
+fn order_bundle(host_txs: Vec<TxEnvelope>) -> SignetEthBundle {
+    test_bundle(false, true, host_txs)
 }
 
 fn counter_bundle(should_revert: bool) -> SignetEthBundle {
-    test_bundle(should_revert, false, None)
+    test_bundle(should_revert, false, vec![])
 }
 
 #[test]
@@ -158,11 +136,7 @@ fn test_bundle_ok() {
 
     let bundle = counter_bundle(false);
 
-    let mut driver = SignetEthBundleDriver::new(
-        &bundle,
-        TEST_SYS.host_chain_id(),
-        Instant::now() + Duration::from_secs(5),
-    );
+    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     // We expect this to work.
     let trevm = driver.run_bundle(trevm).unwrap();
@@ -181,11 +155,7 @@ fn test_bundle_revert() {
 
     let bundle = counter_bundle(true);
 
-    let mut driver = SignetEthBundleDriver::new(
-        &bundle,
-        TEST_SYS.host_chain_id(),
-        Instant::now() + Duration::from_secs(5),
-    );
+    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     let (err, trevm) = driver.run_bundle(trevm).unwrap_err().take_err();
     assert!(matches!(err, SignetEthBundleError::BundleError(BundleError::BundleReverted)));
@@ -207,11 +177,7 @@ fn test_bundle_droppable() {
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
 
-    let mut driver = SignetEthBundleDriver::new(
-        &bundle,
-        TEST_SYS.host_chain_id(),
-        Instant::now() + Duration::from_secs(5),
-    );
+    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     // We expect this to work and drop the second transaction.
     let trevm = driver.run_bundle(trevm).unwrap();
@@ -228,18 +194,23 @@ fn test_order_bundle() {
 
     let inital_balance = trevm.read_balance_ref(*ORDERER);
 
-    let host_fills = host_fills(FILLER, U256::from(0));
+    let host_fills = host_fills();
+    let mut agg_fills = AggregateFills::new();
+    agg_fills.add_fill(HOST_CHAIN_ID, &host_fills);
 
-    let bundle = order_bundle(Some(host_fills));
+    let bundle = order_bundle(vec![]);
 
-    let mut driver = SignetEthBundleDriver::new(
+    let mut driver = SignetEthBundleDriver::new_with_agg_fills(
         &bundle,
-        TEST_SYS.host_chain_id(),
         Instant::now() + Duration::from_secs(5),
+        agg_fills,
     );
 
     // We expect this to work and drop the second transaction.
-    let trevm = driver.run_bundle(trevm).unwrap();
+    let trevm = match driver.run_bundle(trevm) {
+        Ok(trevm) => trevm,
+        Err(err) => panic!("unexpected error running order bundle: {:?}", err.error()),
+    };
 
     // Check the balance of the recipients increased, and the balance of the
     // sender decreased by at least the input amount.
@@ -257,13 +228,9 @@ fn test_order_bundle_revert() {
     let inital_balance = trevm.read_balance_ref(*ORDERER);
 
     // This should cause the order to be invalid, as no fill is provided.
-    let bundle = order_bundle(None);
+    let bundle = order_bundle(vec![]);
 
-    let mut driver = SignetEthBundleDriver::new(
-        &bundle,
-        TEST_SYS.host_chain_id(),
-        Instant::now() + Duration::from_secs(5),
-    );
+    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     let (err, trevm) = driver.run_bundle(trevm).unwrap_err().take_err();
     assert!(matches!(err, SignetEthBundleError::BundleError(BundleError::BundleReverted)));
@@ -281,17 +248,13 @@ fn test_order_bundle_droppable() {
 
     let inital_balance = trevm.read_balance_ref(*ORDERER);
 
-    let mut bundle = order_bundle(None);
+    let mut bundle = order_bundle(vec![]);
 
     // Mark the second transaction as droppable.
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
 
-    let mut driver = SignetEthBundleDriver::new(
-        &bundle,
-        TEST_SYS.host_chain_id(),
-        Instant::now() + Duration::from_secs(5),
-    );
+    let mut driver = SignetEthBundleDriver::new(&bundle, Instant::now() + Duration::from_secs(5));
 
     // We expect this to work and drop the second transaction.
     let trevm = driver.run_bundle(trevm).unwrap();
