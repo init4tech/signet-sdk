@@ -33,4 +33,4 @@ This allows users and builders to simulate and validated the effects of
 
 [trevm]: https://docs.rs/trevm/latest/trevm/
 [Flashbots bundles]: https://docs.flashbots.net/flashbots-auction/advanced/understanding-bundles
-[conditional transactions]: https://docs.signet.sh/learn-about-signet/cross-chain-transfers-on-signet
+[conditional transactions]: https://signet.sh/docs/learn-about-signet/cross-chain-transfers/
