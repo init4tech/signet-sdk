@@ -4,6 +4,93 @@ use serde::{Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_types::SignedOrder;
 
+/// A response from the transaction cache, containing an item.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CacheResponse<T> {
+    /// A paginated response, containing the inner item and a pagination info.
+    Paginated {
+        /// The actual item.
+        inner: T,
+        /// The pagination info.
+        pagination: PaginationInfo,
+    },
+    /// An unpaginated response, containing the actual item.
+    Unpaginated {
+        /// The actual item.
+        inner: T,
+    },
+}
+
+impl<T> CacheResponse<T> {
+    /// Create a new paginated response from a list of items and a pagination info.
+    pub const fn paginated(inner: T, pagination: PaginationInfo) -> Self {
+        Self::Paginated { inner, pagination }
+    }
+
+    /// Create a new unpaginated response from a list of items.
+    pub const fn unpaginated(inner: T) -> Self {
+        Self::Unpaginated { inner }
+    }
+
+    /// Return a reference to the inner value.
+    pub const fn inner(&self) -> &T {
+        match self {
+            Self::Paginated { inner, .. } => inner,
+            Self::Unpaginated { inner } => inner,
+        }
+    }
+
+    /// Return a mutable reference to the inner value.
+    pub const fn inner_mut(&mut self) -> &mut T {
+        match self {
+            Self::Paginated { inner, .. } => inner,
+            Self::Unpaginated { inner } => inner,
+        }
+    }
+
+    /// Return the pagination info, if any.
+    pub const fn pagination_info(&self) -> Option<&PaginationInfo> {
+        match self {
+            Self::Paginated { pagination, .. } => Some(pagination),
+            Self::Unpaginated { .. } => None,
+        }
+    }
+
+    /// Check if the response is paginated.
+    pub const fn is_paginated(&self) -> bool {
+        matches!(self, Self::Paginated { .. })
+    }
+
+    /// Check if the response is unpaginated.
+    pub const fn is_unpaginated(&self) -> bool {
+        matches!(self, Self::Unpaginated { .. })
+    }
+
+    /// Get the inner value.
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::Paginated { inner, .. } => inner,
+            Self::Unpaginated { inner } => inner,
+        }
+    }
+
+    /// Consume the response and return the parts.
+    pub fn into_parts(self) -> (T, Option<PaginationInfo>) {
+        match self {
+            Self::Paginated { inner, pagination } => (inner, Some(pagination)),
+            Self::Unpaginated { inner } => (inner, None),
+        }
+    }
+
+    /// Consume the response and return the pagination info, if any.
+    pub fn into_pagination_info(self) -> Option<PaginationInfo> {
+        match self {
+            Self::Paginated { pagination, .. } => Some(pagination),
+            Self::Unpaginated { .. } => None,
+        }
+    }
+}
+
 /// A bundle response from the transaction cache, containing a UUID and a
 /// [`SignetEthBundle`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,13 +200,18 @@ impl TxCacheBundlesResponse {
     /// Create a new bundle response from a list of bundles.
     #[deprecated = "Use `From::from` instead, `Self::new` in const contexts"]
     pub const fn from_bundles(bundles: Vec<TxCacheBundle>) -> Self {
-        Self::new(bundles)
+        Self { bundles }
     }
 
     /// Convert the bundle response to a list of [`SignetEthBundle`].
     #[deprecated = "Use `this.bundles` instead."]
     pub fn into_bundles(self) -> Vec<TxCacheBundle> {
         self.bundles
+    }
+
+    /// Check if the response is empty (has no bundles).
+    pub fn is_empty(&self) -> bool {
+        self.bundles.is_empty()
     }
 }
 
@@ -177,13 +269,18 @@ impl TxCacheTransactionsResponse {
     /// Create a new transaction response from a list of transactions.
     #[deprecated = "Use `From::from` instead, or `Self::new` in const contexts"]
     pub const fn from_transactions(transactions: Vec<TxEnvelope>) -> Self {
-        Self::new(transactions)
+        Self { transactions }
     }
 
     /// Convert the transaction response to a list of [`TxEnvelope`].
     #[deprecated = "Use `this.transactions` instead."]
     pub fn into_transactions(self) -> Vec<TxEnvelope> {
         self.transactions
+    }
+
+    /// Check if the response is empty (has no transactions).
+    pub fn is_empty(&self) -> bool {
+        self.transactions.is_empty()
     }
 }
 
@@ -260,5 +357,102 @@ impl TxCacheOrdersResponse {
     #[deprecated = "Use `this.orders` instead."]
     pub fn into_orders(self) -> Vec<SignedOrder> {
         self.orders
+    }
+}
+
+/// Represents the pagination information from a transaction cache response.
+/// This applies to all GET endpoints that return a list of items.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationInfo {
+    next_cursor: Option<String>,
+    has_next_page: bool,
+}
+
+impl PaginationInfo {
+    /// Create a new [`PaginationInfo`].
+    pub const fn new(next_cursor: Option<String>, has_next_page: bool) -> Self {
+        Self { next_cursor, has_next_page }
+    }
+
+    /// Create an empty [`PaginationInfo`].
+    pub const fn empty() -> Self {
+        Self { next_cursor: None, has_next_page: false }
+    }
+
+    /// Get the next cursor.
+    pub fn next_cursor(&self) -> Option<&str> {
+        self.next_cursor.as_deref()
+    }
+
+    /// Consume the [`PaginationInfo`] and return the next cursor.
+    pub fn into_next_cursor(self) -> Option<String> {
+        self.next_cursor
+    }
+
+    /// Check if there is a next page in the response.
+    pub const fn has_next_page(&self) -> bool {
+        self.has_next_page
+    }
+}
+
+/// A query for pagination.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct PaginationParams {
+    /// The cursor to start from.
+    cursor: Option<String>,
+    /// The number of items to return.
+    limit: Option<u32>,
+}
+
+impl From<PaginationInfo> for PaginationParams {
+    fn from(info: PaginationInfo) -> Self {
+        Self { cursor: info.into_next_cursor(), limit: None }
+    }
+}
+
+impl PaginationParams {
+    /// Creates a new instance of [`PaginationParams`].
+    pub const fn new(cursor: Option<String>, limit: Option<u32>) -> Self {
+        Self { cursor, limit }
+    }
+
+    /// Get the cursor to start from.
+    pub fn cursor(&self) -> Option<&str> {
+        self.cursor.as_deref()
+    }
+
+    /// Consumes the [`PaginationParams`] and returns the cursor.
+    pub fn into_cursor(self) -> Option<String> {
+        self.cursor
+    }
+
+    /// Set the limit for the pagination params.
+    pub fn with_limit(self, limit: u32) -> Self {
+        Self { limit: Some(limit), cursor: self.cursor }
+    }
+
+    /// Set the cursor for the pagination params.
+    pub fn with_cursor(self, cursor: Option<String>) -> Self {
+        Self { cursor, limit: self.limit }
+    }
+
+    /// Get the number of items to return.
+    pub const fn limit(&self) -> Option<u32> {
+        self.limit
+    }
+
+    /// Check if the query has a cursor.
+    pub const fn has_cursor(&self) -> bool {
+        self.cursor.is_some()
+    }
+
+    /// Check if the query has a limit.
+    pub const fn has_limit(&self) -> bool {
+        self.limit.is_some()
+    }
+
+    /// Check if the query is empty (has no cursor and no limit).
+    pub const fn is_empty(&self) -> bool {
+        !self.has_cursor() && !self.has_limit()
     }
 }
