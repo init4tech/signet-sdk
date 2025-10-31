@@ -1,5 +1,5 @@
 use crate::types::{
-    PaginationParams, TxCacheOrdersResponse, TxCacheSendBundleResponse,
+    CacheResponse, PaginationParams, TxCacheOrdersResponse, TxCacheSendBundleResponse,
     TxCacheSendTransactionResponse, TxCacheTransactionsResponse,
 };
 use alloy::consensus::TxEnvelope;
@@ -175,11 +175,15 @@ impl TxCache {
     pub async fn get_transactions(
         &self,
         query: Option<PaginationParams>,
-    ) -> Result<TxCacheTransactionsResponse, Error> {
+    ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
         if let Some(query) = query {
-            self.get_inner_with_query::<TxCacheTransactionsResponse>(TRANSACTIONS, query).await
+            self.get_inner_with_query::<CacheResponse<TxCacheTransactionsResponse>>(
+                TRANSACTIONS,
+                query,
+            )
+            .await
         } else {
-            self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await
+            self.get_inner::<CacheResponse<TxCacheTransactionsResponse>>(TRANSACTIONS).await
         }
     }
 
@@ -188,11 +192,11 @@ impl TxCache {
     pub async fn get_orders(
         &self,
         query: Option<PaginationParams>,
-    ) -> Result<TxCacheOrdersResponse, Error> {
+    ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
         if let Some(query) = query {
-            self.get_inner_with_query::<TxCacheOrdersResponse>(ORDERS, query).await
+            self.get_inner_with_query::<CacheResponse<TxCacheOrdersResponse>>(ORDERS, query).await
         } else {
-            self.get_inner::<TxCacheOrdersResponse>(ORDERS).await
+            self.get_inner::<CacheResponse<TxCacheOrdersResponse>>(ORDERS).await
         }
     }
 }
