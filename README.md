@@ -50,5 +50,5 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 [Signet]: https://signet.sh
 [trevm]: https://docs.rs/trevm/latest/trevm/
-[Signet docs]: https://docs.signet.sh
+[Signet docs]: https://signet.sh/docs
 [Zenith]: https://github.com/init4tech/zenith
