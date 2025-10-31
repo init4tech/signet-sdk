@@ -95,5 +95,5 @@ block. Specifically, things occur in the following order:
 - `ToReth` - Util trait for type conversions necessary to work with reth's
   database model.
 
-[L1-driven transactions]: https://docs.signet.sh/learn-about-signet/cross-chain-transfers-on-signet#moving-from-ethereum-to-signet
-[conditional transactions]: https://docs.signet.sh/learn-about-signet/cross-chain-transfers-on-signet
+[L1-driven transactions]: https://signet.sh/docs/build-on-signet/ethereum-to-signet/transactor/
+[conditional transactions]: https://signet.sh/docs/learn-about-signet/cross-chain-transfers/
