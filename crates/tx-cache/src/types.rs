@@ -4,6 +4,93 @@ use serde::{Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_types::SignedOrder;
 
+/// A response from the transaction cache, containing an item.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CacheResponse<T> {
+    /// A paginated response, containing the inner item and a pagination info.
+    Paginated {
+        /// The actual item.
+        inner: T,
+        /// The pagination info.
+        pagination: PaginationInfo,
+    },
+    /// An unpaginated response, containing the actual item.
+    Unpaginated {
+        /// The actual item.
+        inner: T,
+    },
+}
+
+impl<T> CacheResponse<T> {
+    /// Create a new paginated response from a list of items and a pagination info.
+    pub const fn paginated(inner: T, pagination: PaginationInfo) -> Self {
+        Self::Paginated { inner, pagination }
+    }
+
+    /// Create a new unpaginated response from a list of items.
+    pub const fn unpaginated(inner: T) -> Self {
+        Self::Unpaginated { inner }
+    }
+
+    /// Return a reference to the inner value.
+    pub const fn inner(&self) -> &T {
+        match self {
+            Self::Paginated { inner, .. } => inner,
+            Self::Unpaginated { inner } => inner,
+        }
+    }
+
+    /// Return a mutable reference to the inner value.
+    pub const fn inner_mut(&mut self) -> &mut T {
+        match self {
+            Self::Paginated { inner, .. } => inner,
+            Self::Unpaginated { inner } => inner,
+        }
+    }
+
+    /// Return the pagination info, if any.
+    pub const fn pagination_info(&self) -> Option<&PaginationInfo> {
+        match self {
+            Self::Paginated { pagination, .. } => Some(pagination),
+            Self::Unpaginated { .. } => None,
+        }
+    }
+
+    /// Check if the response is paginated.
+    pub const fn is_paginated(&self) -> bool {
+        matches!(self, Self::Paginated { .. })
+    }
+
+    /// Check if the response is unpaginated.
+    pub const fn is_unpaginated(&self) -> bool {
+        matches!(self, Self::Unpaginated { .. })
+    }
+
+    /// Get the inner value.
+    pub fn into_inner(self) -> T {
+        match self {
+            Self::Paginated { inner, .. } => inner,
+            Self::Unpaginated { inner } => inner,
+        }
+    }
+
+    /// Consume the response and return the parts.
+    pub fn into_parts(self) -> (T, Option<PaginationInfo>) {
+        match self {
+            Self::Paginated { inner, pagination } => (inner, Some(pagination)),
+            Self::Unpaginated { inner } => (inner, None),
+        }
+    }
+
+    /// Consume the response and return the pagination info, if any.
+    pub fn into_pagination_info(self) -> Option<PaginationInfo> {
+        match self {
+            Self::Paginated { pagination, .. } => Some(pagination),
+            Self::Unpaginated { .. } => None,
+        }
+    }
+}
+
 /// A bundle response from the transaction cache, containing a UUID and a
 /// [`SignetEthBundle`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,13 +177,11 @@ impl TxCacheBundleResponse {
 pub struct TxCacheBundlesResponse {
     /// the list of bundles
     pub bundles: Vec<TxCacheBundle>,
-    /// The pagination info.
-    pub pagination: PaginationInfo,
 }
 
 impl From<Vec<TxCacheBundle>> for TxCacheBundlesResponse {
     fn from(bundles: Vec<TxCacheBundle>) -> Self {
-        Self { bundles, pagination: PaginationInfo::empty() }
+        Self { bundles }
     }
 }
 
@@ -106,22 +191,16 @@ impl From<TxCacheBundlesResponse> for Vec<TxCacheBundle> {
     }
 }
 
-impl From<(Vec<TxCacheBundle>, PaginationInfo)> for TxCacheBundlesResponse {
-    fn from((bundles, pagination): (Vec<TxCacheBundle>, PaginationInfo)) -> Self {
-        Self { bundles, pagination }
-    }
-}
-
 impl TxCacheBundlesResponse {
     /// Create a new bundle response from a list of bundles.
     pub const fn new(bundles: Vec<TxCacheBundle>) -> Self {
-        Self { bundles, pagination: PaginationInfo::empty() }
+        Self { bundles }
     }
 
     /// Create a new bundle response from a list of bundles.
     #[deprecated = "Use `From::from` instead, `Self::new` in const contexts"]
     pub const fn from_bundles(bundles: Vec<TxCacheBundle>) -> Self {
-        Self { bundles, pagination: PaginationInfo::empty() }
+        Self { bundles }
     }
 
     /// Convert the bundle response to a list of [`SignetEthBundle`].
@@ -133,31 +212,6 @@ impl TxCacheBundlesResponse {
     /// Check if the response is empty (has no bundles).
     pub fn is_empty(&self) -> bool {
         self.bundles.is_empty()
-    }
-
-    /// Check if there is a next page in the response.
-    pub const fn has_next_page(&self) -> bool {
-        self.pagination.has_next_page()
-    }
-
-    /// Get the cursor for the next page.
-    pub fn next_cursor(&self) -> Option<&str> {
-        self.pagination.next_cursor()
-    }
-
-    /// Consume the response and return the next cursor.
-    pub fn into_next_cursor(self) -> Option<String> {
-        self.pagination.into_next_cursor()
-    }
-
-    /// Consume the response and return the pagination info.
-    pub fn into_pagination_info(self) -> PaginationInfo {
-        self.pagination
-    }
-
-    /// Consume the response and return the parts.
-    pub fn into_parts(self) -> (Vec<TxCacheBundle>, PaginationInfo) {
-        (self.bundles, self.pagination)
     }
 }
 
@@ -192,13 +246,11 @@ impl From<TxCacheSendBundleResponse> for uuid::Uuid {
 pub struct TxCacheTransactionsResponse {
     /// The list of transactions.
     pub transactions: Vec<TxEnvelope>,
-    /// The pagination info.
-    pub pagination: PaginationInfo,
 }
 
 impl From<Vec<TxEnvelope>> for TxCacheTransactionsResponse {
     fn from(transactions: Vec<TxEnvelope>) -> Self {
-        Self { transactions, pagination: PaginationInfo::empty() }
+        Self { transactions }
     }
 }
 
@@ -208,22 +260,16 @@ impl From<TxCacheTransactionsResponse> for Vec<TxEnvelope> {
     }
 }
 
-impl From<(Vec<TxEnvelope>, PaginationInfo)> for TxCacheTransactionsResponse {
-    fn from((transactions, pagination): (Vec<TxEnvelope>, PaginationInfo)) -> Self {
-        Self { transactions, pagination }
-    }
-}
-
 impl TxCacheTransactionsResponse {
     /// Instantiate a new transaction response from a list of transactions.
     pub const fn new(transactions: Vec<TxEnvelope>) -> Self {
-        Self { transactions, pagination: PaginationInfo::empty() }
+        Self { transactions }
     }
 
     /// Create a new transaction response from a list of transactions.
     #[deprecated = "Use `From::from` instead, or `Self::new` in const contexts"]
     pub const fn from_transactions(transactions: Vec<TxEnvelope>) -> Self {
-        Self { transactions, pagination: PaginationInfo::empty() }
+        Self { transactions }
     }
 
     /// Convert the transaction response to a list of [`TxEnvelope`].
@@ -235,31 +281,6 @@ impl TxCacheTransactionsResponse {
     /// Check if the response is empty (has no transactions).
     pub fn is_empty(&self) -> bool {
         self.transactions.is_empty()
-    }
-
-    /// Check if there is a next page in the response.
-    pub const fn has_next_page(&self) -> bool {
-        self.pagination.has_next_page()
-    }
-
-    /// Get the cursor for the next page.
-    pub fn next_cursor(&self) -> Option<&str> {
-        self.pagination.next_cursor()
-    }
-
-    /// Consume the response and return the next cursor.
-    pub fn into_next_cursor(self) -> Option<String> {
-        self.pagination.into_next_cursor()
-    }
-
-    /// Consume the response and return the pagination info.
-    pub fn into_pagination_info(self) -> PaginationInfo {
-        self.pagination
-    }
-
-    /// Consume the response and return the parts.
-    pub fn into_parts(self) -> (Vec<TxEnvelope>, PaginationInfo) {
-        (self.transactions, self.pagination)
     }
 }
 
@@ -306,13 +327,11 @@ impl TxCacheSendTransactionResponse {
 pub struct TxCacheOrdersResponse {
     /// The list of signed orders.
     pub orders: Vec<SignedOrder>,
-    /// The pagination info.
-    pub pagination: PaginationInfo,
 }
 
 impl From<Vec<SignedOrder>> for TxCacheOrdersResponse {
     fn from(orders: Vec<SignedOrder>) -> Self {
-        Self { orders, pagination: PaginationInfo::empty() }
+        Self { orders }
     }
 }
 
@@ -322,53 +341,22 @@ impl From<TxCacheOrdersResponse> for Vec<SignedOrder> {
     }
 }
 
-impl From<(Vec<SignedOrder>, PaginationInfo)> for TxCacheOrdersResponse {
-    fn from((orders, pagination): (Vec<SignedOrder>, PaginationInfo)) -> Self {
-        Self { orders, pagination }
-    }
-}
-
 impl TxCacheOrdersResponse {
     /// Create a new order response from a list of orders.
     pub const fn new(orders: Vec<SignedOrder>) -> Self {
-        Self { orders, pagination: PaginationInfo::empty() }
+        Self { orders }
     }
 
     /// Create a new order response from a list of orders.
     #[deprecated = "Use `From::from` instead, `Self::new` in const contexts"]
     pub const fn from_orders(orders: Vec<SignedOrder>) -> Self {
-        Self { orders, pagination: PaginationInfo::empty() }
+        Self { orders }
     }
 
     /// Convert the order response to a list of [`SignedOrder`].
     #[deprecated = "Use `this.orders` instead."]
     pub fn into_orders(self) -> Vec<SignedOrder> {
         self.orders
-    }
-
-    /// Check if there is a next page in the response.
-    pub const fn has_next_page(&self) -> bool {
-        self.pagination.has_next_page()
-    }
-
-    /// Get the cursor for the next page.
-    pub fn next_cursor(&self) -> Option<&str> {
-        self.pagination.next_cursor()
-    }
-
-    /// Consume the response and return the next cursor.
-    pub fn into_next_cursor(self) -> Option<String> {
-        self.pagination.into_next_cursor()
-    }
-
-    /// Consume the response and return the pagination info.
-    pub fn into_pagination_info(self) -> PaginationInfo {
-        self.pagination
-    }
-
-    /// Consume the response and return the parts.
-    pub fn into_parts(self) -> (Vec<SignedOrder>, PaginationInfo) {
-        (self.orders, self.pagination)
     }
 }
 
