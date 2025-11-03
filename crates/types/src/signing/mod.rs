@@ -16,7 +16,7 @@ use signet_zenith::RollupOrders::{
 const PERMIT2_CONTRACT_NAME: &str = "Permit2";
 const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
 
-/// Permit2 fields necessary for a SignedOrder or SignedFill.
+/// Permit2 fields necessary for a [`SignedOrder`] or [`SignedFill`].
 pub(crate) struct PermitSigningInfo {
     pub outputs: Vec<Output>,
     pub signing_hash: B256,
