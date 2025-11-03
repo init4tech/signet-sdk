@@ -57,13 +57,23 @@ impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     }
 
     /// Get a reference to the rollup environment.
-    pub const fn rollup(&self) -> &RollupEnv<RuDb, RuInsp> {
+    pub const fn rollup_env(&self) -> &RollupEnv<RuDb, RuInsp> {
         &self.rollup
     }
 
     /// Get a mutable reference to the rollup environment.
     pub const fn rollup_mut(&mut self) -> &mut RollupEnv<RuDb, RuInsp> {
         &mut self.rollup
+    }
+
+    /// Get a reference to the host environment.
+    pub const fn host_env(&self) -> &HostEnv<HostDb, HostInsp> {
+        &self.host
+    }
+
+    /// Get a mutable reference to the host environment.
+    pub const fn host_mut(&mut self) -> &mut HostEnv<HostDb, HostInsp> {
+        &mut self.host
     }
 
     /// Get a reference to the system constants.

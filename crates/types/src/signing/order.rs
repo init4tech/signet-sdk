@@ -139,6 +139,11 @@ impl<'a> UnsignedOrder<'a> {
         }
     }
 
+    /// Get the inputs of the UnsignedOrder.
+    pub fn inputs(&self) -> &[Input] {
+        self.order.inputs()
+    }
+
     /// Add an input to the UnsignedOrder.
     pub fn with_raw_input(self, input: Input) -> UnsignedOrder<'static> {
         let order = self.order.into_owned().with_input(input);
@@ -149,6 +154,11 @@ impl<'a> UnsignedOrder<'a> {
     /// Add an input to the UnsignedOrder.
     pub fn with_input(self, token: Address, amount: U256) -> UnsignedOrder<'static> {
         self.with_raw_input(Input { token, amount })
+    }
+
+    /// Get the outputs of the UnsignedOrder.
+    pub fn outputs(&self) -> &[Output] {
+        self.order.outputs()
     }
 
     /// Add an output to the UnsignedOrder.
@@ -188,6 +198,17 @@ impl<'a> UnsignedOrder<'a> {
             rollup_order_address: Some(constants.ru_orders()),
             ..self
         }
+    }
+
+    /// Convert the UnsignedOrder into an Order, cloning the inner data if
+    /// necessary.
+    pub fn to_order(&self) -> Order {
+        self.order.clone().into_owned()
+    }
+
+    /// Convert the UnsignedOrder into an Order
+    pub fn into_order(self) -> Cow<'a, Order> {
+        self.order
     }
 
     /// Sign the UnsignedOrder, generating a SignedOrder.

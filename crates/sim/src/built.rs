@@ -7,7 +7,6 @@ use alloy::{
 };
 use core::fmt;
 use signet_bundle::SignetEthBundle;
-use signet_types::SignedFill;
 use signet_zenith::{encode_txns, Alloy2718Coder};
 use std::sync::OnceLock;
 use tracing::{error, trace};
@@ -15,9 +14,6 @@ use tracing::{error, trace};
 /// A block that has been built by the simulator.
 #[derive(Clone, Default)]
 pub struct BuiltBlock {
-    /// The host fill actions.
-    pub(crate) host_fills: Vec<SignedFill>,
-
     /// The host transactions to be included in a resulting bundle.
     pub(crate) host_txns: Vec<Bytes>,
 
@@ -40,8 +36,8 @@ pub struct BuiltBlock {
 impl fmt::Debug for BuiltBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BuiltBlock")
-            .field("host_fills", &self.host_fills.len())
             .field("transactions", &self.transactions.len())
+            .field("host_txns", &self.host_txns.len())
             .field("gas_used", &self.gas_used)
             .field("block_number", &self.block_number)
             .finish_non_exhaustive()
@@ -52,7 +48,6 @@ impl BuiltBlock {
     /// Create a new `BuiltBlock`
     pub const fn new(block_number: u64) -> Self {
         Self {
-            host_fills: Vec::new(),
             host_txns: Vec::new(),
             transactions: Vec::new(),
             block_number,
@@ -88,15 +83,9 @@ impl BuiltBlock {
         &self.transactions
     }
 
-    /// Get the current list of host fills included in this block.
-    #[allow(clippy::missing_const_for_fn)] // false positive, const deref
-    pub fn host_fills(&self) -> &[SignedFill] {
-        &self.host_fills
-    }
-
     /// Get the current list of host transactions included in this block.
     #[allow(clippy::missing_const_for_fn)] // false positive, const deref
-    pub fn host_txns(&self) -> &[Bytes] {
+    pub fn host_transactions(&self) -> &[Bytes] {
         &self.host_txns
     }
 

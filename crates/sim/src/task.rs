@@ -55,6 +55,21 @@ where
         Self { env: env.into(), block: BuiltBlock::new(number.to()), finish_by, max_gas }
     }
 
+    /// Get a reference the simulation cache used by this builder.
+    pub fn sim_items(&self) -> &SimCache {
+        self.env.sim_items()
+    }
+
+    /// Get a reference to the rollup environment.
+    pub fn rollup_env(&self) -> &RollupEnv<RuDb, RuInsp> {
+        self.env.rollup_env()
+    }
+
+    /// Get a reference to the host environment.
+    pub fn host_env(&self) -> &HostEnv<HostDb, HostInsp> {
+        self.env.host_env()
+    }
+
     /// Run a simulation round, and accumulate the results into the block.
     async fn round(&mut self) {
         let gas_allowed = self.max_gas - self.block.gas_used();

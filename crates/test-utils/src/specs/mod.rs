@@ -45,13 +45,25 @@ pub fn simple_send(to: Address, amount: U256, nonce: u64, ru_chain_id: u64) -> T
     .into()
 }
 
+/// Create and sign a simple send transaction.
+pub fn signed_simple_send(
+    wallet: &PrivateKeySigner,
+    to: Address,
+    amount: U256,
+    nonce: u64,
+    ru_chain_id: u64,
+) -> TxEnvelope {
+    let tx = simple_send(to, amount, nonce, ru_chain_id);
+    sign_tx_with_key_pair(wallet, tx)
+}
+
 /// Make a simple contract call transaction.
 pub fn simple_call<T>(
     to: Address,
     input: &T,
     value: U256,
     nonce: u64,
-    ru_chain_id: u64,
+    chain_id: u64,
 ) -> TypedTransaction
 where
     T: SolCall,
@@ -61,13 +73,26 @@ where
         gas_limit: 2_100_000,
         to: TxKind::Call(to),
         value,
-        chain_id: ru_chain_id,
+        chain_id,
         max_fee_per_gas: GWEI_TO_WEI as u128 * 100,
         max_priority_fee_per_gas: GWEI_TO_WEI as u128,
         input: input.abi_encode().into(),
         ..Default::default()
     }
     .into()
+}
+
+/// Create and sign a simple contract call transaction.
+pub fn signed_simple_call(
+    wallet: &PrivateKeySigner,
+    to: Address,
+    input: &impl SolCall,
+    value: U256,
+    nonce: u64,
+    chain_id: u64,
+) -> TxEnvelope {
+    let tx = simple_call(to, input, value, nonce, chain_id);
+    sign_tx_with_key_pair(wallet, tx)
 }
 
 /// Create a simple bundle from a list of transactions.
@@ -86,7 +111,7 @@ pub fn simple_bundle(
             min_timestamp: None,
             max_timestamp: None,
             reverting_tx_hashes: vec![],
-            replacement_uuid: None,
+            replacement_uuid: Some(uuid::Uuid::new_v4().to_string()),
             dropping_tx_hashes: vec![],
             refund_percent: None,
             refund_recipient: None,

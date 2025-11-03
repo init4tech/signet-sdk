@@ -63,6 +63,21 @@ where
         SimEnv::new(rollup, host, finish_by, concurrency_limit, sim_items).into()
     }
 
+    /// Get a reference the simulation cache used by this builder.
+    pub fn sim_items(&self) -> &SimCache {
+        self.inner.sim_items()
+    }
+
+    /// Get a reference to the rollup environment.
+    pub fn rollup_env(&self) -> &RollupEnv<RuDb, RuInsp> {
+        self.inner.rollup_env()
+    }
+
+    /// Get a reference to the host environment.
+    pub fn host_env(&self) -> &HostEnv<HostDb, HostInsp> {
+        self.inner.host_env()
+    }
+
     /// Run a simulation round, returning the best item.
     #[instrument(skip(self))]
     pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
