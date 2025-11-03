@@ -78,16 +78,19 @@ pub struct SignetEthBundleDriver<'a> {
 impl<'a> SignetEthBundleDriver<'a> {
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
-    pub fn new(
-        bundle: &'a SignetEthBundle,
-        host_chain_id: u64,
-        deadline: std::time::Instant,
-    ) -> Self {
-        let mut agg_fills = AggregateFills::default();
-        if let Some(host_fills) = &bundle.host_fills {
-            agg_fills.add_signed_fill(host_chain_id, host_fills);
-        }
+    pub fn new(bundle: &'a SignetEthBundle, deadline: std::time::Instant) -> Self {
+        Self::new_with_agg_fills(bundle, deadline, Default::default())
+    }
 
+    /// Creates a new [`SignetEthBundleDriver`] with the given bundle,
+    /// response, and aggregate fills.
+    ///
+    /// This is useful for testing, and for combined host-rollup simulation.
+    pub const fn new_with_agg_fills(
+        bundle: &'a SignetEthBundle,
+        deadline: std::time::Instant,
+        agg_fills: AggregateFills,
+    ) -> Self {
         Self {
             bundle,
             deadline,
@@ -123,6 +126,14 @@ impl<'a> SignetEthBundleDriver<'a> {
     /// inspecting the agg fills after execution.
     pub const fn agg_fills(&self) -> &AggregateFills {
         &self.agg_fills
+    }
+
+    /// Get a mutable reference to the aggregate fills for this driver.
+    ///
+    /// Accessing this is not recommended outside of testing or advanced
+    /// usage.
+    pub const fn agg_fills_mut(&mut self) -> &mut AggregateFills {
+        &mut self.agg_fills
     }
 
     /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate
@@ -190,11 +201,6 @@ where
             trevm,
             BundleError::TimestampOutOfRange.into()
         );
-
-        // Check that the `SignedFill` is valid at the timestamp.
-        if self.bundle().validate_fills_offchain(timestamp.to()).is_err() {
-            return Err(trevm.errored(BundleError::BundleReverted.into()));
-        }
 
         // Decode and validate the transactions in the bundle
         let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);

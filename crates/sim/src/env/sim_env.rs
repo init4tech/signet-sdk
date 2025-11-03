@@ -190,8 +190,7 @@ where
     where
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
     {
-        let mut driver =
-            SignetEthBundleDriver::new(bundle, self.constants().host_chain_id(), self.finish_by);
+        let mut driver = SignetEthBundleDriver::new(bundle, self.finish_by);
         let trevm = self.rollup_evm();
 
         // Run the bundle

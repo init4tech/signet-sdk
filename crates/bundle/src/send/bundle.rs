@@ -1,17 +1,12 @@
 //! Signet bundle types.
-use crate::send::SignetEthBundleError;
 use alloy::{
     consensus::TxEnvelope,
     eips::Decodable2718,
-    network::Network,
     primitives::{Bytes, B256},
-    providers::Provider,
     rlp::Buf,
     rpc::types::mev::EthSendBundle,
 };
 use serde::{Deserialize, Serialize};
-use signet_types::{SignedFill, SignedPermitError};
-use signet_zenith::HostOrders::HostOrdersInstance;
 use trevm::{
     inspectors::{Layered, TimeLimit},
     revm::{inspector::NoOpInspector, Database},
@@ -26,7 +21,7 @@ pub type BundleInspector<I = NoOpInspector> = Layered<TimeLimit, I>;
 /// The Signet bundle contains the following:
 ///
 /// - A standard [`EthSendBundle`] with the transactions to simulate.
-/// - A signed permit2 fill to be applied on the Host chain with the bundle.
+/// - Host transactions to be included in the host bundle.
 ///
 /// This is based on the flashbots `eth_sendBundle` bundle. See [their docs].
 ///
@@ -37,10 +32,6 @@ pub struct SignetEthBundle {
     /// The bundle of transactions to simulate. Same structure as a Flashbots [`EthSendBundle`] bundle.
     #[serde(flatten)]
     pub bundle: EthSendBundle,
-    /// Host fills to be applied with the bundle, represented as a signed
-    /// permit2 fill.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub host_fills: Option<SignedFill>,
 
     /// Host transactions to be included in the host bundle.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -110,36 +101,19 @@ impl SignetEthBundle {
         Ok(txs)
     }
 
-    /// Check that this can be syntactically used as a fill.
-    pub fn validate_fills_offchain(&self, timestamp: u64) -> Result<(), SignedPermitError> {
-        if let Some(host_fills) = &self.host_fills {
-            host_fills.validate(timestamp)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Check that this fill is valid on-chain as of the current block. This
-    /// checks that the tokens can actually be transferred.
-    ///
-    /// # WARNING:
-    ///
-    /// This function will send an RPC request to the provider containing the
-    /// fills. It MUST NOT be used with an untrusted provider.
-    pub async fn alloy_validate_fills_onchain<Db, P, N>(
+    /// Decode and validate the host transactions in the bundle.
+    pub fn decode_and_validate_host_txs<Db: Database>(
         &self,
-        orders: HostOrdersInstance<P, N>,
-    ) -> Result<(), SignetEthBundleError<Db>>
-    where
-        Db: Database,
-        P: Provider<N>,
-        N: Network,
-    {
-        if let Some(host_fills) = self.host_fills.clone() {
-            orders.try_fill(host_fills.outputs, host_fills.permit).await.map_err(Into::into)
-        } else {
-            Ok(())
-        }
+    ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
+        // Decode and validate the host transactions in the bundle
+        let txs = self
+            .host_txs
+            .iter()
+            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| BundleError::TransactionDecodingError(err))?;
+
+        Ok(txs)
     }
 }
 
@@ -161,10 +135,6 @@ pub struct SignetEthBundleResponse {
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloy::primitives::{Address, U256};
-    use signet_zenith::HostOrders::{
-        Output, Permit2Batch, PermitBatchTransferFrom, TokenPermissions,
-    };
 
     #[test]
     fn send_bundle_ser_roundtrip() {
@@ -178,26 +148,6 @@ mod test {
                 replacement_uuid: Some("uuid".to_owned()),
                 ..Default::default()
             },
-            host_fills: Some(SignedFill {
-                permit: Permit2Batch {
-                    permit: PermitBatchTransferFrom {
-                        permitted: vec![TokenPermissions {
-                            token: Address::repeat_byte(66),
-                            amount: U256::from(17),
-                        }],
-                        nonce: U256::from(18),
-                        deadline: U256::from(19),
-                    },
-                    owner: Address::repeat_byte(77),
-                    signature: Bytes::from(b"abcd"),
-                },
-                outputs: vec![Output {
-                    token: Address::repeat_byte(88),
-                    amount: U256::from(20),
-                    recipient: Address::repeat_byte(99),
-                    chainId: 100,
-                }],
-            }),
             host_txs: vec![b"host_tx1".into(), b"host_tx2".into()],
         };
 
@@ -219,7 +169,6 @@ mod test {
                 replacement_uuid: Some("uuid".to_owned()),
                 ..Default::default()
             },
-            host_fills: None,
             host_txs: vec![],
         };
 
@@ -236,7 +185,6 @@ mod test {
 
         let deserialized: SignetEthBundle = serde_json::from_str(json).unwrap();
 
-        assert!(deserialized.host_fills.is_none());
         assert!(deserialized.host_txs.is_empty());
     }
 

@@ -18,7 +18,6 @@ use alloy::{
     sol_types::SolCall,
 };
 use signet_bundle::SignetEthBundle;
-use signet_types::SignedFill;
 
 /// Sign a transaction with a wallet.
 pub fn sign_tx_with_key_pair(wallet: &PrivateKeySigner, tx: TypedTransaction) -> TxEnvelope {
@@ -72,12 +71,13 @@ where
 }
 
 /// Create a simple bundle from a list of transactions.
-pub fn simple_bundle<'a>(
-    txs: impl IntoIterator<Item = &'a TxEnvelope>,
-    host_fills: Option<SignedFill>,
+pub fn simple_bundle(
+    txs: Vec<TxEnvelope>,
+    host_txs: Vec<TxEnvelope>,
     block_number: u64,
 ) -> SignetEthBundle {
     let txs = txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
+    let host_txs = host_txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
 
     SignetEthBundle {
         bundle: EthSendBundle {
@@ -93,7 +93,6 @@ pub fn simple_bundle<'a>(
             refund_tx_hashes: vec![],
             extra_fields: Default::default(),
         },
-        host_fills,
-        host_txs: vec![],
+        host_txs,
     }
 }
