@@ -18,7 +18,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 use trevm::{
     revm::{
         database::InMemoryDB,
-        inspector::NoOpInspector,
         state::{Account, AccountInfo, EvmState},
         Database, DatabaseCommit,
     },
@@ -71,7 +70,7 @@ pub async fn test_simulator() {
     let host = HostEnv::new(host_db, TEST_SYS, &TestCfg, &NoopBlock);
 
     // Set up the simulator
-    let built = BlockBuild::<_, _, NoOpInspector, NoOpInspector>::new(
+    let built = BlockBuild::<_, _>::new(
         rollup,
         host,
         std::time::Instant::now() + std::time::Duration::from_millis(200),

@@ -226,7 +226,7 @@ impl<R> ExtractedEvent<'_, R, Transactor::Transact> {
     /// information.
     pub fn magic_sig(&self) -> MagicSig {
         MagicSig {
-            ty: MagicSigInfo::Transact { sender: self.event.sender() },
+            ty: MagicSigInfo::Transact { sender: self.event.host_sender() },
             txid: self.tx_hash(),
             event_idx: self.log_index,
         }
