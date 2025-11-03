@@ -1,5 +1,5 @@
 use crate::send::SignetEthBundle;
-use alloy::primitives::U256;
+use alloy::{hex, primitives::U256};
 use signet_evm::{DriveBundleResult, EvmErrored, EvmNeedsTx, SignetInspector, SignetLayered};
 use signet_types::{AggregateFills, AggregateOrders, MarketError, SignedPermitError};
 use std::borrow::Cow;
@@ -261,11 +261,16 @@ where
                     .run_tx(&tx)
                     .and_then(|mut htrevm| {
                         let result = htrevm.result();
+                        if let Some(output) = result.output()  {
+                            if !result.is_success() {
+                                debug!(output = hex::encode(&output), "host transaction reverted");
+                            }
+                        }
 
                         trevm_ensure!(
                             result.is_success(),
                             htrevm,
-                            EVMError::Custom("host transaction reverted".to_string())
+                            EVMError::Custom(format!("host transaction reverted"))
                         );
 
                         // The host fills go in the bundle fills.
@@ -280,7 +285,7 @@ where
                         Ok(htrevm.accept_state())
                     })
                     .map_err(|err| {
-                        error!(err = %err.error(), "error while running host transaction");
+                        error!(err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
                         SignetEthBundleError::HostSimulation("host simulation error")
                     }),
                 trevm

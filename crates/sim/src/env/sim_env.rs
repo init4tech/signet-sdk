@@ -222,6 +222,8 @@ where
             .fill_state()
             .check_ru_tx_events(&outputs.bundle_fills, &outputs.bundle_orders)?;
 
+        dbg!(&outputs.bundle_fills, &outputs.bundle_orders, self.rollup.fill_state());
+
         let host_cache = outputs.host_evm.map(|evm| evm.into_db().into_cache()).unwrap_or_default();
         trace!(
             gas_used = outputs.total_gas_used,

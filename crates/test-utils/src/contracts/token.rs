@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{bytes, Address, Bytes, Keccak256, B256, U256},
+    primitives::{bytes, Address, Bytes, Keccak256, U256},
     uint,
 };
 use trevm::revm::{
@@ -82,26 +82,21 @@ pub fn deploy_wbtc_at<Db: Database + DatabaseCommit>(
     deploy_token_at(db, addr, WBTC_NAME, WBTC_SYMBOL)
 }
 
+fn mapping_slot(base: U256, key: Address) -> U256 {
+    let mut hasher = Keccak256::new();
+    hasher.update([0u8; 12]);
+    hasher.update(key);
+    hasher.update(base.to_be_bytes::<32>());
+    U256::from_be_bytes::<32>(hasher.finalize().into())
+}
+
 /// Computes the storage slot for the balance of the given owner.
 pub fn balance_slot_for(owner: Address) -> U256 {
-    let mut hasher = Keccak256::new();
-    hasher.update(BALANCES_SLOT.to_be_bytes::<32>());
-    hasher.update([0x00u8; 12]);
-    hasher.update(owner);
-    hasher.finalize().into()
+    mapping_slot(BALANCES_SLOT, owner)
 }
 
 /// Computes the storage slot for the allowance mapping for the given owner and spender.
 pub fn allowances_slot_for(owner: Address, spender: Address) -> U256 {
-    let mut inner_map_hasher = Keccak256::new();
-    inner_map_hasher.update(ALLOWANCES_SLOT.to_be_bytes::<32>());
-    inner_map_hasher.update([0x00u8; 12]);
-    inner_map_hasher.update(owner);
-
-    let inner_map_loc: B256 = inner_map_hasher.finalize();
-    let mut hasher = Keccak256::new();
-    hasher.update(inner_map_loc);
-    hasher.update([0x00u8; 12]);
-    hasher.update(spender);
-    hasher.finalize().into()
+    let inner_map_loc = mapping_slot(ALLOWANCES_SLOT, owner);
+    mapping_slot(inner_map_loc, spender)
 }

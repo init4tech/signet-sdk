@@ -4,18 +4,16 @@ use crate::{
     contracts::{
         counter::{COUNTER_BYTECODE, COUNTER_TEST_ADDRESS},
         reverts::{REVERT_BYTECODE, REVERT_TEST_ADDRESS},
-        system::{RU_ORDERS_BYTECODE, RU_PASSAGE_BYTECODE},
-        token::{
-            allowances_slot_for, balance_slot_for, deploy_wbtc_at, deploy_weth_at, MINTER,
-            MINTER_SLOT, NAME_SLOT, SYMBOL_SLOT, TOKEN_BYTECODE, WBTC_NAME, WBTC_SYMBOL, WETH_NAME,
-            WETH_SYMBOL,
+        system::{
+            HOST_ORDERS_BYTECODE, HOST_PASSAGE_BYTECODE, RU_ORDERS_BYTECODE, RU_PASSAGE_BYTECODE,
         },
+        token::{allowances_slot_for, balance_slot_for, deploy_wbtc_at, deploy_weth_at},
     },
     users::TEST_USERS,
 };
 use alloy::{
     consensus::constants::ETH_TO_WEI,
-    primitives::{Address, U256},
+    primitives::{Address, Bytes, U256},
 };
 use signet_constants::test_utils::*;
 use signet_sim::{BlockBuild, HostEnv, RollupEnv};
@@ -62,37 +60,10 @@ pub fn test_signet_evm_with_inspector<I>(inspector: I) -> signet_evm::EvmNeedsBl
 where
     I: Inspector<Ctx<InMemoryDB>>,
 {
-    let mut evm = signet_evm::signet_evm_with_inspector(InMemoryDB::default(), inspector, TEST_SYS)
-        .fill_cfg(&TestCfg);
+    let mut db = InMemoryDB::default();
+    setup_rollup_db(&mut db).unwrap();
 
-    // Set the bytecode for system contracts
-    evm.set_bytecode_unchecked(TEST_SYS.ru_orders(), Bytecode::new_legacy(RU_ORDERS_BYTECODE));
-    evm.set_bytecode_unchecked(TEST_SYS.ru_passage(), Bytecode::new_legacy(RU_PASSAGE_BYTECODE));
-
-    // Set WBTC bytecode and storage
-    evm.set_bytecode_unchecked(RU_WBTC, Bytecode::new_legacy(TOKEN_BYTECODE));
-    evm.set_storage_unchecked(RU_WBTC, NAME_SLOT, WBTC_NAME);
-    evm.set_storage_unchecked(RU_WBTC, SYMBOL_SLOT, WBTC_SYMBOL);
-    evm.set_storage_unchecked(RU_WBTC, MINTER_SLOT, MINTER);
-
-    // Set WETH bytecode and storage
-    evm.set_bytecode_unchecked(RU_WETH, Bytecode::new_legacy(TOKEN_BYTECODE));
-    evm.set_storage_unchecked(RU_WETH, NAME_SLOT, WETH_NAME);
-    evm.set_storage_unchecked(RU_WETH, SYMBOL_SLOT, WETH_SYMBOL);
-    evm.set_storage_unchecked(RU_WETH, MINTER_SLOT, MINTER);
-
-    // Set the bytecode for the Counter contract
-    evm.set_bytecode_unchecked(COUNTER_TEST_ADDRESS, Bytecode::new_legacy(COUNTER_BYTECODE));
-
-    // Set the bytecode for the Revert contract
-    evm.set_bytecode_unchecked(REVERT_TEST_ADDRESS, Bytecode::new_legacy(REVERT_BYTECODE));
-
-    // increment the balance for each test signer
-    TEST_USERS.iter().copied().for_each(|user| {
-        evm.set_balance_unchecked(user, U256::from(1000 * ETH_TO_WEI));
-    });
-
-    evm
+    signet_evm::signet_evm_with_inspector(db, inspector, TEST_SYS).fill_cfg(&TestCfg)
 }
 
 /// Test configuration for the Signet EVM.
@@ -125,11 +96,7 @@ impl trevm::Cfg for HostTestCfg {
 pub fn rollup_sim_env() -> RollupEnv<Arc<InMemoryDB>, NoOpInspector> {
     let mut ru_db = InMemoryDB::default();
 
-    // Each test user has 1000 ETH
-    TEST_USERS.iter().copied().for_each(|user| {
-        modify_account(&mut ru_db, user, |acct| acct.balance = U256::from(1000 * ETH_TO_WEI))
-            .unwrap();
-    });
+    setup_rollup_db(&mut ru_db).unwrap();
 
     let ru_db = Arc::new(ru_db);
 
@@ -139,58 +106,7 @@ pub fn rollup_sim_env() -> RollupEnv<Arc<InMemoryDB>, NoOpInspector> {
 /// Create a host EVM environment for testing.
 pub fn host_sim_env() -> HostEnv<Arc<InMemoryDB>, NoOpInspector> {
     let mut host_db = InMemoryDB::default();
-
-    deploy_weth_at(&mut host_db, HOST_WETH).unwrap();
-    deploy_wbtc_at(&mut host_db, HOST_WBTC).unwrap();
-
-    // Each test user
-    // - Has 1000 ETH,
-    // - Has 1000 WETH
-    // - Has 1000 WBTC
-    // - Approves the Orders contract to spend max uint of WETH and WBTC
-
-    TEST_USERS.iter().copied().for_each(|user| {
-        modify_account(&mut host_db, user, |acct| acct.balance = U256::from(1000 * ETH_TO_WEI))
-            .unwrap();
-
-        let weth_acct: Account = host_db
-            .basic(HOST_WETH)
-            .unwrap()
-            .map(Into::<Account>::into)
-            .unwrap_or_default()
-            .with_storage(
-                [
-                    (balance_slot_for(user), EvmStorageSlot::new(U256::from(1000 * ETH_TO_WEI), 0)),
-                    (
-                        allowances_slot_for(user, TEST_SYS.host_orders()),
-                        EvmStorageSlot::new(U256::MAX, 0),
-                    ),
-                ]
-                .into_iter(),
-            );
-
-        let wbtc_acct: Account = host_db
-            .basic(HOST_WBTC)
-            .unwrap()
-            .map(Into::<Account>::into)
-            .unwrap_or_default()
-            .with_storage(
-                [
-                    (balance_slot_for(user), EvmStorageSlot::new(U256::from(1000 * ETH_TO_WEI), 0)),
-                    (
-                        allowances_slot_for(user, TEST_SYS.host_orders()),
-                        EvmStorageSlot::new(U256::MAX, 0),
-                    ),
-                ]
-                .into_iter(),
-            );
-
-        let mut changes: EvmState = Default::default();
-        changes.insert(HOST_WETH, weth_acct);
-        changes.insert(HOST_WBTC, wbtc_acct);
-        host_db.commit(changes);
-    });
-
+    setup_host_db(&mut host_db).unwrap();
     let host_db = Arc::new(host_db);
 
     HostEnv::new(host_db, TEST_SYS, &HostTestCfg, &NoopBlock)
@@ -217,4 +133,97 @@ where
     let changes: EvmState = [(addr, acct)].into_iter().collect();
     db.commit(changes);
     Ok(old)
+}
+
+/// Set the bytecode at the given address in the database.
+fn set_bytecode_at<Db: Database + DatabaseCommit>(
+    db: &mut Db,
+    addr: Address,
+    code: Bytes,
+) -> Result<(), Db::Error> {
+    modify_account(db, addr, |acct| {
+        acct.set_code(Bytecode::new_legacy(code));
+    })
+    .map(|_| ())
+}
+
+fn set_balance_of<Db: Database + DatabaseCommit>(
+    db: &mut Db,
+    addr: Address,
+    balance: U256,
+) -> Result<(), Db::Error> {
+    modify_account(db, addr, |acct| {
+        acct.balance = balance;
+    })
+    .map(|_| ())
+}
+
+fn setup_db<Db: Database + DatabaseCommit>(db: &mut Db, rollup: bool) -> Result<(), Db::Error> {
+    let (weth, wbtc, orders, orders_bytecode, passage, passage_bytecode);
+    if rollup {
+        weth = RU_WETH;
+        wbtc = RU_WBTC;
+        orders = TEST_SYS.ru_orders();
+        orders_bytecode = RU_ORDERS_BYTECODE;
+        passage = TEST_SYS.ru_passage();
+        passage_bytecode = RU_PASSAGE_BYTECODE;
+    } else {
+        weth = HOST_WETH;
+        wbtc = HOST_WBTC;
+        orders = TEST_SYS.host_orders();
+        orders_bytecode = HOST_ORDERS_BYTECODE;
+        passage = TEST_SYS.host_passage();
+        passage_bytecode = HOST_PASSAGE_BYTECODE;
+    }
+
+    // Deploy WETH and WBTC
+    deploy_weth_at(db, weth)?;
+    deploy_wbtc_at(db, wbtc)?;
+
+    // Set the bytecode for system contracts
+    set_bytecode_at(db, orders, orders_bytecode)?;
+    set_bytecode_at(db, passage, passage_bytecode)?;
+
+    set_bytecode_at(db, COUNTER_TEST_ADDRESS, COUNTER_BYTECODE)?;
+
+    // Set the bytecode for the Revert contract
+    set_bytecode_at(db, REVERT_TEST_ADDRESS, REVERT_BYTECODE)?;
+
+    // increment the balance for each test signer
+    TEST_USERS.iter().copied().for_each(|user| {
+        set_balance_of(db, user, U256::from(1000 * ETH_TO_WEI)).unwrap();
+
+        let weth_acct: Account =
+            db.basic(weth).unwrap().map(Into::<Account>::into).unwrap_or_default().with_storage(
+                [
+                    (balance_slot_for(user), EvmStorageSlot::new(U256::from(1000 * ETH_TO_WEI), 0)),
+                    (allowances_slot_for(user, orders), EvmStorageSlot::new(U256::MAX, 0)),
+                ]
+                .into_iter(),
+            );
+
+        let wbtc_acct: Account =
+            db.basic(wbtc).unwrap().map(Into::<Account>::into).unwrap_or_default().with_storage(
+                [
+                    (balance_slot_for(user), EvmStorageSlot::new(U256::from(1000 * ETH_TO_WEI), 0)),
+                    (allowances_slot_for(user, orders), EvmStorageSlot::new(U256::MAX, 0)),
+                ]
+                .into_iter(),
+            );
+
+        let mut changes: EvmState = Default::default();
+        changes.insert(weth, weth_acct);
+        changes.insert(wbtc, wbtc_acct);
+        db.commit(changes);
+    });
+
+    Ok(())
+}
+
+fn setup_rollup_db<Db: Database + DatabaseCommit>(db: &mut Db) -> Result<(), Db::Error> {
+    setup_db(db, true)
+}
+
+fn setup_host_db<Db: Database + DatabaseCommit>(db: &mut Db) -> Result<(), Db::Error> {
+    setup_db(db, false)
 }

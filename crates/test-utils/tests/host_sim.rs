@@ -8,9 +8,15 @@ use signet_test_utils::{
 use signet_types::UnsignedOrder;
 use signet_zenith::{HostOrders::fillCall, RollupOrders::initiateCall};
 use std::time::{Duration, Instant};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 #[tokio::test]
 async fn test_with_host_sim() {
+    let filter = EnvFilter::from_default_env();
+    let fmt = fmt::layer().with_filter(filter);
+    let registry = tracing_subscriber::registry().with(fmt);
+    registry.try_init().unwrap();
+
     let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
 
     // Set up an order, fill pair
@@ -71,6 +77,11 @@ async fn test_with_host_sim() {
 
 #[tokio::test]
 async fn test_with_host_sim_insufficient_fill() {
+    let filter = EnvFilter::from_default_env();
+    let fmt = fmt::layer().with_filter(filter);
+    let registry = tracing_subscriber::registry().with(fmt);
+    registry.try_init().unwrap();
+
     let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
 
     // Set up an order, fill pair
