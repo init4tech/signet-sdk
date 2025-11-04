@@ -1,22 +1,16 @@
-use alloy::primitives::{Address, U256};
+use alloy::primitives::U256;
 use signet_test_utils::{
     evm::test_sim_env,
     specs::{signed_simple_call, simple_bundle},
     test_constants::*,
-    users::TEST_SIGNERS,
+    users::{TEST_SIGNERS, TEST_USERS},
 };
 use signet_types::UnsignedOrder;
 use signet_zenith::{HostOrders::fillCall, RollupOrders::initiateCall};
 use std::time::{Duration, Instant};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 #[tokio::test]
 async fn test_with_host_sim() {
-    let filter = EnvFilter::from_default_env();
-    let fmt = fmt::layer().with_filter(filter);
-    let registry = tracing_subscriber::registry().with(fmt);
-    registry.try_init().unwrap();
-
     let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
 
     // Set up an order, fill pair
@@ -25,7 +19,7 @@ async fn test_with_host_sim() {
         .with_output(
             TEST_SYS.host().tokens().weth(),
             U256::from(1000),
-            Address::ZERO,
+            TEST_USERS[5],
             TEST_SYS.host_chain_id() as u32,
         )
         .to_order();
@@ -77,11 +71,6 @@ async fn test_with_host_sim() {
 
 #[tokio::test]
 async fn test_with_host_sim_insufficient_fill() {
-    let filter = EnvFilter::from_default_env();
-    let fmt = fmt::layer().with_filter(filter);
-    let registry = tracing_subscriber::registry().with(fmt);
-    registry.try_init().unwrap();
-
     let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
 
     // Set up an order, fill pair
@@ -90,7 +79,7 @@ async fn test_with_host_sim_insufficient_fill() {
         .with_output(
             TEST_SYS.host().tokens().weth(),
             U256::from(1000),
-            Address::ZERO,
+            TEST_USERS[5],
             TEST_SYS.host_chain_id() as u32,
         )
         .to_order();
@@ -136,8 +125,6 @@ async fn test_with_host_sim_insufficient_fill() {
     builder.sim_items().add_bundle(bundle, 0).unwrap();
 
     let block = builder.build().await;
-
-    dbg!(&block.transactions());
 
     assert!(block.transactions().is_empty());
 }

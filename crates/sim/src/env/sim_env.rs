@@ -135,11 +135,10 @@ where
                 let reason = trevm.result().output().cloned().map(hex::encode);
                 let halted = trevm.result().is_halt();
                 let halt_reason = if let ExecutionResult::Halt { reason, .. } = trevm.result() {
-                    Some(reason)
+                    Some(reason.clone())
                 } else {
                     None
-                }
-                .cloned();
+                };
 
                 // We collect the orders and fills from the inspector, and check
                 // them against the provided fill state. If the fills are
@@ -221,8 +220,6 @@ where
         self.rollup
             .fill_state()
             .check_ru_tx_events(&outputs.bundle_fills, &outputs.bundle_orders)?;
-
-        dbg!(&outputs.bundle_fills, &outputs.bundle_orders, self.rollup.fill_state());
 
         let host_cache = outputs.host_evm.map(|evm| evm.into_db().into_cache()).unwrap_or_default();
         trace!(

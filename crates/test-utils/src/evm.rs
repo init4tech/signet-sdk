@@ -13,7 +13,7 @@ use crate::{
 };
 use alloy::{
     consensus::constants::ETH_TO_WEI,
-    primitives::{Address, Bytes, U256},
+    primitives::{Address, Bytes, KECCAK256_EMPTY, U256},
 };
 use signet_constants::test_utils::*;
 use signet_sim::{BlockBuild, HostEnv, RollupEnv};
@@ -145,6 +145,9 @@ fn set_bytecode_at<Db: Database + DatabaseCommit>(
         acct.set_code(Bytecode::new_legacy(code));
     })
     .map(|_| ())
+    .inspect(|_| {
+        assert_ne!(db.basic(addr).unwrap().unwrap().code_hash, KECCAK256_EMPTY);
+    })
 }
 
 fn set_balance_of<Db: Database + DatabaseCommit>(
@@ -156,6 +159,25 @@ fn set_balance_of<Db: Database + DatabaseCommit>(
         acct.balance = balance;
     })
     .map(|_| ())
+    .inspect(|_| {
+        assert_eq!(db.basic(addr).unwrap().unwrap().balance, balance);
+    })
+}
+
+fn set_storage_at<Db: Database + DatabaseCommit>(
+    db: &mut Db,
+    addr: Address,
+    slot: U256,
+    value: U256,
+) -> Result<(), Db::Error> {
+    let mut account: Account = db.basic(addr)?.unwrap_or_default().into();
+    let mut changes = EvmState::default();
+    account.storage.insert(slot, EvmStorageSlot::new(value, 1));
+    account.mark_touch();
+    changes.insert(addr, account);
+    db.commit(changes);
+    assert_eq!(db.storage(addr, slot).unwrap(), value);
+    Ok(())
 }
 
 fn setup_db<Db: Database + DatabaseCommit>(db: &mut Db, rollup: bool) -> Result<(), Db::Error> {
@@ -189,32 +211,18 @@ fn setup_db<Db: Database + DatabaseCommit>(db: &mut Db, rollup: bool) -> Result<
     // Set the bytecode for the Revert contract
     set_bytecode_at(db, REVERT_TEST_ADDRESS, REVERT_BYTECODE)?;
 
+    let max_approve = U256::MAX;
+    let token_balance = U256::from(1000 * ETH_TO_WEI);
+
     // increment the balance for each test signer
     TEST_USERS.iter().copied().for_each(|user| {
         set_balance_of(db, user, U256::from(1000 * ETH_TO_WEI)).unwrap();
 
-        let weth_acct: Account =
-            db.basic(weth).unwrap().map(Into::<Account>::into).unwrap_or_default().with_storage(
-                [
-                    (balance_slot_for(user), EvmStorageSlot::new(U256::from(1000 * ETH_TO_WEI), 0)),
-                    (allowances_slot_for(user, orders), EvmStorageSlot::new(U256::MAX, 0)),
-                ]
-                .into_iter(),
-            );
+        set_storage_at(db, weth, balance_slot_for(user), token_balance).unwrap();
+        set_storage_at(db, weth, allowances_slot_for(user, orders), max_approve).unwrap();
 
-        let wbtc_acct: Account =
-            db.basic(wbtc).unwrap().map(Into::<Account>::into).unwrap_or_default().with_storage(
-                [
-                    (balance_slot_for(user), EvmStorageSlot::new(U256::from(1000 * ETH_TO_WEI), 0)),
-                    (allowances_slot_for(user, orders), EvmStorageSlot::new(U256::MAX, 0)),
-                ]
-                .into_iter(),
-            );
-
-        let mut changes: EvmState = Default::default();
-        changes.insert(weth, weth_acct);
-        changes.insert(wbtc, wbtc_acct);
-        db.commit(changes);
+        set_storage_at(db, wbtc, balance_slot_for(user), token_balance).unwrap();
+        set_storage_at(db, wbtc, allowances_slot_for(user, orders), max_approve).unwrap();
     });
 
     Ok(())
