@@ -53,6 +53,11 @@ where
         self.total_gas_used = self.total_gas_used.saturating_add(gas);
     }
 
+    /// Increase the total host gas used by the given amount.
+    pub const fn use_host_gas(&mut self, gas: u64) {
+        self.total_host_gas_used = self.total_host_gas_used.saturating_add(gas);
+    }
+
     /// Absorb fills and orders into the running totals.
     pub fn absorb(&mut self, fills: &AggregateFills, orders: &AggregateOrders) {
         self.bundle_fills.absorb(fills);
@@ -278,7 +283,7 @@ where
                         );
 
                         // Accumulate gas used
-                        self.output.total_host_gas_used += result.gas_used();
+                        self.output.use_host_gas(result.gas_used());
 
                         // The host fills go in the bundle fills.
                         let host_fills = htrevm

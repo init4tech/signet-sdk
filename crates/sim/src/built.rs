@@ -42,6 +42,7 @@ impl fmt::Debug for BuiltBlock {
             .field("transactions", &self.transactions.len())
             .field("host_txns", &self.host_txns.len())
             .field("gas_used", &self.gas_used)
+            .field("host_gas_used", &self.host_gas_used)
             .field("block_number", &self.block_number)
             .finish_non_exhaustive()
     }
