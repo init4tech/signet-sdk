@@ -66,6 +66,26 @@ where
         }
     }
 
+    /// Get the maximum gas limit for the block being built.
+    pub const fn max_gas(&self) -> u64 {
+        self.max_gas
+    }
+
+    /// Set the maximum gas limit for the block being built.
+    pub const fn set_max_gas(&mut self, max_gas: u64) {
+        self.max_gas = max_gas;
+    }
+
+    /// Get the maximum host gas limit for the block being built.
+    pub const fn max_host_gas(&self) -> u64 {
+        self.max_host_gas
+    }
+
+    /// Set the maximum host gas limit for the block being built.
+    pub const fn set_max_host_gas(&mut self, max_host_gas: u64) {
+        self.max_host_gas = max_host_gas;
+    }
+
     /// Get a reference the simulation cache used by this builder.
     pub fn sim_items(&self) -> &SimCache {
         self.env.sim_items()
