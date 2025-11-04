@@ -17,6 +17,9 @@ pub struct SimOutcomeWithCache {
     /// The total amount of gas used by the simulation.
     pub gas_used: u64,
 
+    /// The total amount of host gas used by the simulation.
+    pub host_gas_used: u64,
+
     /// The result of the simulation, a [`Cache`] containing state changes that
     /// can be applied.
     pub rollup_cache: Cache,
@@ -41,6 +44,9 @@ pub struct SimulatedItem {
 
     /// The total amount of gas used by the simulation.
     pub gas_used: u64,
+
+    /// The total amount of host gas used by the simulation.
+    pub host_gas_used: u64,
 
     /// The transaction or bundle that was simulated.
     pub item: SimItem,

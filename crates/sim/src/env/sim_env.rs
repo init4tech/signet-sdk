@@ -177,6 +177,7 @@ where
                     score,
                     rollup_cache: cache,
                     host_cache: Default::default(),
+                    host_gas_used: 0,
                     gas_used,
                     bundle_fills,
                     bundle_orders,
@@ -224,6 +225,7 @@ where
         let host_cache = outputs.host_evm.map(|evm| evm.into_db().into_cache()).unwrap_or_default();
         trace!(
             gas_used = outputs.total_gas_used,
+            host_gas_used = outputs.total_host_gas_used,
             %score,
             "Bundle simulation successful"
         );
@@ -234,6 +236,7 @@ where
             rollup_cache: trevm.into_db().into_cache(),
             host_cache,
             gas_used: outputs.total_gas_used,
+            host_gas_used: outputs.total_host_gas_used,
             bundle_fills: outputs.bundle_fills,
             bundle_orders: outputs.bundle_orders,
         })
@@ -255,6 +258,7 @@ where
     pub(crate) fn sim_round(
         self: Arc<Self>,
         max_gas: u64,
+        max_host_gas: u64,
         best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
     ) {
         // Pull the `n` best items from the cache.
@@ -281,14 +285,25 @@ where
 
                     // If simulation is succesful, send the outcome via the
                     // channel.
+
                     match this_ref.simulate(cache_rank, &item) {
+                        Ok(candidate) if candidate.score.is_zero() => {
+                            trace!("zero score candidate, skipping");
+                        }
+                        Ok(candidate) if candidate.host_gas_used > max_host_gas => {
+                            trace!(
+                                host_gas_used = candidate.host_gas_used,
+                                max_host_gas,
+                                "Host gas limit exceeded"
+                            );
+                        }
+                        Ok(candidate) if candidate.gas_used > max_gas => {
+                            trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
+                        }
                         Ok(candidate) => {
-                            if candidate.gas_used <= max_gas {
-                                // shortcut return on success
-                                let _ = c.blocking_send(candidate);
-                                return;
-                            }
-                            trace!(gas_used = candidate.gas_used, max_gas, %identifier, "Gas limit exceeded");
+                            // shortcut return on success
+                            let _ = c.blocking_send(candidate);
+                            return;
                         }
                         Err(e) => {
                             trace!(?identifier, %e, "Simulation failed");

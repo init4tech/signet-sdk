@@ -27,10 +27,13 @@ where
     /// The host evm used to run the bundle.
     pub host_evm: Option<signet_evm::EvmNeedsTx<Db, Insp>>,
 
-    /// Total gas used by this bundle during execution, an output of the driver.
+    /// Total gas used by this bundle during execution.
     pub total_gas_used: u64,
 
-    /// Beneficiary balance increase during execution, an output of the driver.
+    /// Total host gas used by this bundle during execution.
+    pub total_host_gas_used: u64,
+
+    /// Beneficiary balance increase during execution.
     pub beneficiary_balance_increase: U256,
 
     /// Running aggregate of fills during execution.
@@ -168,6 +171,7 @@ where
             output: DriverOutput {
                 host_evm: Some(host_evm),
                 total_gas_used: 0,
+                total_host_gas_used: 0,
                 beneficiary_balance_increase: U256::ZERO,
                 bundle_fills: AggregateFills::default(),
                 bundle_orders: AggregateOrders::default(),
@@ -263,15 +267,18 @@ where
                         let result = htrevm.result();
                         if let Some(output) = result.output()  {
                             if !result.is_success() {
-                                debug!(output = hex::encode(&output), "host transaction reverted");
+                                debug!(output = hex::encode(output), "host transaction reverted");
                             }
                         }
 
                         trevm_ensure!(
                             result.is_success(),
                             htrevm,
-                            EVMError::Custom(format!("host transaction reverted"))
+                            EVMError::Custom("host transaction reverted".to_string())
                         );
+
+                        // Accumulate gas used
+                        self.output.total_host_gas_used += result.gas_used();
 
                         // The host fills go in the bundle fills.
                         let host_fills = htrevm

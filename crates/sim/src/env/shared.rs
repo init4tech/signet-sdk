@@ -80,13 +80,14 @@ where
 
     /// Run a simulation round, returning the best item.
     #[instrument(skip(self))]
-    pub async fn sim_round(&mut self, max_gas: u64) -> Option<SimulatedItem> {
+    pub async fn sim_round(&mut self, max_gas: u64, max_host_gas: u64) -> Option<SimulatedItem> {
         let (best_tx, mut best_watcher) = watch::channel(None);
 
         let this = self.inner.clone();
 
         // Spawn a blocking task to run the simulations.
-        let sim_task = tokio::task::spawn_blocking(move || this.sim_round(max_gas, best_tx));
+        let sim_task =
+            tokio::task::spawn_blocking(move || this.sim_round(max_gas, max_host_gas, best_tx));
 
         // Either simulation is done, or we time out
         select! {
@@ -118,6 +119,11 @@ where
             .accept_aggregates(&outcome.bundle_fills, &outcome.bundle_orders)
             .expect("checked during simulation");
 
-        Some(SimulatedItem { gas_used: outcome.gas_used, score: outcome.score, item })
+        Some(SimulatedItem {
+            gas_used: outcome.gas_used,
+            host_gas_used: outcome.host_gas_used,
+            score: outcome.score,
+            item,
+        })
     }
 }

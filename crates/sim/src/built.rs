@@ -26,6 +26,9 @@ pub struct BuiltBlock {
     /// The amount of gas used by the block so far
     pub(crate) gas_used: u64,
 
+    /// The amount of host gas used by the block so far
+    pub(crate) host_gas_used: u64,
+
     // -- Memoization fields --
     /// Memoized raw encoding of the block.
     pub(crate) raw_encoding: OnceLock<Bytes>,
@@ -52,6 +55,7 @@ impl BuiltBlock {
             transactions: Vec::new(),
             block_number,
             gas_used: 0,
+            host_gas_used: 0,
             raw_encoding: OnceLock::new(),
             hash: OnceLock::new(),
         }
@@ -65,6 +69,11 @@ impl BuiltBlock {
     /// Get the amount of gas used by the block.
     pub const fn gas_used(&self) -> u64 {
         self.gas_used
+    }
+
+    /// Get the amount of host gas used by the block.
+    pub const fn host_gas_used(&self) -> u64 {
+        self.host_gas_used
     }
 
     /// Get the number of transactions in the block.
@@ -135,6 +144,7 @@ impl BuiltBlock {
     /// Ingest a simulated item, extending the block.
     pub fn ingest(&mut self, item: SimulatedItem) {
         self.gas_used += item.gas_used;
+        self.host_gas_used += item.host_gas_used;
 
         match item.item {
             SimItem::Bundle(bundle) => self.ingest_bundle(bundle),

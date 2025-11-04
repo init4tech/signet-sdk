@@ -24,6 +24,10 @@ pub struct BlockBuild<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspe
 
     /// The maximum amount of gas to use in the built block
     max_gas: u64,
+
+    /// The maximum amount of host gas to use in the user portion of the built
+    /// block, not including overhead for the signet RU block submission.
+    max_host_gas: u64,
 }
 
 impl<RuDb, HostDb, RuInsp, HostInsp> BlockBuild<RuDb, HostDb, RuInsp, HostInsp>
@@ -41,6 +45,7 @@ where
         concurrency_limit: usize,
         sim_items: SimCache,
         max_gas: u64,
+        max_host_gas: u64,
     ) -> Self {
         let number = rollup.block().number;
 
@@ -52,7 +57,13 @@ where
             sim_items,
         );
         let finish_by = env.finish_by();
-        Self { env: env.into(), block: BuiltBlock::new(number.to()), finish_by, max_gas }
+        Self {
+            env: env.into(),
+            block: BuiltBlock::new(number.to()),
+            finish_by,
+            max_gas,
+            max_host_gas,
+        }
     }
 
     /// Get a reference the simulation cache used by this builder.
@@ -73,9 +84,16 @@ where
     /// Run a simulation round, and accumulate the results into the block.
     async fn round(&mut self) {
         let gas_allowed = self.max_gas - self.block.gas_used();
+        let host_gas_allowed = self.max_host_gas - self.block.host_gas_used();
 
-        if let Some(simulated) = self.env.sim_round(gas_allowed).await {
-            tracing::debug!(score = %simulated.score, gas_used = simulated.gas_used, identifier = %simulated.item.identifier(), "Adding item to block");
+        if let Some(simulated) = self.env.sim_round(gas_allowed, host_gas_allowed).await {
+            tracing::debug!(
+                score = %simulated.score,
+                gas_used = simulated.gas_used,
+                host_gas_used = simulated.host_gas_used,
+                identifier = %simulated.item.identifier(),
+                "Adding item to block"
+            );
             self.block.ingest(simulated);
         }
     }

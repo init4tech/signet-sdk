@@ -127,4 +127,70 @@ async fn test_with_host_sim_insufficient_fill() {
     let block = builder.build().await;
 
     assert!(block.transactions().is_empty());
+    assert!(block.host_transactions().is_empty());
+}
+
+#[tokio::test]
+async fn test_with_host_sim_insufficient_fill_reverting_ok() {
+    signet_test_utils::init_tracing();
+
+    let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
+
+    // Set up an order, fill pair
+    let order = UnsignedOrder::default()
+        .with_input(TEST_SYS.rollup().tokens().weth(), U256::from(1000))
+        .with_output(
+            TEST_SYS.host().tokens().weth(),
+            U256::from(1000),
+            TEST_USERS[5],
+            TEST_SYS.host_chain_id() as u32,
+        )
+        .to_order();
+
+    let fill_outputs = order
+        .outputs
+        .clone()
+        .into_iter()
+        .map(|mut output| {
+            output.chainId = TEST_SYS.host_chain_id() as u32;
+            output.amount -= U256::ONE; // Make the fill insufficient
+            output
+        })
+        .collect::<Vec<_>>();
+
+    let order_call =
+        initiateCall { deadline: U256::MAX, inputs: order.inputs, outputs: order.outputs };
+
+    let fill_call = fillCall { outputs: fill_outputs };
+
+    // Make RU and HOST transactions
+    let ru_tx = signed_simple_call(
+        &TEST_SIGNERS[0],
+        TEST_SYS.ru_orders(),
+        &order_call,
+        U256::ZERO,
+        0,
+        TEST_SYS.ru_chain_id(),
+    );
+
+    let host_tx = signed_simple_call(
+        &TEST_SIGNERS[1],
+        TEST_SYS.host_orders(),
+        &fill_call,
+        U256::ZERO,
+        0,
+        TEST_SYS.host_chain_id(),
+    );
+
+    // Make a bundle containing the two transactions
+    let ru_tx_hash = *ru_tx.hash();
+    let mut bundle = simple_bundle(vec![ru_tx], vec![host_tx], 0);
+    bundle.bundle.reverting_tx_hashes.push(ru_tx_hash);
+
+    builder.sim_items().add_bundle(bundle, 0).unwrap();
+
+    let block = builder.build().await;
+
+    assert!(block.transactions().is_empty());
+    assert_eq!(block.host_transactions().len(), 1);
 }

@@ -50,7 +50,6 @@ pub async fn complex_simulation() {
 /// Modify an account with a closure and commit the modified account.
 ///
 /// This code is reproduced and modified from trevm
-
 fn send_with_mfpg(to: Address, value: U256, mpfpg: u128) -> TxEip1559 {
     TxEip1559 {
         nonce: 0,
