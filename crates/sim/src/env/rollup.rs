@@ -65,6 +65,11 @@ impl<Db, Insp> RollupEnv<Db, Insp> {
         }
     }
 
+    /// Get a reference to the inner database.
+    pub const fn db(&self) -> &InnerDb<Db> {
+        &self.db
+    }
+
     /// Get a mutable reference to the inner database.
     pub const fn db_mut(&mut self) -> &mut InnerDb<Db> {
         &mut self.db

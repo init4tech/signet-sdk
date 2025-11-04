@@ -73,9 +73,19 @@ where
         self.inner.rollup_env()
     }
 
+    /// Get a mutable reference to the rollup environment.
+    pub fn rollup_env_mut(&mut self) -> &mut RollupEnv<RuDb, RuInsp> {
+        Arc::get_mut(&mut self.inner).expect("sims dropped already").rollup_mut()
+    }
+
     /// Get a reference to the host environment.
     pub fn host_env(&self) -> &HostEnv<HostDb, HostInsp> {
         self.inner.host_env()
+    }
+
+    /// Get a mutable reference to the host environment.
+    pub fn host_env_mut(&mut self) -> &mut HostEnv<HostDb, HostInsp> {
+        Arc::get_mut(&mut self.inner).expect("sims dropped already").host_mut()
     }
 
     /// Run a simulation round, returning the best item.

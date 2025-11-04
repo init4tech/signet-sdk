@@ -101,6 +101,14 @@ where
         self.env.host_env()
     }
 
+    /// Consume the builder and return the built block.
+    ///
+    /// This should generally not be called directly; use [`BlockBuild::build`]
+    /// instead.
+    pub fn into_block(self) -> BuiltBlock {
+        self.block
+    }
+
     /// Run a simulation round, and accumulate the results into the block.
     async fn round(&mut self) {
         let gas_allowed = self.max_gas - self.block.gas_used();
@@ -118,8 +126,20 @@ where
         }
     }
 
-    /// Run several rounds, building
-    pub async fn build(mut self) -> BuiltBlock {
+    /// Run several rounds, building a block by iteratively adding simulated
+    /// items.
+    ///
+    /// This version returns self to allow inspection of the building process.
+    /// It does nothing if the block already has transactions (i.e. this
+    /// function should be idempotent).
+    pub async fn run_build(mut self) -> Self {
+        if !self.block.transactions.is_empty() {
+            debug!(
+                transactions = self.block.transactions.len(),
+                "Starting block build with pre-existing transactions",
+            );
+            return self;
+        }
         let mut i = 1;
         // Run until the deadline is reached.
         loop {
@@ -161,8 +181,13 @@ where
         }
 
         debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
+        self
+    }
 
-        self.block
+    /// Run several rounds, building a block by iteratively adding simulated
+    /// items.
+    pub async fn build(self) -> BuiltBlock {
+        self.run_build().await.block
     }
 }
 

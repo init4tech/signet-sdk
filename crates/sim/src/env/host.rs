@@ -55,6 +55,11 @@ impl<Db, Insp> HostEnv<Db, Insp> {
         Self { db: Arc::new(CacheDB::new(db)), constants, cfg, block, _pd: PhantomData }
     }
 
+    /// Get a reference to the inner database.
+    pub const fn db(&self) -> &InnerDb<Db> {
+        &self.db
+    }
+
     /// Get a mutable reference to the inner database.
     pub const fn db_mut(&mut self) -> &mut InnerDb<Db> {
         &mut self.db

@@ -1,5 +1,6 @@
 use alloy::primitives::U256;
 use signet_test_utils::{
+    contracts::counter::{Counter::incrementCall, COUNTER_SLOT, COUNTER_TEST_ADDRESS},
     evm::test_sim_env,
     specs::{signed_simple_call, simple_bundle},
     test_constants::*,
@@ -8,6 +9,7 @@ use signet_test_utils::{
 use signet_types::UnsignedOrder;
 use signet_zenith::{HostOrders::fillCall, RollupOrders::initiateCall};
 use std::time::{Duration, Instant};
+use trevm::revm::DatabaseRef;
 
 #[tokio::test]
 async fn host_sim() {
@@ -433,6 +435,68 @@ async fn larger_bundle_revert_ok() {
 
     let block = builder.build().await;
 
+    assert_eq!(block.transactions().len(), 2);
+    assert_eq!(block.host_transactions().len(), 2);
+}
+
+// Test checks that host cache simulation works when consuming all host balance
+#[tokio::test]
+async fn host_cache_between_bundles() {
+    let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
+
+    let increment_call = incrementCall {};
+
+    // Make RU and HOST transactions
+    // In this test the ru txns are dummies. We're testing that the host cache
+    // updates correctly.
+    let ru_tx = signed_simple_call(
+        &TEST_SIGNERS[0],
+        TEST_USERS[1],
+        &increment_call,
+        U256::ZERO,
+        0,
+        TEST_SYS.ru_chain_id(),
+    );
+    let ru_tx_1 = signed_simple_call(
+        &TEST_SIGNERS[1],
+        TEST_USERS[1],
+        &increment_call,
+        U256::ZERO,
+        0,
+        TEST_SYS.ru_chain_id(),
+    );
+
+    let host_tx = signed_simple_call(
+        &TEST_SIGNERS[2],
+        COUNTER_TEST_ADDRESS,
+        &increment_call,
+        U256::ZERO,
+        0,
+        TEST_SYS.host_chain_id(),
+    );
+    let host_tx_1 = signed_simple_call(
+        &TEST_SIGNERS[3],
+        COUNTER_TEST_ADDRESS,
+        &increment_call,
+        U256::ZERO,
+        0,
+        TEST_SYS.host_chain_id(),
+    );
+
+    let bundle = simple_bundle(vec![ru_tx], vec![host_tx], 0);
+    let bundle_1 = simple_bundle(vec![ru_tx_1], vec![host_tx_1], 0);
+
+    builder.sim_items().add_bundle(bundle, 0).unwrap();
+    builder.sim_items().add_bundle(bundle_1, 0).unwrap();
+
+    let builder = builder.run_build().await;
+
+    assert_eq!(
+        builder.host_env().db().storage_ref(COUNTER_TEST_ADDRESS, COUNTER_SLOT).unwrap(),
+        U256::from(2)
+    );
+
+    let block = builder.into_block();
     assert_eq!(block.transactions().len(), 2);
     assert_eq!(block.host_transactions().len(), 2);
 }
