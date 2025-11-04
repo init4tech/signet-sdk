@@ -3,11 +3,12 @@ use signet_evm::{signet_precompiles, EvmNeedsTx, OrderDetector, SignetLayered};
 use signet_types::constants::SignetSystemConstants;
 use std::{marker::PhantomData, sync::Arc, time::Instant};
 use trevm::{
+    db::TryCachingDb,
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
     revm::{
         context::{BlockEnv, CfgEnv},
-        database::CacheDB,
+        database::{Cache, CacheDB},
         inspector::{Inspector, NoOpInspector},
         DatabaseRef,
     },
@@ -119,5 +120,27 @@ where
             .expect("db set")
             .fill_cfg(&self.cfg)
             .fill_block(&self.block)
+    }
+}
+
+impl<Db, Insp> HostEnv<Db, Insp>
+where
+    Db: DatabaseRef,
+    Insp: Inspector<Ctx<SimDb<Db>>> + Default + Sync,
+{
+    /// Accepts a cache from the simulation and extends the database with it.
+    pub fn accept_cache(
+        &mut self,
+        cache: Cache,
+    ) -> Result<(), <InnerDb<Db> as TryCachingDb>::Error> {
+        self.db_mut().try_extend(cache)
+    }
+
+    /// Accepts a cache from the simulation and extends the database with it.
+    pub fn accept_cache_ref(
+        &mut self,
+        cache: &Cache,
+    ) -> Result<(), <InnerDb<Db> as TryCachingDb>::Error> {
+        self.db_mut().try_extend_ref(cache)
     }
 }

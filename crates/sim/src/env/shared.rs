@@ -106,15 +106,15 @@ where
 
         // Remove the item from the cache.
         let item = self.sim_items().remove(outcome.cache_rank)?;
+
+        let inner = Arc::get_mut(&mut self.inner).expect("sims dropped already");
+
         // Accept the cache from the simulation.
-        Arc::get_mut(&mut self.inner)
-            .expect("sims dropped already")
-            .rollup_mut()
-            .accept_cache_ref(&outcome.rollup_cache)
-            .ok()?;
+        inner.rollup_mut().accept_cache_ref(&outcome.rollup_cache).ok()?;
+        // Accept the host cache from the simulation.
+        inner.host_mut().accept_cache_ref(&outcome.host_cache).ok()?;
         // Accept the aggregate fills and orders.
-        Arc::get_mut(&mut self.inner)
-            .expect("sims dropped already")
+        inner
             .rollup_mut()
             .accept_aggregates(&outcome.bundle_fills, &outcome.bundle_orders)
             .expect("checked during simulation");
