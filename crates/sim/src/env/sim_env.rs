@@ -135,7 +135,7 @@ where
                 let reason = trevm.result().output().cloned().map(hex::encode);
                 let halted = trevm.result().is_halt();
                 let halt_reason = if let ExecutionResult::Halt { reason, .. } = trevm.result() {
-                    Some(*reason)
+                    Some(reason.clone())
                 } else {
                     None
                 };

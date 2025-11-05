@@ -54,7 +54,6 @@ pub fn signet_evm<Db: Database + DatabaseCommit>(
         .with_insp(Layered::new(NoOpInspector, OrderDetector::for_rollup(constants)))
         .with_precompiles(signet_precompiles())
         .build_trevm()
-        .expect("db set")
 }
 
 /// Create a new EVM with the given database and inspector.
@@ -74,5 +73,4 @@ where
         .with_insp(inspector)
         .with_precompiles(signet_precompiles())
         .build_trevm()
-        .expect("db set")
 }

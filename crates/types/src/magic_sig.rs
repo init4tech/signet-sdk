@@ -1,7 +1,6 @@
+use crate::alias_address;
 use alloy::primitives::{Address, Signature, B256};
 use signet_zenith::MINTER_ADDRESS;
-
-use crate::alias_address;
 
 /// A sentinel value to identify the magic signature. This is encoded in the
 /// S value, and renders the S value invalid for Ethereum-based chains
@@ -54,7 +53,13 @@ pub enum MagicSigInfo {
     Transact {
         /// The address of the sender.
         sender: Address,
-        /// Whether the sender address was aliased.
+        /// Whether the sender address was aliased. This is set by the system,
+        /// and could be set for any reason. It causes the output of
+        /// [`Self::rollup_sender`] to be aliased according to Optimism
+        /// conventions.
+        ///
+        /// Typically, this is true for `Transact` events emitted by
+        /// non-ephemeral contracts.
         aliased: bool,
     },
 }
