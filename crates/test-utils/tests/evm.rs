@@ -46,6 +46,7 @@ impl TestEnv {
         let header = Header { gas_limit: 30_000_000, ..Default::default() };
         SignetDriver::new(
             extracts,
+            Default::default(),
             txns.into(),
             SealedHeader::new(header),
             SignetSystemConstants::test(),
@@ -345,7 +346,7 @@ fn test_a_transact() {
         MintNative::new(&extracts.enter_tokens[2], USDC_RECORD.decimals()).with_nonce(3);
     let expected_tx_3 = expected_sys_3.produce_transaction();
 
-    let expected_tx_4 = extracts.transacts[0].make_transaction(0);
+    let expected_tx_4 = extracts.transacts[0].make_transaction(0, false);
 
     assert_eq!(
         sealed_block.senders,

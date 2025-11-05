@@ -6,13 +6,14 @@ use alloy::{
 };
 use core::fmt;
 use signet_extract::ExtractedEvent;
-use signet_types::{primitives::TransactionSigned, MagicSig};
+use signet_types::{primitives::TransactionSigned, MagicSig, MagicSigInfo};
 use signet_zenith::Transactor;
 use trevm::{revm::context::TxEnv, Tx};
 
 /// Shim to impl [`Tx`] for [`Transactor::Transact`].
 #[derive(PartialEq, Eq)]
 pub struct TransactSysTx {
+    /// The transact transaction.
     tx: TransactionSigned,
 
     /// The nonce of the transaction.
@@ -23,18 +24,21 @@ pub struct TransactSysTx {
     magic_sig: MagicSig,
 }
 
-impl<'a, R> From<&ExtractedEvent<'a, R, Transactor::Transact>> for TransactSysTx {
-    fn from(transact: &ExtractedEvent<'a, R, Transactor::Transact>) -> Self {
-        Self::new(transact)
-    }
-}
-
 impl TransactSysTx {
     /// Instantiate a new [`TransactSysTx`].
-    pub fn new<R>(transact: &ExtractedEvent<'_, R, Transactor::Transact>) -> Self {
-        let magic_sig = transact.magic_sig();
-        let tx = transact.make_transaction(0);
+    pub fn new<R>(transact: &ExtractedEvent<'_, R, Transactor::Transact>, aliased: bool) -> Self {
+        let magic_sig = transact.magic_sig(aliased);
+        let tx = transact.make_transaction(0, aliased);
         Self { tx, nonce: None, magic_sig }
+    }
+
+    /// Check if the sender was aliased (i.e. the sender is a smart contract on
+    /// the host chain).
+    pub fn is_aliased(&self) -> bool {
+        match self.magic_sig.ty {
+            MagicSigInfo::Transact { aliased, .. } => aliased,
+            _ => unreachable!(),
+        }
     }
 
     /// Create a [`TransactSysLog`] from the filler.
@@ -71,7 +75,7 @@ impl Clone for TransactSysTx {
 impl Tx for TransactSysTx {
     fn fill_tx_env(&self, tx_env: &mut TxEnv) {
         self.tx.as_eip1559().unwrap().fill_tx_env(tx_env);
-        tx_env.caller = self.magic_sig.sender();
+        tx_env.caller = self.magic_sig.rollup_sender();
     }
 }
 
@@ -81,9 +85,11 @@ impl SysBase for TransactSysTx {
     }
 
     fn description(&self) -> String {
+        let is_aliased = if self.is_aliased() { " (aliased)" } else { "" };
+
         format!(
-            "Transact from {} to {} with value {} and {} bytes of input data: `0x{}{}`",
-            self.magic_sig.sender(),
+            "Transact from {}{is_aliased} to {} with value {} and {} bytes of input data: `0x{}{}`",
+            self.magic_sig.rollup_sender(),
             self.tx.to().expect("creates not allowed"),
             format_ether(self.tx.value()),
             self.tx.input().len(),
@@ -116,7 +122,7 @@ impl SysBase for TransactSysTx {
     }
 
     fn evm_sender(&self) -> Address {
-        self.magic_sig.sender()
+        self.magic_sig.rollup_sender()
     }
 }
 

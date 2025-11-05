@@ -1,6 +1,8 @@
 use alloy::primitives::{Address, Signature, B256};
 use signet_zenith::MINTER_ADDRESS;
 
+use crate::alias_address;
+
 /// A sentinel value to identify the magic signature. This is encoded in the
 /// S value, and renders the S value invalid for Ethereum-based chains
 /// supporting EIP-2.
@@ -52,6 +54,8 @@ pub enum MagicSigInfo {
     Transact {
         /// The address of the sender.
         sender: Address,
+        /// Whether the sender address was aliased.
+        aliased: bool,
     },
 }
 
@@ -70,7 +74,8 @@ impl MagicSigInfo {
         debug_assert_eq!(buf.len(), 32);
 
         buf[8] = self.flag();
-        if let Self::Transact { sender } = self {
+        if let Self::Transact { sender, aliased } = self {
+            buf[11] = *aliased as u8;
             buf[12..32].copy_from_slice(sender.as_slice());
         }
     }
@@ -85,16 +90,34 @@ impl MagicSigInfo {
         match flag {
             Flags::Enter => Some(Self::Enter),
             Flags::EnterToken => Some(Self::EnterToken),
-            Flags::Transact => Some(Self::Transact { sender: Address::from_slice(&s[12..]) }),
+            Flags::Transact => {
+                Some(Self::Transact { aliased: s[11] != 0, sender: Address::from_slice(&s[12..]) })
+            }
         }
     }
 
     /// Get the sender from the magic signature info. For enter and enter token
     /// events, this is the [`MINTER_ADDRESS`]. For transact events, this is the
     /// sender.
-    pub const fn sender(&self) -> Address {
+    pub const fn raw_sender(&self) -> Address {
         match self {
-            Self::Transact { sender } => *sender,
+            Self::Transact { sender, .. } => *sender,
+            _ => MINTER_ADDRESS,
+        }
+    }
+
+    /// Get the rollup sender from the magic signature info. For enter and
+    /// enter token events, this is the [`MINTER_ADDRESS`]. For transact events,
+    /// this is the aliased or non-aliased sender.
+    pub fn rollup_sender(&self) -> Address {
+        match self {
+            Self::Transact { sender, aliased } => {
+                if *aliased {
+                    alias_address(*sender)
+                } else {
+                    *sender
+                }
+            }
             _ => MINTER_ADDRESS,
         }
     }
@@ -173,13 +196,13 @@ impl MagicSig {
     }
 
     /// Create a new [`MagicSig`] for a transact event.
-    pub const fn transact(txid: B256, event_idx: usize, sender: Address) -> Self {
-        Self { ty: MagicSigInfo::Transact { sender }, txid, event_idx }
+    pub const fn transact(txid: B256, aliased: bool, event_idx: usize, sender: Address) -> Self {
+        Self { ty: MagicSigInfo::Transact { sender, aliased }, txid, event_idx }
     }
 
     /// Get the sender of the magic signature.
-    pub const fn sender(&self) -> Address {
-        self.ty.sender()
+    pub fn rollup_sender(&self) -> Address {
+        self.ty.rollup_sender()
     }
 }
 
@@ -229,10 +252,13 @@ mod test {
         let txid = B256::repeat_byte(0xcc);
         let sender = Address::repeat_byte(0x12);
 
-        let msig = MagicSig::transact(txid, u32::MAX as usize, sender);
+        let msig = MagicSig::transact(txid, false, u32::MAX as usize, sender);
         let sig: Signature = msig.into();
+        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig));
 
-        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig))
+        let msig = MagicSig::transact(txid, true, 0, sender);
+        let sig: Signature = msig.into();
+        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig));
     }
 
     #[test]
@@ -241,7 +267,8 @@ mod test {
         let sig = tx.signature();
         let msig = MagicSig::try_from_signature(sig).unwrap();
         // The sender should be equivalent to the minter address.
-        // Only on transact events the sender is the actual initiator of the tx on L1.
-        assert_eq!(msig.sender(), MINTER_ADDRESS)
+        // Only on transact events the sender is the actual caller of the
+        // transaction on L1
+        assert_eq!(msig.rollup_sender(), MINTER_ADDRESS)
     }
 }

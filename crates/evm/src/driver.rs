@@ -8,7 +8,7 @@ use alloy::{
         TxType,
     },
     eips::eip1559::{BaseFeeParams, INITIAL_BASE_FEE as EIP1559_INITIAL_BASE_FEE},
-    primitives::{Address, Bloom, U256},
+    primitives::{map::HashSet, Address, Bloom, U256},
 };
 use signet_extract::{Extractable, Extracts};
 use signet_types::{
@@ -195,6 +195,10 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     /// The block extracts.
     pub(crate) extracts: &'a Extracts<'b, C>,
 
+    /// Set of addresses that generated transact events and should be aliased
+    /// because they contain code.
+    pub(crate) to_alias: HashSet<Address>,
+
     /// Parent rollup block.
     parent: SealedHeader,
 
@@ -222,6 +226,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     /// Create a new driver.
     pub fn new(
         extracts: &'a Extracts<'b, C>,
+        to_alias: HashSet<Address>,
         to_process: VecDeque<TransactionSigned>,
         parent: SealedHeader,
         constants: SignetSystemConstants,
@@ -232,6 +237,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             + extracts.enter_tokens.len();
         Self {
             extracts,
+            to_alias,
             parent,
             constants,
             working_context: extracts.aggregate_fills(),

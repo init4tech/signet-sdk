@@ -397,7 +397,12 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             count = self.extracts.transacts.len()
         )
         .entered();
-        let transacts = self.extracts.transacts.iter().map(TransactSysTx::new);
+        let transacts: Vec<_> = self
+            .extracts
+            .transacts
+            .iter()
+            .map(|t| TransactSysTx::new(t, self.to_alias.contains(&t.event.sender)))
+            .collect();
         self.apply_metered_sys_transactions(trevm, transacts)
     }
 
