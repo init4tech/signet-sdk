@@ -15,8 +15,8 @@
 #[macro_use]
 mod macros;
 
-mod aliases;
-pub use aliases::*;
+mod types;
+pub use types::*;
 
 mod driver;
 pub use driver::SignetDriver;
