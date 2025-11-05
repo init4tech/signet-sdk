@@ -374,30 +374,37 @@ mod transactor {
     impl Copy for Transactor::GasConfigured {}
 
     impl Transactor::Transact {
+        /// Get the chain ID of the event (discarding high bytes).
         pub const fn rollup_chain_id(&self) -> u64 {
             self.rollupChainId.as_limbs()[0]
         }
 
-        pub const fn sender(&self) -> Address {
+        /// Get the host sender that triggered the event.
+        pub const fn host_sender(&self) -> Address {
             self.sender
         }
 
+        /// Get the recipient of the transact.
         pub const fn to(&self) -> Address {
             self.to
         }
 
+        /// Get the data of the transact.
         pub const fn data(&self) -> &Bytes {
             &self.data
         }
 
+        /// Get the value of the transact.
         pub const fn value(&self) -> U256 {
             self.value
         }
 
+        /// Get the max fee per gas of the transact.
         pub fn max_fee_per_gas(&self) -> u128 {
             self.maxFeePerGas.to::<u128>()
         }
 
+        /// Get the gas limit of the transact.
         pub fn gas(&self) -> u128 {
             self.gas.to::<u128>()
         }

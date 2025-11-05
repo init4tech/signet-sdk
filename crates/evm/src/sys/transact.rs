@@ -30,7 +30,7 @@ impl<'a, R> From<&ExtractedEvent<'a, R, Transactor::Transact>> for TransactSysTx
 }
 
 impl TransactSysTx {
-    /// Instantiate a new [`TransactFiller`].
+    /// Instantiate a new [`TransactSysTx`].
     pub fn new<R>(transact: &ExtractedEvent<'_, R, Transactor::Transact>) -> Self {
         let magic_sig = transact.magic_sig();
         let tx = transact.make_transaction(0);
@@ -53,8 +53,9 @@ impl TransactSysTx {
 // NB: manual impl because of incorrect auto-derive bound on `R: Debug`
 impl fmt::Debug for TransactSysTx {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TransactFiller")
+        f.debug_struct("TransactSysTx")
             .field("transact", &self.tx)
+            .field("nonce", &self.nonce)
             .field("magic_sig", &self.magic_sig)
             .finish()
     }
