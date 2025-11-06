@@ -1,18 +1,21 @@
 //! The endpoints for the transaction cache.
+use std::collections::HashMap;
+
 use alloy::{consensus::TxEnvelope, primitives::B256};
 use serde::{Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_types::SignedOrder;
+use uuid::Uuid;
 
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CacheResponse<T> {
+pub enum CacheResponse<T, C: CursorKey> {
     /// A paginated response, containing the inner item and a pagination info.
     Paginated {
         /// The actual item.
         inner: T,
         /// The pagination info.
-        pagination: PaginationInfo,
+        pagination: PaginationInfo<C>,
     },
     /// An unpaginated response, containing the actual item.
     Unpaginated {
@@ -21,9 +24,9 @@ pub enum CacheResponse<T> {
     },
 }
 
-impl<T> CacheResponse<T> {
+impl<T, C: CursorKey> CacheResponse<T, C> {
     /// Create a new paginated response from a list of items and a pagination info.
-    pub const fn paginated(inner: T, pagination: PaginationInfo) -> Self {
+    pub const fn paginated(inner: T, pagination: PaginationInfo<C>) -> Self {
         Self::Paginated { inner, pagination }
     }
 
@@ -49,7 +52,7 @@ impl<T> CacheResponse<T> {
     }
 
     /// Return the pagination info, if any.
-    pub const fn pagination_info(&self) -> Option<&PaginationInfo> {
+    pub const fn pagination_info(&self) -> Option<&PaginationInfo<C>> {
         match self {
             Self::Paginated { pagination, .. } => Some(pagination),
             Self::Unpaginated { .. } => None,
@@ -75,7 +78,7 @@ impl<T> CacheResponse<T> {
     }
 
     /// Consume the response and return the parts.
-    pub fn into_parts(self) -> (T, Option<PaginationInfo>) {
+    pub fn into_parts(self) -> (T, Option<PaginationInfo<C>>) {
         match self {
             Self::Paginated { inner, pagination } => (inner, Some(pagination)),
             Self::Unpaginated { inner } => (inner, None),
@@ -83,7 +86,7 @@ impl<T> CacheResponse<T> {
     }
 
     /// Consume the response and return the pagination info, if any.
-    pub fn into_pagination_info(self) -> Option<PaginationInfo> {
+    pub fn into_pagination_info(self) -> Option<PaginationInfo<C>> {
         match self {
             Self::Paginated { pagination, .. } => Some(pagination),
             Self::Unpaginated { .. } => None,
@@ -363,14 +366,16 @@ impl TxCacheOrdersResponse {
 /// Represents the pagination information from a transaction cache response.
 /// This applies to all GET endpoints that return a list of items.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginationInfo {
-    next_cursor: Option<String>,
+pub struct PaginationInfo<T: CursorKey> {
+    /// The next cursor.
+    next_cursor: Option<T>,
+    /// Whether there is a next page.
     has_next_page: bool,
 }
 
-impl PaginationInfo {
+impl<T: CursorKey> PaginationInfo<T> {
     /// Create a new [`PaginationInfo`].
-    pub const fn new(next_cursor: Option<String>, has_next_page: bool) -> Self {
+    pub const fn new(next_cursor: Option<T>, has_next_page: bool) -> Self {
         Self { next_cursor, has_next_page }
     }
 
@@ -380,12 +385,12 @@ impl PaginationInfo {
     }
 
     /// Get the next cursor.
-    pub fn next_cursor(&self) -> Option<&str> {
-        self.next_cursor.as_deref()
+    pub const fn next_cursor(&self) -> Option<&T> {
+        self.next_cursor.as_ref()
     }
 
     /// Consume the [`PaginationInfo`] and return the next cursor.
-    pub fn into_next_cursor(self) -> Option<String> {
+    pub fn into_next_cursor(self) -> Option<T> {
         self.next_cursor
     }
 
@@ -395,34 +400,97 @@ impl PaginationInfo {
     }
 }
 
-/// A query for pagination.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct PaginationParams {
-    /// The cursor to start from.
-    cursor: Option<String>,
-    /// The number of items to return.
-    limit: Option<u32>,
+/// A trait for allowing crusor keys to be converted into an URL query object.
+pub trait CursorKey {
+    /// Convert the cursor key into a URL query object.
+    fn to_query_object(&self) -> HashMap<String, String>;
 }
 
-impl From<PaginationInfo> for PaginationParams {
-    fn from(info: PaginationInfo) -> Self {
-        Self { cursor: info.into_next_cursor(), limit: None }
+/// The query object keys for the transaction GET endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TxKey {
+    /// The transaction hash    
+    pub txn_hash: B256,
+    /// The transaction score
+    pub score: u64,
+    /// The global transaction score key
+    pub global_transaction_score_key: String,
+}
+
+impl CursorKey for TxKey {
+    fn to_query_object(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("txn_hash".to_string(), self.txn_hash.to_string());
+        map.insert("score".to_string(), self.score.to_string());
+        map.insert(
+            "global_transaction_score_key".to_string(),
+            self.global_transaction_score_key.to_string(),
+        );
+        map
     }
 }
 
-impl PaginationParams {
+/// The query object keys for the bundle GET endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleKey {
+    /// The bundle id
+    pub id: Uuid,
+    /// The bundle score
+    pub score: u64,
+    /// The global bundle score key
+    pub global_bundle_score_key: String,
+}
+
+impl CursorKey for BundleKey {
+    fn to_query_object(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("id".to_string(), self.id.to_string());
+        map.insert("score".to_string(), self.score.to_string());
+        map.insert("global_bundle_score_key".to_string(), self.global_bundle_score_key.to_string());
+        map
+    }
+}
+
+/// The query object keys for the order GET endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderKey {
+    /// The order id
+    pub id: String,
+}
+
+impl CursorKey for OrderKey {
+    fn to_query_object(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("id".to_string(), self.id.to_string());
+        map
+    }
+}
+
+/// A query for pagination.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct PaginationParams<T: CursorKey> {
+    /// The cursor to start from.
+    cursor: T,
+    /// The number of items to return.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    limit: Option<u32>,
+}
+
+impl<T: CursorKey> PaginationParams<T> {
     /// Creates a new instance of [`PaginationParams`].
-    pub const fn new(cursor: Option<String>, limit: Option<u32>) -> Self {
+    pub const fn new(cursor: T, limit: Option<u32>) -> Self {
         Self { cursor, limit }
     }
 
     /// Get the cursor to start from.
-    pub fn cursor(&self) -> Option<&str> {
-        self.cursor.as_deref()
+    pub const fn cursor(&self) -> &T {
+        &self.cursor
     }
 
     /// Consumes the [`PaginationParams`] and returns the cursor.
-    pub fn into_cursor(self) -> Option<String> {
+    pub fn into_cursor(self) -> T {
         self.cursor
     }
 
@@ -430,29 +498,10 @@ impl PaginationParams {
     pub fn with_limit(self, limit: u32) -> Self {
         Self { limit: Some(limit), cursor: self.cursor }
     }
+}
 
-    /// Set the cursor for the pagination params.
-    pub fn with_cursor(self, cursor: Option<String>) -> Self {
-        Self { cursor, limit: self.limit }
-    }
-
-    /// Get the number of items to return.
-    pub const fn limit(&self) -> Option<u32> {
-        self.limit
-    }
-
-    /// Check if the query has a cursor.
-    pub const fn has_cursor(&self) -> bool {
-        self.cursor.is_some()
-    }
-
-    /// Check if the query has a limit.
-    pub const fn has_limit(&self) -> bool {
-        self.limit.is_some()
-    }
-
-    /// Check if the query is empty (has no cursor and no limit).
-    pub const fn is_empty(&self) -> bool {
-        !self.has_cursor() && !self.has_limit()
+impl<T: CursorKey> CursorKey for PaginationParams<T> {
+    fn to_query_object(&self) -> HashMap<String, String> {
+        self.cursor.to_query_object()
     }
 }

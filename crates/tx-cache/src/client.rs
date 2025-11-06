@@ -1,6 +1,6 @@
 use crate::types::{
-    CacheResponse, PaginationParams, TxCacheOrdersResponse, TxCacheSendBundleResponse,
-    TxCacheSendTransactionResponse, TxCacheTransactionsResponse,
+    CacheResponse, CursorKey, OrderKey, PaginationParams, TxCacheOrdersResponse,
+    TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -114,10 +114,10 @@ impl TxCache {
             .map_err(Into::into)
     }
 
-    async fn get_inner_with_query<T>(
+    async fn get_inner_with_query<C: CursorKey, T>(
         &self,
         join: &'static str,
-        query: PaginationParams,
+        query: PaginationParams<C>,
     ) -> Result<T, Error>
     where
         T: DeserializeOwned,
@@ -128,14 +128,7 @@ impl TxCache {
             .join(join)
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
 
-        let mut request = self.client.get(url);
-
-        if let Some(cursor) = query.cursor() {
-            request = request.query(&[("cursor", cursor)]);
-        }
-        if let Some(limit) = query.limit() {
-            request = request.query(&[("limit", limit)]);
-        }
+        let request = self.client.get(url).query(&query.cursor().to_query_object());
 
         request
             .send()
@@ -174,16 +167,16 @@ impl TxCache {
     #[instrument(skip_all)]
     pub async fn get_transactions(
         &self,
-        query: Option<PaginationParams>,
-    ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
+        query: Option<PaginationParams<TxKey>>,
+    ) -> Result<CacheResponse<TxCacheTransactionsResponse, TxKey>, Error> {
         if let Some(query) = query {
-            self.get_inner_with_query::<CacheResponse<TxCacheTransactionsResponse>>(
+            self.get_inner_with_query::<TxKey, CacheResponse<TxCacheTransactionsResponse, TxKey>>(
                 TRANSACTIONS,
                 query,
             )
             .await
         } else {
-            self.get_inner::<CacheResponse<TxCacheTransactionsResponse>>(TRANSACTIONS).await
+            self.get_inner::<CacheResponse<TxCacheTransactionsResponse, TxKey>>(TRANSACTIONS).await
         }
     }
 
@@ -191,12 +184,15 @@ impl TxCache {
     #[instrument(skip_all)]
     pub async fn get_orders(
         &self,
-        query: Option<PaginationParams>,
-    ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
+        query: Option<PaginationParams<OrderKey>>,
+    ) -> Result<CacheResponse<TxCacheOrdersResponse, OrderKey>, Error> {
         if let Some(query) = query {
-            self.get_inner_with_query::<CacheResponse<TxCacheOrdersResponse>>(ORDERS, query).await
+            self.get_inner_with_query::<OrderKey, CacheResponse<TxCacheOrdersResponse, OrderKey>>(
+                ORDERS, query,
+            )
+            .await
         } else {
-            self.get_inner::<CacheResponse<TxCacheOrdersResponse>>(ORDERS).await
+            self.get_inner::<CacheResponse<TxCacheOrdersResponse, OrderKey>>(ORDERS).await
         }
     }
 }
