@@ -43,6 +43,11 @@ impl RollupConstants {
         Self { chain_id, orders, passage, base_fee_recipient, tokens }
     }
 
+    /// Get the hard-coded Mainnet rollup constants.
+    pub const fn mainnet() -> Self {
+        crate::chains::mainnet::ROLLUP
+    }
+
     /// Get the hard-coded Pecorino rollup constants.
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::ROLLUP
@@ -111,6 +116,7 @@ impl TryFrom<KnownChains> for RollupConstants {
 
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
+            KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 /// The list of known chains as a string.
-const KNOWN_CHAINS: &str = "pecorino, test";
+const KNOWN_CHAINS: &str = "mainnet, pecorino, test";
 
 /// Error type for parsing struct from a chain name.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -14,6 +14,8 @@ pub enum ParseChainError {
 /// Known chains for the Signet system.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum KnownChains {
+    /// Mainnet chain.
+    Mainnet,
     /// Pecorino chain.
     Pecorino,
     /// Test chain.
@@ -26,8 +28,9 @@ impl FromStr for KnownChains {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim().to_lowercase();
         match s.as_str() {
-            "test" => Ok(Self::Test),
+            "mainnet" => Ok(Self::Mainnet),
             "pecorino" => Ok(Self::Pecorino),
+            "test" => Ok(Self::Test),
             _ => Err(ParseChainError::ChainNotSupported(s)),
         }
     }
