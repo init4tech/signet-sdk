@@ -47,6 +47,11 @@ impl SignetSystemConstants {
         Self { host, rollup }
     }
 
+    /// Get the hard-coded Mainnet constants.
+    pub const fn mainnet() -> Self {
+        crate::chains::mainnet::MAINNET_SYS
+    }
+
     /// Get the hard-coded Pecorino constants.
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::PECORINO_SYS
@@ -225,6 +230,7 @@ impl TryFrom<KnownChains> for SignetSystemConstants {
 
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
+            KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
@@ -255,6 +261,11 @@ impl SignetConstants {
         environment: SignetEnvironmentConstants,
     ) -> Self {
         Self { system, environment }
+    }
+
+    /// Get the hard-coded Mainnet rollup constants.
+    pub const fn mainnet() -> Self {
+        crate::chains::mainnet::MAINNET
     }
 
     /// Get the hard-coded Pecorino rollup constants.
@@ -293,6 +304,7 @@ impl TryFrom<KnownChains> for SignetConstants {
 
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
+            KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
