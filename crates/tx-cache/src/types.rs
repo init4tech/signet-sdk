@@ -1,11 +1,22 @@
 //! The endpoints for the transaction cache.
-use std::collections::HashMap;
-
 use alloy::{consensus::TxEnvelope, primitives::B256};
 use serde::{Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_types::SignedOrder;
+use std::collections::HashMap;
 use uuid::Uuid;
+
+/// A trait for allowing crusor keys to be converted into an URL query object.
+pub trait CursorKey {
+    /// Convert the cursor key into a URL query object.
+    fn to_query_object(&self) -> HashMap<String, String>;
+}
+
+/// A trait for types that can be used as a cache object.
+pub trait CacheObject {
+    /// The cursor key type for the cache object.
+    type Key: CursorKey;
+}
 
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +33,10 @@ pub enum CacheResponse<T, C: CursorKey> {
         /// The actual item.
         inner: T,
     },
+}
+
+impl<T, C: CursorKey> CacheObject for CacheResponse<T, C> {
+    type Key = C;
 }
 
 impl<T, C: CursorKey> CacheResponse<T, C> {
@@ -194,6 +209,10 @@ impl From<TxCacheBundlesResponse> for Vec<TxCacheBundle> {
     }
 }
 
+impl CacheObject for TxCacheBundlesResponse {
+    type Key = BundleKey;
+}
+
 impl TxCacheBundlesResponse {
     /// Create a new bundle response from a list of bundles.
     pub const fn new(bundles: Vec<TxCacheBundle>) -> Self {
@@ -261,6 +280,10 @@ impl From<TxCacheTransactionsResponse> for Vec<TxEnvelope> {
     fn from(response: TxCacheTransactionsResponse) -> Self {
         response.transactions
     }
+}
+
+impl CacheObject for TxCacheTransactionsResponse {
+    type Key = TxKey;
 }
 
 impl TxCacheTransactionsResponse {
@@ -344,6 +367,10 @@ impl From<TxCacheOrdersResponse> for Vec<SignedOrder> {
     }
 }
 
+impl CacheObject for TxCacheOrdersResponse {
+    type Key = OrderKey;
+}
+
 impl TxCacheOrdersResponse {
     /// Create a new order response from a list of orders.
     pub const fn new(orders: Vec<SignedOrder>) -> Self {
@@ -398,12 +425,6 @@ impl<T: CursorKey> PaginationInfo<T> {
     pub const fn has_next_page(&self) -> bool {
         self.has_next_page
     }
-}
-
-/// A trait for allowing crusor keys to be converted into an URL query object.
-pub trait CursorKey {
-    /// Convert the cursor key into a URL query object.
-    fn to_query_object(&self) -> HashMap<String, String>;
 }
 
 /// The query object keys for the transaction GET endpoint.

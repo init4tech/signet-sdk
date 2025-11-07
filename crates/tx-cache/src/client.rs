@@ -1,5 +1,5 @@
 use crate::types::{
-    CacheResponse, CursorKey, OrderKey, PaginationParams, TxCacheOrdersResponse,
+    CacheObject, CacheResponse, CursorKey, OrderKey, PaginationParams, TxCacheOrdersResponse,
     TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
@@ -114,13 +114,13 @@ impl TxCache {
             .map_err(Into::into)
     }
 
-    async fn get_inner_with_query<C: CursorKey, T>(
+    async fn get_inner_with_query<T>(
         &self,
         join: &'static str,
-        query: PaginationParams<C>,
+        query: PaginationParams<T::Key>,
     ) -> Result<T, Error>
     where
-        T: DeserializeOwned,
+        T: DeserializeOwned + CacheObject,
     {
         // Append the path to the URL.
         let url = self
@@ -170,13 +170,9 @@ impl TxCache {
         query: Option<PaginationParams<TxKey>>,
     ) -> Result<CacheResponse<TxCacheTransactionsResponse, TxKey>, Error> {
         if let Some(query) = query {
-            self.get_inner_with_query::<TxKey, CacheResponse<TxCacheTransactionsResponse, TxKey>>(
-                TRANSACTIONS,
-                query,
-            )
-            .await
+            self.get_inner_with_query(TRANSACTIONS, query).await
         } else {
-            self.get_inner::<CacheResponse<TxCacheTransactionsResponse, TxKey>>(TRANSACTIONS).await
+            self.get_inner(TRANSACTIONS).await
         }
     }
 
@@ -187,12 +183,9 @@ impl TxCache {
         query: Option<PaginationParams<OrderKey>>,
     ) -> Result<CacheResponse<TxCacheOrdersResponse, OrderKey>, Error> {
         if let Some(query) = query {
-            self.get_inner_with_query::<OrderKey, CacheResponse<TxCacheOrdersResponse, OrderKey>>(
-                ORDERS, query,
-            )
-            .await
+            self.get_inner_with_query(ORDERS, query).await
         } else {
-            self.get_inner::<CacheResponse<TxCacheOrdersResponse, OrderKey>>(ORDERS).await
+            self.get_inner(ORDERS).await
         }
     }
 }
