@@ -20,6 +20,7 @@ pub trait CacheObject {
 
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum CacheResponse<T, C: CursorKey> {
     /// A paginated response, containing the inner item and a pagination info.
     Paginated {
