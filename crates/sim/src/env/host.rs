@@ -122,7 +122,6 @@ where
             .with_insp(inspector)
             .with_precompiles(signet_precompiles())
             .build_trevm()
-            .expect("db set")
             .fill_cfg(&self.cfg)
             .fill_block(&self.block)
     }

@@ -35,3 +35,6 @@ mod signing;
 pub use signing::{
     SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
 };
+
+mod utils;
+pub use utils::{alias_address, unalias_address};

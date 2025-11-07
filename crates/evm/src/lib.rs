@@ -15,8 +15,8 @@
 #[macro_use]
 mod macros;
 
-mod aliases;
-pub use aliases::*;
+mod types;
+pub use types::*;
 
 mod driver;
 pub use driver::SignetDriver;
@@ -54,25 +54,23 @@ pub fn signet_evm<Db: Database + DatabaseCommit>(
         .with_insp(Layered::new(NoOpInspector, OrderDetector::for_rollup(constants)))
         .with_precompiles(signet_precompiles())
         .build_trevm()
-        .expect("db set")
 }
 
 /// Create a new EVM with the given database and inspector.
 pub fn signet_evm_with_inspector<Db, I>(
     db: Db,
-    inner: I,
+    outer: I,
     constants: SignetSystemConstants,
 ) -> EvmNeedsCfg<Db, I>
 where
     I: Inspector<Ctx<Db>>,
     Db: Database + DatabaseCommit,
 {
-    let inspector = SignetLayered::new(inner, OrderDetector::for_rollup(constants));
+    let inspector = SignetLayered::new(outer, OrderDetector::for_rollup(constants));
 
     TrevmBuilder::new()
         .with_db(db)
         .with_insp(inspector)
         .with_precompiles(signet_precompiles())
         .build_trevm()
-        .expect("db set")
 }

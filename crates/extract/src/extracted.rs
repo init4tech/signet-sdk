@@ -224,22 +224,22 @@ impl<'a, R> ExtractedEvent<'a, R, Events> {
 impl<R> ExtractedEvent<'_, R, Transactor::Transact> {
     /// Create a magic signature for the transact event, containing sender
     /// information.
-    pub fn magic_sig(&self) -> MagicSig {
+    pub fn magic_sig(&self, aliased: bool) -> MagicSig {
         MagicSig {
-            ty: MagicSigInfo::Transact { sender: self.event.host_sender() },
+            ty: MagicSigInfo::Transact { sender: self.event.host_sender(), aliased },
             txid: self.tx_hash(),
             event_idx: self.log_index,
         }
     }
 
     /// Create the signature for the transact event.
-    fn signature(&self) -> alloy::primitives::Signature {
-        self.magic_sig().into()
+    fn signature(&self, aliased: bool) -> alloy::primitives::Signature {
+        self.magic_sig(aliased).into()
     }
 
     /// Make the transaction that corresponds to this transact event,
     /// using the provided nonce.
-    pub fn make_transaction(&self, nonce: u64) -> TransactionSigned {
+    pub fn make_transaction(&self, nonce: u64, aliased: bool) -> TransactionSigned {
         TransactionSigned::new_unhashed(
             Transaction::Eip1559(TxEip1559 {
                 chain_id: self.rollup_chain_id(),
@@ -252,7 +252,7 @@ impl<R> ExtractedEvent<'_, R, Transactor::Transact> {
                 access_list: Default::default(),
                 input: self.data.clone(),
             }),
-            self.signature(),
+            self.signature(aliased),
         )
     }
 }

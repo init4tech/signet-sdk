@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.13.0"
+version = "0.14.0"
 edition = "2021"
 rust-version = "1.85"
 authors = ["init4"]
@@ -34,21 +34,21 @@ debug = false
 incremental = false
 
 [workspace.dependencies]
-signet-bundle = { version = "0.13", path = "crates/bundle" }
-signet-constants = { version = "0.13", path = "crates/constants" }
-signet-evm = { version = "0.13", path = "crates/evm" }
-signet-extract = { version = "0.13", path = "crates/extract" }
-signet-journal = { version = "0.13", path = "crates/journal" }
-signet-node = { version = "0.13", path = "crates/node" }
-signet-sim = { version = "0.13", path = "crates/sim" }
-signet-types = { version = "0.13", path = "crates/types" }
-signet-tx-cache = { version = "0.13", path = "crates/tx-cache" }
-signet-zenith = { version = "0.13", path = "crates/zenith" }
+signet-bundle = { version = "0.14", path = "crates/bundle" }
+signet-constants = { version = "0.14", path = "crates/constants" }
+signet-evm = { version = "0.14", path = "crates/evm" }
+signet-extract = { version = "0.14", path = "crates/extract" }
+signet-journal = { version = "0.14", path = "crates/journal" }
+signet-node = { version = "0.14", path = "crates/node" }
+signet-sim = { version = "0.14", path = "crates/sim" }
+signet-types = { version = "0.14", path = "crates/types" }
+signet-tx-cache = { version = "0.14", path = "crates/tx-cache" }
+signet-zenith = { version = "0.14", path = "crates/zenith" }
 
-signet-test-utils = { version = "0.13", path = "crates/test-utils" }
+signet-test-utils = { version = "0.14", path = "crates/test-utils" }
 
 # trevm
-trevm = { version = "0.29.0", features = ["full_env_cfg"] }
+trevm = { version = "0.31.0", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
 alloy-core = "1.4"
