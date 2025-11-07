@@ -519,6 +519,11 @@ impl<T: CursorKey> PaginationParams<T> {
     pub fn with_limit(self, limit: u32) -> Self {
         Self { limit: Some(limit), cursor: self.cursor }
     }
+
+    /// Get the limit for the items returned.
+    pub const fn limit(&self) -> Option<u32> {
+        self.limit
+    }
 }
 
 impl<T: CursorKey> CursorKey for PaginationParams<T> {
