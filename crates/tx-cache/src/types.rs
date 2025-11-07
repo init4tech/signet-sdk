@@ -21,14 +21,17 @@ pub trait CacheObject {
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum CacheResponse<T, C: CursorKey> {
+pub enum CacheResponse<T: CacheObject>
+where
+    T::Key: Serialize + for<'a> Deserialize<'a>,
+{
     /// A paginated response, containing the inner item and a pagination info.
     Paginated {
         /// The actual item.
         #[serde(flatten)]
         inner: T,
         /// The pagination info.
-        pagination: PaginationInfo<C>,
+        pagination: PaginationInfo<T::Key>,
     },
     /// An unpaginated response, containing the actual item.
     Unpaginated {
@@ -38,13 +41,19 @@ pub enum CacheResponse<T, C: CursorKey> {
     },
 }
 
-impl<T, C: CursorKey> CacheObject for CacheResponse<T, C> {
-    type Key = C;
+impl<T: CacheObject> CacheObject for CacheResponse<T>
+where
+    T::Key: Serialize + for<'a> Deserialize<'a>,
+{
+    type Key = T::Key;
 }
 
-impl<T, C: CursorKey> CacheResponse<T, C> {
+impl<T: CacheObject> CacheResponse<T>
+where
+    T::Key: Serialize + for<'a> Deserialize<'a>,
+{
     /// Create a new paginated response from a list of items and a pagination info.
-    pub const fn paginated(inner: T, pagination: PaginationInfo<C>) -> Self {
+    pub const fn paginated(inner: T, pagination: PaginationInfo<T::Key>) -> Self {
         Self::Paginated { inner, pagination }
     }
 
@@ -70,7 +79,7 @@ impl<T, C: CursorKey> CacheResponse<T, C> {
     }
 
     /// Return the pagination info, if any.
-    pub const fn pagination_info(&self) -> Option<&PaginationInfo<C>> {
+    pub const fn pagination_info(&self) -> Option<&PaginationInfo<T::Key>> {
         match self {
             Self::Paginated { pagination, .. } => Some(pagination),
             Self::Unpaginated { .. } => None,
@@ -96,7 +105,7 @@ impl<T, C: CursorKey> CacheResponse<T, C> {
     }
 
     /// Consume the response and return the parts.
-    pub fn into_parts(self) -> (T, Option<PaginationInfo<C>>) {
+    pub fn into_parts(self) -> (T, Option<PaginationInfo<T::Key>>) {
         match self {
             Self::Paginated { inner, pagination } => (inner, Some(pagination)),
             Self::Unpaginated { inner } => (inner, None),
@@ -104,7 +113,7 @@ impl<T, C: CursorKey> CacheResponse<T, C> {
     }
 
     /// Consume the response and return the pagination info, if any.
-    pub fn into_pagination_info(self) -> Option<PaginationInfo<C>> {
+    pub fn into_pagination_info(self) -> Option<PaginationInfo<T::Key>> {
         match self {
             Self::Paginated { pagination, .. } => Some(pagination),
             Self::Unpaginated { .. } => None,

@@ -108,7 +108,7 @@ impl TxCache {
             .get(url)
             .send()
             .await
-            .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache"))?
+            .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache."))?
             .json::<T>()
             .await
             .map_err(Into::into)
@@ -168,7 +168,7 @@ impl TxCache {
     pub async fn get_transactions(
         &self,
         query: Option<PaginationParams<TxKey>>,
-    ) -> Result<CacheResponse<TxCacheTransactionsResponse, TxKey>, Error> {
+    ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
         if let Some(query) = query {
             self.get_inner_with_query(TRANSACTIONS, query).await
         } else {
@@ -181,7 +181,7 @@ impl TxCache {
     pub async fn get_orders(
         &self,
         query: Option<PaginationParams<OrderKey>>,
-    ) -> Result<CacheResponse<TxCacheOrdersResponse, OrderKey>, Error> {
+    ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
         if let Some(query) = query {
             self.get_inner_with_query(ORDERS, query).await
         } else {
