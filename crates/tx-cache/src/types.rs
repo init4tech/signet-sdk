@@ -396,16 +396,16 @@ impl TxCacheOrdersResponse {
 /// Represents the pagination information from a transaction cache response.
 /// This applies to all GET endpoints that return a list of items.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginationInfo<T: CursorKey> {
+pub struct PaginationInfo<C: CursorKey> {
     /// The next cursor.
-    next_cursor: Option<T>,
+    next_cursor: Option<C>,
     /// Whether there is a next page.
     has_next_page: bool,
 }
 
-impl<T: CursorKey> PaginationInfo<T> {
+impl<C: CursorKey> PaginationInfo<C> {
     /// Create a new [`PaginationInfo`].
-    pub const fn new(next_cursor: Option<T>, has_next_page: bool) -> Self {
+    pub const fn new(next_cursor: Option<C>, has_next_page: bool) -> Self {
         Self { next_cursor, has_next_page }
     }
 
@@ -415,12 +415,12 @@ impl<T: CursorKey> PaginationInfo<T> {
     }
 
     /// Get the next cursor.
-    pub const fn next_cursor(&self) -> Option<&T> {
+    pub const fn next_cursor(&self) -> Option<&C> {
         self.next_cursor.as_ref()
     }
 
     /// Consume the [`PaginationInfo`] and return the next cursor.
-    pub fn into_next_cursor(self) -> Option<T> {
+    pub fn into_next_cursor(self) -> Option<C> {
         self.next_cursor
     }
 
@@ -494,27 +494,27 @@ impl CursorKey for OrderKey {
 
 /// A query for pagination.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct PaginationParams<T: CursorKey> {
+pub struct PaginationParams<C: CursorKey> {
     /// The cursor to start from.
-    cursor: T,
+    cursor: C,
     /// The number of items to return.
     #[serde(skip_serializing_if = "Option::is_none")]
     limit: Option<u32>,
 }
 
-impl<T: CursorKey> PaginationParams<T> {
+impl<C: CursorKey> PaginationParams<C> {
     /// Creates a new instance of [`PaginationParams`].
-    pub const fn new(cursor: T, limit: Option<u32>) -> Self {
+    pub const fn new(cursor: C, limit: Option<u32>) -> Self {
         Self { cursor, limit }
     }
 
     /// Get the cursor to start from.
-    pub const fn cursor(&self) -> &T {
+    pub const fn cursor(&self) -> &C {
         &self.cursor
     }
 
     /// Consumes the [`PaginationParams`] and returns the cursor.
-    pub fn into_cursor(self) -> T {
+    pub fn into_cursor(self) -> C {
         self.cursor
     }
 
@@ -529,7 +529,7 @@ impl<T: CursorKey> PaginationParams<T> {
     }
 }
 
-impl<T: CursorKey> CursorKey for PaginationParams<T> {
+impl<C: CursorKey> CursorKey for PaginationParams<C> {
     fn to_query_object(&self) -> HashMap<String, String> {
         self.cursor.to_query_object()
     }
