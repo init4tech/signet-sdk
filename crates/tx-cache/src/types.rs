@@ -25,6 +25,7 @@ pub enum CacheResponse<T, C: CursorKey> {
     /// A paginated response, containing the inner item and a pagination info.
     Paginated {
         /// The actual item.
+        #[serde(flatten)]
         inner: T,
         /// The pagination info.
         pagination: PaginationInfo<C>,
@@ -32,6 +33,7 @@ pub enum CacheResponse<T, C: CursorKey> {
     /// An unpaginated response, containing the actual item.
     Unpaginated {
         /// The actual item.
+        #[serde(flatten)]
         inner: T,
     },
 }
