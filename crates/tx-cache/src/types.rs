@@ -402,6 +402,36 @@ impl TxCacheOrdersResponse {
     }
 }
 
+/// Response from the transaction cache to successfully adding an order.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct TxCacheSendOrderResponse {
+    /// The order id
+    pub id: B256,
+}
+
+impl From<B256> for TxCacheSendOrderResponse {
+    fn from(id: B256) -> Self {
+        Self { id }
+    }
+}
+
+impl From<TxCacheSendOrderResponse> for B256 {
+    fn from(response: TxCacheSendOrderResponse) -> Self {
+        response.id
+    }
+}
+
+impl CacheObject for TxCacheSendOrderResponse {
+    type Key = OrderKey;
+}
+
+impl TxCacheSendOrderResponse {
+    /// Create a new order response from an order id.
+    pub const fn new(id: B256) -> Self {
+        Self { id }
+    }
+}
+
 /// Represents the pagination information from a transaction cache response.
 /// This applies to all GET endpoints that return a list of items.
 #[derive(Debug, Clone, Serialize, Deserialize)]
