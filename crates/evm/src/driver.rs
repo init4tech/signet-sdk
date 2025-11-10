@@ -29,7 +29,7 @@ use trevm::{
         database::State,
         Database, DatabaseCommit, Inspector,
     },
-    trevm_try, BlockDriver, BlockOutput, Tx,
+    trevm_try, Block, BlockDriver, BlockOutput, Cfg, Tx,
 };
 
 /// Used internally to signal that the transaction should be discarded.
@@ -562,7 +562,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     }
 }
 
-impl<C: Extractable> trevm::Cfg for SignetDriver<'_, '_, C> {
+impl<C: Extractable> Cfg for SignetDriver<'_, '_, C> {
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnv) {
         cfg_env.chain_id = self.extracts.chain_id;
     }
@@ -630,7 +630,7 @@ where
     }
 }
 
-impl<C: Extractable> trevm::Block for SignetDriver<'_, '_, C> {
+impl<C: Extractable> Block for SignetDriver<'_, '_, C> {
     fn fill_block_env(&self, block_env: &mut BlockEnv) {
         let BlockEnv {
             number,

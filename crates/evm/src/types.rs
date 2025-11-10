@@ -1,12 +1,13 @@
 use super::*;
 #[allow(unused_imports)]
 use trevm::{
+    inspectors::Layered,
     revm::{context::result::EVMError, inspector::NoOpInspector, Database},
     Block, Cfg, Trevm,
 };
 
 /// Layered inspector containing an [`OrderDetector`].
-pub type SignetLayered<I> = trevm::inspectors::Layered<I, OrderDetector>;
+pub type SignetLayered<I> = Layered<I, OrderDetector>;
 
 /// A [`Trevm`] that requires a [`Cfg`].
 ///

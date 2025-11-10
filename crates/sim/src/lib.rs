@@ -15,6 +15,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod built;
+
 pub use built::BuiltBlock;
 
 mod cache;
@@ -35,11 +36,18 @@ pub use outcome::SimOutcomeWithCache;
 mod task;
 pub use task::BlockBuild;
 
+use std::sync::Arc;
+use trevm::{
+    db::cow::CacheOnWrite,
+    inspectors::{Layered, TimeLimit},
+    revm::database::CacheDB,
+};
+
 /// A type alias for the database underlying the simulation.
-pub type InnerDb<Db> = std::sync::Arc<trevm::revm::database::CacheDB<Db>>;
+pub type InnerDb<Db> = Arc<CacheDB<Db>>;
 
 /// A type alias for the database used in the simulation.
-pub type SimDb<Db> = trevm::db::cow::CacheOnWrite<InnerDb<Db>>;
+pub type SimDb<Db> = CacheOnWrite<InnerDb<Db>>;
 
 /// A time-limited layered inspector.
-pub type TimeLimited<Insp> = trevm::inspectors::Layered<trevm::inspectors::TimeLimit, Insp>;
+pub type TimeLimited<Insp> = Layered<TimeLimit, Insp>;

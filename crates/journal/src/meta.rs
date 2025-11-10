@@ -1,6 +1,5 @@
-use std::borrow::Cow;
-
 use alloy::{consensus::Header, primitives::B256};
+use std::borrow::Cow;
 use trevm::journal::{JournalDecode, JournalDecodeError, JournalEncode};
 
 /// Metadata for a block journal. This includes the block header, the host

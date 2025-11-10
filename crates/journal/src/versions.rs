@@ -1,7 +1,6 @@
-use alloy::{consensus::Header, primitives::B256};
-use trevm::journal::{JournalDecode, JournalEncode};
-
 use crate::HostJournal;
+use alloy::{consensus::Header, primitives::B256};
+use trevm::journal::{JournalDecode, JournalDecodeError, JournalEncode};
 
 /// Journal versions.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,11 +73,11 @@ impl JournalEncode for Journal<'_> {
 }
 
 impl JournalDecode for Journal<'static> {
-    fn decode(buf: &mut &[u8]) -> Result<Self, trevm::journal::JournalDecodeError> {
+    fn decode(buf: &mut &[u8]) -> Result<Self, JournalDecodeError> {
         let version: u8 = JournalDecode::decode(buf)?;
         match version {
             1 => JournalDecode::decode(buf).map(Journal::V1),
-            _ => Err(trevm::journal::JournalDecodeError::InvalidTag {
+            _ => Err(JournalDecodeError::InvalidTag {
                 ty_name: "Journal",
                 tag: version,
                 max_expected: 1,
