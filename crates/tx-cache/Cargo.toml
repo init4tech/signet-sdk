@@ -21,4 +21,4 @@ eyre.workspace = true
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tracing.workspace = true
-uuid = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["serde", "v4"] }

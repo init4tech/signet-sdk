@@ -183,6 +183,10 @@ impl From<TxCacheBundleResponse> for TxCacheBundle {
     }
 }
 
+impl CacheObject for TxCacheBundleResponse {
+    type Key = BundleKey;
+}
+
 impl TxCacheBundleResponse {
     /// Create a new bundle response from a bundle.
     pub const fn new(bundle: TxCacheBundle) -> Self {
@@ -275,6 +279,10 @@ impl From<TxCacheSendBundleResponse> for uuid::Uuid {
     }
 }
 
+impl CacheObject for TxCacheSendBundleResponse {
+    type Key = BundleKey;
+}
+
 /// Response from the transaction cache `transactions` endpoint, containing a list of transactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxCacheTransactionsResponse {
@@ -339,6 +347,10 @@ impl From<TxCacheSendTransactionResponse> for B256 {
     fn from(response: TxCacheSendTransactionResponse) -> Self {
         response.tx_hash
     }
+}
+
+impl CacheObject for TxCacheSendTransactionResponse {
+    type Key = TxKey;
 }
 
 impl TxCacheSendTransactionResponse {

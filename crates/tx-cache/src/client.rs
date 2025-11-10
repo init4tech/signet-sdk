@@ -93,43 +93,26 @@ impl TxCache {
         self.client.post(url).json(&obj).send().await?.error_for_status().map_err(Into::into)
     }
 
-    async fn get_inner<T>(&self, join: &'static str) -> Result<T, Error>
-    where
-        T: DeserializeOwned,
-    {
-        // Append the path to the URL.
-        let url = self
-            .url
-            .join(join)
-            .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
-
-        // Get the result.
-        self.client
-            .get(url)
-            .send()
-            .await
-            .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache."))?
-            .json::<T>()
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn get_inner_with_query<T>(
+    async fn get_inner<T>(
         &self,
         join: &'static str,
-        query: PaginationParams<T::Key>,
+        query: Option<PaginationParams<T::Key>>,
     ) -> Result<T, Error>
     where
         T: DeserializeOwned + CacheObject,
     {
-        // Append the path to the URL.
         let url = self
             .url
             .join(join)
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
 
-        let request = self.client.get(url).query(&query.cursor().to_query_object());
+        let request = if let Some(query) = query {
+            self.client.get(url).query(&query.cursor().to_query_object())
+        } else {
+            self.client.get(url)
+        };
 
+        // Get the result.
         request
             .send()
             .await
@@ -169,11 +152,7 @@ impl TxCache {
         &self,
         query: Option<PaginationParams<TxKey>>,
     ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
-        if let Some(query) = query {
-            self.get_inner_with_query(TRANSACTIONS, query).await
-        } else {
-            self.get_inner(TRANSACTIONS).await
-        }
+        self.get_inner(TRANSACTIONS, query).await
     }
 
     /// Get signed orders from the URL.
@@ -182,10 +161,6 @@ impl TxCache {
         &self,
         query: Option<PaginationParams<OrderKey>>,
     ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
-        if let Some(query) = query {
-            self.get_inner_with_query(ORDERS, query).await
-        } else {
-            self.get_inner(ORDERS).await
-        }
+        self.get_inner(ORDERS, query).await
     }
 }
