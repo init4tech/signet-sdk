@@ -156,7 +156,7 @@ impl SignetCallBundle {
     }
 
     /// Decode and validate the transactions in the bundle.
-    pub fn decode_and_validate_txs<Db: trevm::revm::Database>(
+    pub fn decode_and_validate_txs<Db: Database>(
         &self,
     ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
         let txs = self

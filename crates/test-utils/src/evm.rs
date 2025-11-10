@@ -27,7 +27,7 @@ use trevm::{
         state::{Account, AccountInfo, Bytecode, EvmState, EvmStorageSlot},
         Database, DatabaseCommit, Inspector,
     },
-    NoopBlock,
+    Cfg, NoopBlock,
 };
 
 /// Create a new Signet EVM with an in-memory database for testing.
@@ -70,7 +70,7 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestCfg;
 
-impl trevm::Cfg for TestCfg {
+impl Cfg for TestCfg {
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnv) {
         let CfgEnv { chain_id, spec, .. } = cfg_env;
 
@@ -83,7 +83,7 @@ impl trevm::Cfg for TestCfg {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostTestCfg;
 
-impl trevm::Cfg for HostTestCfg {
+impl Cfg for HostTestCfg {
     fn fill_cfg_env(&self, cfg_env: &mut CfgEnv) {
         let CfgEnv { chain_id, spec, .. } = cfg_env;
 
