@@ -548,15 +548,12 @@ impl CursorKey for OrderKey {
 pub struct PaginationParams<C: CursorKey> {
     /// The cursor to start from.
     cursor: C,
-    /// The number of items to return.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<u32>,
 }
 
 impl<C: CursorKey> PaginationParams<C> {
     /// Creates a new instance of [`PaginationParams`].
-    pub const fn new(cursor: C, limit: Option<u32>) -> Self {
-        Self { cursor, limit }
+    pub const fn new(cursor: C) -> Self {
+        Self { cursor }
     }
 
     /// Get the cursor to start from.
@@ -567,16 +564,6 @@ impl<C: CursorKey> PaginationParams<C> {
     /// Consumes the [`PaginationParams`] and returns the cursor.
     pub fn into_cursor(self) -> C {
         self.cursor
-    }
-
-    /// Set the limit for the pagination params.
-    pub fn with_limit(self, limit: u32) -> Self {
-        Self { limit: Some(limit), cursor: self.cursor }
-    }
-
-    /// Get the limit for the items returned.
-    pub const fn limit(&self) -> Option<u32> {
-        self.limit
     }
 }
 

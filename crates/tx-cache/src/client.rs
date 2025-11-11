@@ -106,11 +106,7 @@ impl TxCache {
             .join(join)
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
 
-        let request = if let Some(query) = query {
-            self.client.get(url).query(&query.cursor().to_query_object())
-        } else {
-            self.client.get(url)
-        };
+        let request = self.client.get(url).query(&query.map(|q| q.to_query_object()));
 
         // Get the result.
         request
