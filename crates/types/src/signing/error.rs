@@ -24,8 +24,9 @@ pub enum SigningError {
     MissingChainId,
     /// Missing rollup chain id for a Fill.
     #[error(
-        "Rollup chain id is missing. Populate it by calling with_ru_chain_id before attempting to sign"
+        "Rollup chain id is missing. Populate it by calling with_chain before attempting to sign"
     )]
+    #[deprecated(since = "0.14.1", note = "Use MissingChainId instead.")]
     MissingRollupChainId,
     /// Missing chain config for a specific chain.
     #[error("Target Order contract address is missing for chain id {0}. Populate it by calling with_chain before attempting to sign")]

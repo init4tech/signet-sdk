@@ -271,7 +271,7 @@ impl<'a> UnsignedFill<'a> {
             .ok_or(SigningError::MissingOrderContract(target_chain_id))?;
 
         // get the rollup chain id, or throw an error if not set
-        let ru_chain_id = self.ru_chain_id.ok_or(SigningError::MissingRollupChainId)?;
+        let ru_chain_id = self.ru_chain_id.ok_or(SigningError::MissingChainId)?;
 
         // get the outputs for the target chain from the AggregateOrders
         let outputs = self.orders.outputs_for(target_chain_id, ru_chain_id);
