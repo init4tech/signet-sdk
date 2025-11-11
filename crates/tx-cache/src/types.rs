@@ -450,19 +450,17 @@ impl TxCacheSendOrderResponse {
 pub struct PaginationInfo<C: CursorKey> {
     /// The next cursor.
     next_cursor: Option<C>,
-    /// Whether there is a next page.
-    has_next_page: bool,
 }
 
 impl<C: CursorKey> PaginationInfo<C> {
     /// Create a new [`PaginationInfo`].
-    pub const fn new(next_cursor: Option<C>, has_next_page: bool) -> Self {
-        Self { next_cursor, has_next_page }
+    pub const fn new(next_cursor: Option<C>) -> Self {
+        Self { next_cursor }
     }
 
     /// Create an empty [`PaginationInfo`].
     pub const fn empty() -> Self {
-        Self { next_cursor: None, has_next_page: false }
+        Self { next_cursor: None }
     }
 
     /// Get the next cursor.
@@ -477,7 +475,7 @@ impl<C: CursorKey> PaginationInfo<C> {
 
     /// Check if there is a next page in the response.
     pub const fn has_next_page(&self) -> bool {
-        self.has_next_page
+        self.next_cursor.is_some()
     }
 }
 
