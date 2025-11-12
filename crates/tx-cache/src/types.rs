@@ -545,28 +545,22 @@ impl CursorKey for OrderKey {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct PaginationParams<C: CursorKey> {
     /// The cursor to start from.
-    cursor: C,
+    cursor: Option<C>,
 }
 
 impl<C: CursorKey> PaginationParams<C> {
     /// Creates a new instance of [`PaginationParams`].
-    pub const fn new(cursor: C) -> Self {
+    pub const fn new(cursor: Option<C>) -> Self {
         Self { cursor }
     }
 
     /// Get the cursor to start from.
-    pub const fn cursor(&self) -> &C {
-        &self.cursor
+    pub const fn cursor(&self) -> Option<&C> {
+        self.cursor.as_ref()
     }
 
     /// Consumes the [`PaginationParams`] and returns the cursor.
-    pub fn into_cursor(self) -> C {
+    pub fn into_cursor(self) -> Option<C> {
         self.cursor
-    }
-}
-
-impl<C: CursorKey> CursorKey for PaginationParams<C> {
-    fn to_query_object(&self) -> HashMap<String, String> {
-        self.cursor.to_query_object()
     }
 }
