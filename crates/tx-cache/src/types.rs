@@ -1,7 +1,7 @@
 //! The endpoints for the transaction cache.
 use alloy::{consensus::TxEnvelope, primitives::B256};
 use serde::{
-    de::{MapAccess, SeqAccess, Visitor},
+    de::{DeserializeOwned, MapAccess, SeqAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 use signet_bundle::SignetEthBundle;
@@ -11,20 +11,20 @@ use uuid::Uuid;
 /// A trait for types that can be used as a cache object.
 pub trait CacheObject {
     /// The cursor key type for the cache object.
-    type Key: Serialize + for<'a> Deserialize<'a>;
+    type Key: Serialize + DeserializeOwned;
 }
 
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CacheResponse<T: CacheObject> {
-    /// A paginated response, containing the inner item and a pagination info.
+    /// A paginated response, containing the inner item and a next cursor.
     Paginated {
         /// The actual item.
         #[serde(flatten)]
         inner: T,
-        /// The pagination info.
-        pagination: PaginationInfo<T::Key>,
+        /// The next cursor for pagination, if any.
+        next_cursor: Option<T::Key>,
     },
     /// An unpaginated response, containing the actual item.
     Unpaginated {
@@ -40,8 +40,8 @@ impl<T: CacheObject> CacheObject for CacheResponse<T> {
 
 impl<T: CacheObject> CacheResponse<T> {
     /// Create a new paginated response from a list of items and a pagination info.
-    pub const fn paginated(inner: T, pagination: PaginationInfo<T::Key>) -> Self {
-        Self::Paginated { inner, pagination }
+    pub const fn paginated(inner: T, pagination: T::Key) -> Self {
+        Self::Paginated { inner, next_cursor: Some(pagination) }
     }
 
     /// Create a new unpaginated response from a list of items.
@@ -65,12 +65,17 @@ impl<T: CacheObject> CacheResponse<T> {
         }
     }
 
-    /// Return the pagination info, if any.
-    pub const fn pagination_info(&self) -> Option<&PaginationInfo<T::Key>> {
+    /// Return the next cursor for pagination, if any.
+    pub const fn next_cursor(&self) -> Option<&T::Key> {
         match self {
-            Self::Paginated { pagination, .. } => Some(pagination),
+            Self::Paginated { next_cursor, .. } => next_cursor.as_ref(),
             Self::Unpaginated { .. } => None,
         }
+    }
+
+    /// Check if the response has more items to fetch.
+    pub const fn has_more(&self) -> bool {
+        self.next_cursor().is_some()
     }
 
     /// Check if the response is paginated.
@@ -92,15 +97,15 @@ impl<T: CacheObject> CacheResponse<T> {
     }
 
     /// Consume the response and return the parts.
-    pub fn into_parts(self) -> (T, Option<PaginationInfo<T::Key>>) {
+    pub fn into_parts(self) -> (T, Option<T::Key>) {
         match self {
-            Self::Paginated { inner, pagination } => (inner, Some(pagination)),
+            Self::Paginated { inner, next_cursor } => (inner, next_cursor),
             Self::Unpaginated { inner } => (inner, None),
         }
     }
 
-    /// Consume the response and return the pagination info, if any.
-    pub fn into_pagination_info(self) -> Option<PaginationInfo<T::Key>> {
+    /// Consume the response and return the next cursor for pagination, if any.
+    pub fn into_next_cursor(self) -> Option<T::Key> {
         self.into_parts().1
     }
 }
@@ -425,41 +430,6 @@ impl TxCacheSendOrderResponse {
     /// Create a new order response from an order id.
     pub const fn new(id: B256) -> Self {
         Self { id }
-    }
-}
-
-/// Represents the pagination information from a transaction cache response.
-/// This applies to all GET endpoints that return a list of items.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginationInfo<C> {
-    /// The next cursor.
-    next_cursor: Option<C>,
-}
-
-impl<C> PaginationInfo<C> {
-    /// Create a new [`PaginationInfo`].
-    pub const fn new(next_cursor: Option<C>) -> Self {
-        Self { next_cursor }
-    }
-
-    /// Create an empty [`PaginationInfo`].
-    pub const fn empty() -> Self {
-        Self { next_cursor: None }
-    }
-
-    /// Get the next cursor.
-    pub const fn next_cursor(&self) -> Option<&C> {
-        self.next_cursor.as_ref()
-    }
-
-    /// Consume the [`PaginationInfo`] and return the next cursor.
-    pub fn into_next_cursor(self) -> Option<C> {
-        self.next_cursor
-    }
-
-    /// Check if there is a next page in the response.
-    pub const fn has_next_page(&self) -> bool {
-        self.next_cursor.is_some()
     }
 }
 
