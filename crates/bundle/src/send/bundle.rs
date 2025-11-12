@@ -117,21 +117,6 @@ impl SignetEthBundle {
     }
 }
 
-/// Response for `signet_sendBundle`.
-///
-/// This is based on the flashbots `eth_sendBundle` response. See [their docs].
-///
-/// [their docs]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SignetEthBundleResponse {
-    /// The bundle hash of the sent bundle.
-    ///
-    /// This is calculated as keccak256(tx_hashes) where tx_hashes are the
-    /// concatenated transaction hashes.
-    pub bundle_hash: B256,
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -186,15 +171,5 @@ mod test {
         let deserialized: SignetEthBundle = serde_json::from_str(json).unwrap();
 
         assert!(deserialized.host_txs.is_empty());
-    }
-
-    #[test]
-    fn send_bundle_resp_ser_roundtrip() {
-        let resp = SignetEthBundleResponse { bundle_hash: B256::repeat_byte(1) };
-
-        let serialized = serde_json::to_string(&resp).unwrap();
-        let deserialized: SignetEthBundleResponse = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(resp, deserialized);
     }
 }
