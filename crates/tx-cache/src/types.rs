@@ -974,13 +974,13 @@ mod tests {
             "txnHash=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&score=100";
         let partial_params =
             serde_urlencoded::from_str::<PaginationParams<TxKey>>(partial_query_string);
-        assert_eq!(partial_params.is_err(), true);
+        assert!(partial_params.is_err());
 
         let empty_query_string = "";
         let empty_params =
             serde_urlencoded::from_str::<PaginationParams<TxKey>>(empty_query_string);
-        assert_eq!(empty_params.is_ok(), true);
-        assert_eq!(empty_params.unwrap().cursor().is_none(), true);
+        assert!(empty_params.is_ok());
+        assert!(empty_params.unwrap().cursor().is_none());
     }
 
     #[test]
@@ -1006,19 +1006,20 @@ mod tests {
         let partial_query_string = "id=5932d4bb-58d9-41a9-851d-8dd7f04ccc33&score=100";
         let partial_params =
             serde_urlencoded::from_str::<PaginationParams<BundleKey>>(partial_query_string);
-        assert_eq!(partial_params.is_err(), true);
+        assert!(partial_params.is_err());
 
         let empty_query_string = "";
         let empty_params =
             serde_urlencoded::from_str::<PaginationParams<BundleKey>>(empty_query_string);
-        assert_eq!(empty_params.is_err(), false);
+        assert!(empty_params.is_ok());
+        assert!(empty_params.unwrap().cursor().is_none());
     }
 
     #[test]
     fn test_pagination_params_order_deser() {
         let order_key = OrderKey { id: B256::repeat_byte(0xaa) };
 
-        let params = PaginationParams::<OrderKey>::new(Some(order_key.clone()));
+        let params = PaginationParams::<OrderKey>::new(Some(order_key));
         let serialized = serde_urlencoded::to_string(&params).unwrap();
         assert_eq!(
             serialized,

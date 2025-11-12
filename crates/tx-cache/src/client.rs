@@ -1,6 +1,6 @@
 use crate::types::{
-    CacheObject, CacheResponse, CursorKey, OrderKey, PaginationParams, TxCacheOrdersResponse,
-    TxCacheSendBundleResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
+    CacheObject, CacheResponse, OrderKey, TxCacheOrdersResponse, TxCacheSendBundleResponse,
+    TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
