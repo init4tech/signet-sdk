@@ -960,7 +960,7 @@ mod tests {
     #[test]
     fn test_pagination_params_order_deser() {
         let order_key = OrderKey { id: B256::repeat_byte(0xaa) };
-        let serialized = serde_urlencoded::to_string(&order_key).unwrap();
+        let serialized = serde_urlencoded::to_string(order_key).unwrap();
         assert_eq!(
             serialized,
             "id=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
