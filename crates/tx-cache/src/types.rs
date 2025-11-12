@@ -880,8 +880,8 @@ mod tests {
             score: 100,
             global_transaction_score_key: "gtsk".to_string(),
         };
-        let params = PaginationParams::<TxKey>::new(Some(tx_key));
-        let empty_params = PaginationParams::<TxKey>::new(None);
+        let params = tx_key.clone();
+        let empty_params: Option<TxKey> = None;
 
         let serialized = serde_urlencoded::to_string(&params).unwrap();
         let empty_serialized = serde_urlencoded::to_string(&empty_params).unwrap();
@@ -896,8 +896,7 @@ mod tests {
             score: 100,
             global_transaction_score_key: "gtsk".to_string(),
         };
-        let params = PaginationParams::<TxKey>::new(Some(tx_key.clone()));
-        let serialized = serde_urlencoded::to_string(&params).unwrap();
+        let serialized = serde_urlencoded::to_string(&tx_key).unwrap();
         assert_eq!(serialized, "txnHash=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&score=100&globalTransactionScoreKey=gtsk");
 
         let deserialized =
@@ -931,8 +930,7 @@ mod tests {
             global_bundle_score_key: "gbsk".to_string(),
         };
 
-        let params = PaginationParams::<BundleKey>::new(Some(bundle_key.clone()));
-        let serialized = serde_urlencoded::to_string(&params).unwrap();
+        let serialized = serde_urlencoded::to_string(&bundle_key).unwrap();
         assert_eq!(
             serialized,
             "id=5932d4bb-58d9-41a9-851d-8dd7f04ccc33&score=100&globalBundleScoreKey=gbsk"
@@ -962,9 +960,7 @@ mod tests {
     #[test]
     fn test_pagination_params_order_deser() {
         let order_key = OrderKey { id: B256::repeat_byte(0xaa) };
-
-        let params = PaginationParams::<OrderKey>::new(Some(order_key));
-        let serialized = serde_urlencoded::to_string(&params).unwrap();
+        let serialized = serde_urlencoded::to_string(&order_key).unwrap();
         assert_eq!(
             serialized,
             "id=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
