@@ -16,22 +16,14 @@ pub trait CacheObject {
 
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged, rename_all_fields = "camelCase")]
-pub enum CacheResponse<T: CacheObject> {
-    /// A paginated response, containing the inner item and a next cursor.
-    Paginated {
-        /// The actual item.
-        #[serde(flatten)]
-        inner: T,
-        /// The next cursor for pagination, if any.
-        next_cursor: T::Key,
-    },
-    /// An unpaginated response, containing the actual item.
-    Unpaginated {
-        /// The actual item.
-        #[serde(flatten)]
-        inner: T,
-    },
+#[serde(rename_all = "camelCase")]
+pub struct CacheResponse<T: CacheObject> {
+    /// The response.
+    #[serde(flatten)]
+    inner: T,
+    /// The next cursor for pagination, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    next_cursor: Option<T::Key>,
 }
 
 impl<T: CacheObject> CacheObject for CacheResponse<T> {
@@ -41,35 +33,32 @@ impl<T: CacheObject> CacheObject for CacheResponse<T> {
 impl<T: CacheObject> CacheResponse<T> {
     /// Create a new paginated response from a list of items and a pagination info.
     pub const fn paginated(inner: T, pagination: T::Key) -> Self {
-        Self::Paginated { inner, next_cursor: pagination }
+        Self { inner, next_cursor: Some(pagination) }
     }
 
     /// Create a new unpaginated response from a list of items.
     pub const fn unpaginated(inner: T) -> Self {
-        Self::Unpaginated { inner }
+        Self { inner, next_cursor: None }
     }
 
     /// Return a reference to the inner value.
     pub const fn inner(&self) -> &T {
         match self {
-            Self::Paginated { inner, .. } => inner,
-            Self::Unpaginated { inner } => inner,
+            Self { inner, .. } => inner,
         }
     }
 
     /// Return a mutable reference to the inner value.
     pub const fn inner_mut(&mut self) -> &mut T {
         match self {
-            Self::Paginated { inner, .. } => inner,
-            Self::Unpaginated { inner } => inner,
+            Self { inner, .. } => inner,
         }
     }
 
     /// Return the next cursor for pagination, if any.
     pub const fn next_cursor(&self) -> Option<&T::Key> {
         match self {
-            Self::Paginated { next_cursor, .. } => Some(next_cursor),
-            Self::Unpaginated { .. } => None,
+            Self { next_cursor, .. } => next_cursor.as_ref(),
         }
     }
 
@@ -80,27 +69,25 @@ impl<T: CacheObject> CacheResponse<T> {
 
     /// Check if the response is paginated.
     pub const fn is_paginated(&self) -> bool {
-        matches!(self, Self::Paginated { .. })
+        self.next_cursor.is_some()
     }
 
     /// Check if the response is unpaginated.
     pub const fn is_unpaginated(&self) -> bool {
-        matches!(self, Self::Unpaginated { .. })
+        self.next_cursor.is_none()
     }
 
     /// Get the inner value.
     pub fn into_inner(self) -> T {
         match self {
-            Self::Paginated { inner, .. } => inner,
-            Self::Unpaginated { inner } => inner,
+            Self { inner, .. } => inner,
         }
     }
 
     /// Consume the response and return the parts.
     pub fn into_parts(self) -> (T, Option<T::Key>) {
         match self {
-            Self::Paginated { inner, next_cursor } => (inner, Some(next_cursor)),
-            Self::Unpaginated { inner } => (inner, None),
+            Self { inner, next_cursor } => (inner, next_cursor),
         }
     }
 
@@ -889,9 +876,8 @@ mod tests {
 
     #[test]
     fn test_unpaginated_cache_response_deser() {
-        let cache_response = CacheResponse::Unpaginated {
-            inner: TxCacheTransactionsResponse { transactions: vec![] },
-        };
+        let cache_response =
+            CacheResponse::unpaginated(TxCacheTransactionsResponse { transactions: vec![] });
         let expected_json = r#"{"transactions":[]}"#;
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
@@ -903,14 +889,14 @@ mod tests {
 
     #[test]
     fn test_paginated_cache_response_deser() {
-        let cache_response = CacheResponse::Paginated {
-            inner: TxCacheTransactionsResponse { transactions: vec![] },
-            next_cursor: TxKey {
+        let cache_response = CacheResponse::paginated(
+            TxCacheTransactionsResponse { transactions: vec![] },
+            TxKey {
                 txn_hash: B256::repeat_byte(0xaa),
                 score: 100,
                 global_transaction_score_key: "gtsk".to_string(),
             },
-        };
+        );
         let expected_json = r#"{"transactions":[],"nextCursor":{"txnHash":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","score":100,"globalTransactionScoreKey":"gtsk"}}"#;
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
@@ -955,13 +941,11 @@ mod tests {
 
     #[test]
     fn test_unpaginated_cache_bundle_response_deser() {
-        let cache_response = CacheResponse::Unpaginated {
-            inner: TxCacheBundlesResponse {
-                bundles: vec![dummy_bundle_with_id(
-                    Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap(),
-                )],
-            },
-        };
+        let cache_response = CacheResponse::unpaginated(TxCacheBundlesResponse {
+            bundles: vec![dummy_bundle_with_id(
+                Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap(),
+            )],
+        });
         let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}]}"#;
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
@@ -974,14 +958,10 @@ mod tests {
     fn test_paginated_cache_bundle_response_deser() {
         let uuid = Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap();
 
-        let cache_response = CacheResponse::Paginated {
-            inner: TxCacheBundlesResponse { bundles: vec![dummy_bundle_with_id(uuid)] },
-            next_cursor: BundleKey {
-                id: uuid,
-                score: 100,
-                global_bundle_score_key: "gbsk".to_string(),
-            },
-        };
+        let cache_response = CacheResponse::paginated(
+            TxCacheBundlesResponse { bundles: vec![dummy_bundle_with_id(uuid)] },
+            BundleKey { id: uuid, score: 100, global_bundle_score_key: "gbsk".to_string() },
+        );
         let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}],"nextCursor":{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","score":100,"globalBundleScoreKey":"gbsk"}}"#;
         let serialized = serde_json::to_string(&cache_response).unwrap();
         dbg!(&serialized);
