@@ -934,6 +934,11 @@ mod tests {
             serde_urlencoded::from_str::<PaginationParams<TxKey>>(&serialized).unwrap();
         assert_eq!(deserialized.cursor().unwrap(), &tx_key);
 
+        let partial_query_string = "score=100&globalTransactionScoreKey=gtsk";
+        let partial_params =
+            serde_urlencoded::from_str::<PaginationParams<TxKey>>(partial_query_string);
+        assert!(partial_params.is_err());
+
         let partial_query_string =
             "txnHash=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&score=100";
         let partial_params =
@@ -966,6 +971,11 @@ mod tests {
         let deserialized =
             serde_urlencoded::from_str::<PaginationParams<BundleKey>>(&serialized).unwrap();
         assert_eq!(deserialized.cursor().unwrap(), &bundle_key);
+
+        let partial_query_string = "score=100&globalBundleScoreKey=gbsk";
+        let partial_params =
+            serde_urlencoded::from_str::<PaginationParams<BundleKey>>(partial_query_string);
+        assert!(partial_params.is_err());
 
         let partial_query_string = "id=5932d4bb-58d9-41a9-851d-8dd7f04ccc33&score=100";
         let partial_params =
