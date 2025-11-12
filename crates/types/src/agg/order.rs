@@ -72,11 +72,11 @@ impl AggregateOrders {
     /// Ingest a signed order into the aggregate orders.
     pub fn ingest_signed(&mut self, order: &SignedOrder) {
         order
-            .outputs
+            .outputs()
             .iter()
             .for_each(|o| self.ingest_raw_output(o.chainId as u64, o.token, o.recipient, o.amount));
         order
-            .permit
+            .permit()
             .permit
             .permitted
             .iter()
