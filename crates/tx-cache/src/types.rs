@@ -900,7 +900,7 @@ mod tests {
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
         let deserialized =
-            serde_json::from_str::<CacheResponse<TxCacheTransactionsResponse>>(&expected_json)
+            serde_json::from_str::<CacheResponse<TxCacheTransactionsResponse>>(expected_json)
                 .unwrap();
         assert_eq!(deserialized, cache_response);
     }
@@ -911,7 +911,7 @@ mod tests {
     fn test_backwards_compatibility_cache_response_deser() {
         let expected_json = r#"{"transactions":[],"nextCursor":{"txnHash":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","score":100,"globalTransactionScoreKey":"gtsk"}}"#;
         let deserialized =
-            serde_json::from_str::<TxCacheTransactionsResponse>(&expected_json).unwrap();
+            serde_json::from_str::<TxCacheTransactionsResponse>(expected_json).unwrap();
         assert_eq!(deserialized, TxCacheTransactionsResponse { transactions: vec![] });
     }
 
@@ -922,7 +922,7 @@ mod tests {
         let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}]}"#;
         let uuid = Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap();
 
-        let deserialized = serde_json::from_str::<TxCacheBundlesResponse>(&expected_json).unwrap();
+        let deserialized = serde_json::from_str::<TxCacheBundlesResponse>(expected_json).unwrap();
 
         assert_eq!(
             deserialized,
@@ -935,7 +935,7 @@ mod tests {
     #[test]
     fn test_backwards_compatibility_cache_order_response_deser() {
         let expected_json = r#"{"orders":[{"permit":{"permitted":[{"token":"0x0b8bc5e60ee10957e0d1a0d95598fa63e65605e2","amount":"0xf4240"}],"nonce":"0x637253c1eb651","deadline":"0x6846fde6"},"owner":"0x492e9c316f073fe4de9d665221568cdad1a7e95b","signature":"0x73e31a7c80f02840c4e0671230c408a5cbc7cddefc780db4dd102eed8e87c5740fc89944eb8e5756edd368ed755415ed090b043d1740ee6869c20cb1676329621c","outputs":[{"token":"0x885f8db528dc8a38aa3ddad9d3f619746b4a6a81","amount":"0xf4240","recipient":"0x492e9c316f073fe4de9d665221568cdad1a7e95b","chainId":3151908}]}], "id":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
-        let _ = serde_json::from_str::<TxCacheOrdersResponse>(&expected_json).unwrap();
+        let _ = serde_json::from_str::<TxCacheOrdersResponse>(expected_json).unwrap();
     }
 
     #[test]
@@ -949,7 +949,7 @@ mod tests {
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
         let deserialized =
-            serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(&expected_json).unwrap();
+            serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(expected_json).unwrap();
         assert_eq!(deserialized, cache_response);
     }
 
@@ -965,7 +965,7 @@ mod tests {
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
         let deserialized =
-            serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(&expected_json).unwrap();
+            serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(expected_json).unwrap();
         assert_eq!(deserialized, cache_response);
     }
 
