@@ -15,8 +15,8 @@ pub trait CacheObject {
 }
 
 /// A response from the transaction cache, containing an item.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged, rename_all_fields = "camelCase")]
 pub enum CacheResponse<T: CacheObject> {
     /// A paginated response, containing the inner item and a next cursor.
     Paginated {
@@ -24,7 +24,7 @@ pub enum CacheResponse<T: CacheObject> {
         #[serde(flatten)]
         inner: T,
         /// The next cursor for pagination, if any.
-        next_cursor: Option<T::Key>,
+        next_cursor: T::Key,
     },
     /// An unpaginated response, containing the actual item.
     Unpaginated {
@@ -41,7 +41,7 @@ impl<T: CacheObject> CacheObject for CacheResponse<T> {
 impl<T: CacheObject> CacheResponse<T> {
     /// Create a new paginated response from a list of items and a pagination info.
     pub const fn paginated(inner: T, pagination: T::Key) -> Self {
-        Self::Paginated { inner, next_cursor: Some(pagination) }
+        Self::Paginated { inner, next_cursor: pagination }
     }
 
     /// Create a new unpaginated response from a list of items.
@@ -68,7 +68,7 @@ impl<T: CacheObject> CacheResponse<T> {
     /// Return the next cursor for pagination, if any.
     pub const fn next_cursor(&self) -> Option<&T::Key> {
         match self {
-            Self::Paginated { next_cursor, .. } => next_cursor.as_ref(),
+            Self::Paginated { next_cursor, .. } => Some(next_cursor),
             Self::Unpaginated { .. } => None,
         }
     }
@@ -99,7 +99,7 @@ impl<T: CacheObject> CacheResponse<T> {
     /// Consume the response and return the parts.
     pub fn into_parts(self) -> (T, Option<T::Key>) {
         match self {
-            Self::Paginated { inner, next_cursor } => (inner, next_cursor),
+            Self::Paginated { inner, next_cursor } => (inner, Some(next_cursor)),
             Self::Unpaginated { inner } => (inner, None),
         }
     }
@@ -112,7 +112,7 @@ impl<T: CacheObject> CacheResponse<T> {
 
 /// A bundle response from the transaction cache, containing a UUID and a
 /// [`SignetEthBundle`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheBundle {
     /// The bundle id (a UUID)
     pub id: uuid::Uuid,
@@ -154,7 +154,7 @@ impl TxCacheBundle {
 }
 
 /// A response from the transaction cache, containing a single bundle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheBundleResponse {
     /// The bundle.
     pub bundle: TxCacheBundle,
@@ -196,7 +196,7 @@ impl TxCacheBundleResponse {
 }
 
 /// Response from the transaction cache `bundles` endpoint, containing a list of bundles.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheBundlesResponse {
     /// the list of bundles
     pub bundles: Vec<TxCacheBundle>,
@@ -243,7 +243,7 @@ impl TxCacheBundlesResponse {
 }
 
 /// Represents a response to successfully adding or updating a bundle in the transaction cache.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheSendBundleResponse {
     /// The bundle id (a UUID)
     pub id: uuid::Uuid,
@@ -273,7 +273,7 @@ impl CacheObject for TxCacheSendBundleResponse {
 }
 
 /// Response from the transaction cache `transactions` endpoint, containing a list of transactions.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheTransactionsResponse {
     /// The list of transactions.
     pub transactions: Vec<TxEnvelope>,
@@ -320,7 +320,7 @@ impl TxCacheTransactionsResponse {
 }
 
 /// Response from the transaction cache to successfully adding a transaction.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheSendTransactionResponse {
     /// The transaction hash
     pub tx_hash: B256,
@@ -362,7 +362,7 @@ impl TxCacheSendTransactionResponse {
 }
 
 /// Response from the transaction cache `orders` endpoint, containing a list of signed orders.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheOrdersResponse {
     /// The list of signed orders.
     pub orders: Vec<SignedOrder>,
@@ -404,7 +404,7 @@ impl TxCacheOrdersResponse {
 }
 
 /// Response from the transaction cache to successfully adding an order.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxCacheSendOrderResponse {
     /// The order id
     pub id: B256,
@@ -861,9 +861,135 @@ impl<'de> Deserialize<'de> for CursorPayload<OrderKey> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::str::FromStr;
 
-    use super::*;
+    fn dummy_bundle_with_id(id: Uuid) -> TxCacheBundle {
+        TxCacheBundle {
+            id,
+            bundle: SignetEthBundle {
+                bundle: alloy::rpc::types::mev::EthSendBundle {
+                    txs: vec![],
+                    block_number: 0,
+                    min_timestamp: None,
+                    max_timestamp: None,
+                    reverting_tx_hashes: vec![],
+                    replacement_uuid: Some(id.to_string()),
+                    dropping_tx_hashes: vec![],
+                    refund_percent: None,
+                    refund_recipient: None,
+                    refund_tx_hashes: vec![],
+                    extra_fields: Default::default(),
+                },
+                host_fills: None,
+                host_txs: vec![],
+            },
+        }
+    }
+
+    #[test]
+    fn test_unpaginated_cache_response_deser() {
+        let cache_response = CacheResponse::Unpaginated {
+            inner: TxCacheTransactionsResponse { transactions: vec![] },
+        };
+        let expected_json = r#"{"transactions":[]}"#;
+        let serialized = serde_json::to_string(&cache_response).unwrap();
+        assert_eq!(serialized, expected_json);
+        let deserialized =
+            serde_json::from_str::<CacheResponse<TxCacheTransactionsResponse>>(&serialized)
+                .unwrap();
+        assert_eq!(deserialized, cache_response);
+    }
+
+    #[test]
+    fn test_paginated_cache_response_deser() {
+        let cache_response = CacheResponse::Paginated {
+            inner: TxCacheTransactionsResponse { transactions: vec![] },
+            next_cursor: TxKey {
+                txn_hash: B256::repeat_byte(0xaa),
+                score: 100,
+                global_transaction_score_key: "gtsk".to_string(),
+            },
+        };
+        let expected_json = r#"{"transactions":[],"nextCursor":{"txnHash":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","score":100,"globalTransactionScoreKey":"gtsk"}}"#;
+        let serialized = serde_json::to_string(&cache_response).unwrap();
+        assert_eq!(serialized, expected_json);
+        let deserialized =
+            serde_json::from_str::<CacheResponse<TxCacheTransactionsResponse>>(&expected_json)
+                .unwrap();
+        assert_eq!(deserialized, cache_response);
+    }
+
+    // `serde_json` should be able to deserialize the old format, regardless if there's pagination information on the response.
+    // This mimics the behavior of the types pre-pagination.
+    #[test]
+    fn test_backwards_compatibility_cache_response_deser() {
+        let expected_json = r#"{"transactions":[],"nextCursor":{"txnHash":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","score":100,"globalTransactionScoreKey":"gtsk"}}"#;
+        let deserialized =
+            serde_json::from_str::<TxCacheTransactionsResponse>(&expected_json).unwrap();
+        assert_eq!(deserialized, TxCacheTransactionsResponse { transactions: vec![] });
+    }
+
+    // `serde_json` should be able to deserialize the old format, regardless if there's pagination information on the response.
+    // This mimics the behavior of the types pre-pagination.
+    #[test]
+    fn test_backwards_compatibility_cache_bundle_response_deser() {
+        let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}]}"#;
+        let uuid = Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap();
+
+        let deserialized = serde_json::from_str::<TxCacheBundlesResponse>(&expected_json).unwrap();
+
+        assert_eq!(
+            deserialized,
+            TxCacheBundlesResponse { bundles: vec![dummy_bundle_with_id(uuid)] }
+        );
+    }
+
+    // `serde_json` should be able to deserialize the old format, regardless if there's pagination information on the response.
+    // This mimics the behavior of the types pre-pagination.
+    #[test]
+    fn test_backwards_compatibility_cache_order_response_deser() {
+        let expected_json = r#"{"orders":[{"permit":{"permitted":[{"token":"0x0b8bc5e60ee10957e0d1a0d95598fa63e65605e2","amount":"0xf4240"}],"nonce":"0x637253c1eb651","deadline":"0x6846fde6"},"owner":"0x492e9c316f073fe4de9d665221568cdad1a7e95b","signature":"0x73e31a7c80f02840c4e0671230c408a5cbc7cddefc780db4dd102eed8e87c5740fc89944eb8e5756edd368ed755415ed090b043d1740ee6869c20cb1676329621c","outputs":[{"token":"0x885f8db528dc8a38aa3ddad9d3f619746b4a6a81","amount":"0xf4240","recipient":"0x492e9c316f073fe4de9d665221568cdad1a7e95b","chainId":3151908}]}], "id":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}"#;
+        let _ = serde_json::from_str::<TxCacheOrdersResponse>(&expected_json).unwrap();
+    }
+
+    #[test]
+    fn test_unpaginated_cache_bundle_response_deser() {
+        let cache_response = CacheResponse::Unpaginated {
+            inner: TxCacheBundlesResponse {
+                bundles: vec![dummy_bundle_with_id(
+                    Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap(),
+                )],
+            },
+        };
+        let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}]}"#;
+        let serialized = serde_json::to_string(&cache_response).unwrap();
+        assert_eq!(serialized, expected_json);
+        let deserialized =
+            serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(&expected_json).unwrap();
+        assert_eq!(deserialized, cache_response);
+    }
+
+    #[test]
+    fn test_paginated_cache_bundle_response_deser() {
+        let uuid = Uuid::from_str("5932d4bb-58d9-41a9-851d-8dd7f04ccc33").unwrap();
+
+        let cache_response = CacheResponse::Paginated {
+            inner: TxCacheBundlesResponse { bundles: vec![dummy_bundle_with_id(uuid)] },
+            next_cursor: BundleKey {
+                id: uuid,
+                score: 100,
+                global_bundle_score_key: "gbsk".to_string(),
+            },
+        };
+        let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}],"nextCursor":{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","score":100,"globalBundleScoreKey":"gbsk"}}"#;
+        let serialized = serde_json::to_string(&cache_response).unwrap();
+        dbg!(&serialized);
+        assert_eq!(serialized, expected_json);
+        let deserialized =
+            serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(&expected_json).unwrap();
+        assert_eq!(deserialized, cache_response);
+    }
 
     #[test]
     fn test_pagination_params_simple_deser() {
