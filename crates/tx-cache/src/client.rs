@@ -93,11 +93,7 @@ impl TxCache {
         self.client.post(url).json(&obj).send().await?.error_for_status().map_err(Into::into)
     }
 
-    async fn get_inner<T>(
-        &self,
-        join: &'static str,
-        query: Option<PaginationParams<T::Key>>,
-    ) -> Result<T, Error>
+    async fn get_inner<T>(&self, join: &'static str, query: Option<T::Key>) -> Result<T, Error>
     where
         T: DeserializeOwned + CacheObject,
     {
@@ -106,10 +102,7 @@ impl TxCache {
             .join(join)
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
 
-        let request = self
-            .client
-            .get(url)
-            .query(&query.and_then(|q| q.cursor().map(|c| c.to_query_object())));
+        let request = self.client.get(url).query(&query);
 
         // Get the result.
         request
@@ -149,7 +142,7 @@ impl TxCache {
     #[instrument(skip_all)]
     pub async fn get_transactions(
         &self,
-        query: Option<PaginationParams<TxKey>>,
+        query: Option<TxKey>,
     ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
         self.get_inner(TRANSACTIONS, query).await
     }
@@ -158,7 +151,7 @@ impl TxCache {
     #[instrument(skip_all)]
     pub async fn get_orders(
         &self,
-        query: Option<PaginationParams<OrderKey>>,
+        query: Option<OrderKey>,
     ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
         self.get_inner(ORDERS, query).await
     }
