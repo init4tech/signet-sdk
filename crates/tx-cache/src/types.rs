@@ -868,7 +868,6 @@ mod tests {
                     refund_tx_hashes: vec![],
                     extra_fields: Default::default(),
                 },
-                host_fills: None,
                 host_txs: vec![],
             },
         }
