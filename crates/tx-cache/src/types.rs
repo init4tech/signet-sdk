@@ -577,7 +577,7 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
             where
                 S: SeqAccess<'de>,
             {
-                // We consider this a complete request if we have no txn hash.
+                // We consider this a complete request if we have no elements in the sequence.
                 let Some(txn_hash) = seq.next_element()? else {
                     // We consider this a complete request if we have no txn hash.
                     return Ok(PaginationParams::new(None));
@@ -630,9 +630,19 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
                     }
                 }
 
-                // We consider this a complete request if we have no txn hash.
-                let Some(txn_hash) = txn_hash else {
-                    return Ok(PaginationParams::new(None));
+                // We consider this a complete request if we have no txn hash and no other fields are present.
+                let txn_hash = match txn_hash {
+                    Some(hash) => hash,
+                    None => {
+                        if score.is_some() || global_transaction_score_key.is_some() {
+                            return Err(serde::de::Error::invalid_length(
+                                score.is_some() as usize
+                                    + global_transaction_score_key.is_some() as usize,
+                                &self,
+                            ));
+                        }
+                        return Ok(PaginationParams::new(None));
+                    }
                 };
 
                 // For all other items, we require a score and a global transaction score key.
@@ -712,9 +722,8 @@ impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
                 where
                     S: SeqAccess<'de>,
                 {
-                    // We consider this a complete request if we have no txn hash.
+                    // We consider this a complete request if we have no elements in the sequence.
                     let Some(id) = seq.next_element()? else {
-                        // We consider this a complete request if we have no txn hash.
                         return Ok(PaginationParams::new(None));
                     };
 
@@ -765,17 +774,22 @@ impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
                         }
                     }
 
-                    // We consider this a complete request if we have no txn hash.
+                    // We consider this a complete request if we have no id and no other fields are present.
                     let Some(id) = id else {
+                        if score.is_some() || global_bundle_score_key.is_some() {
+                            return Err(serde::de::Error::invalid_length(
+                                score.is_some() as usize
+                                    + global_bundle_score_key.is_some() as usize,
+                                &self,
+                            ));
+                        }
                         return Ok(PaginationParams::new(None));
                     };
 
-                    // For all other items, we require a score and a global transaction score key.
+                    // For all other items, we require a score and a global bundle score key.
                     let score = score.ok_or_else(|| serde::de::Error::missing_field("score"))?;
-                    let global_bundle_score_key = global_bundle_score_key.ok_or_else(|| {
-                        serde::de::Error::missing_field("globalTransactionScoreKey")
-                    })?;
-
+                    let global_bundle_score_key = global_bundle_score_key
+                        .ok_or_else(|| serde::de::Error::missing_field("globalBundleScoreKey"))?;
                     Ok(PaginationParams::new(Some(BundleKey {
                         id,
                         score,
