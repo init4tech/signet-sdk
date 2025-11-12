@@ -464,15 +464,15 @@ pub struct OrderKey {
     pub id: B256,
 }
 
-/// A query for pagination.
+/// A deserialization helper for cursors keys.
 #[derive(Clone, Debug, Serialize)]
-pub struct PaginationParams<C: Serialize + for<'a> Deserialize<'a>> {
-    /// The cursor to start from.
+pub struct CursorPayload<C: Serialize + for<'a> Deserialize<'a>> {
+    // The cursor key.
     #[serde(flatten)]
     cursor: Option<C>,
 }
 
-impl<C: Serialize + for<'a> Deserialize<'a>> PaginationParams<C> {
+impl<C: Serialize + for<'a> Deserialize<'a>> CursorPayload<C> {
     /// Creates a new instance of [`PaginationParams`].
     pub const fn new(cursor: Option<C>) -> Self {
         Self { cursor }
@@ -489,7 +489,7 @@ impl<C: Serialize + for<'a> Deserialize<'a>> PaginationParams<C> {
     }
 }
 
-impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
+impl<'de> Deserialize<'de> for CursorPayload<TxKey> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -537,20 +537,20 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
         struct TxKeyVisitor;
 
         impl<'de> Visitor<'de> for TxKeyVisitor {
-            type Value = PaginationParams<TxKey>;
+            type Value = CursorPayload<TxKey>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("a PaginationParams<TxKey>")
             }
 
-            fn visit_seq<S>(self, mut seq: S) -> Result<PaginationParams<TxKey>, S::Error>
+            fn visit_seq<S>(self, mut seq: S) -> Result<CursorPayload<TxKey>, S::Error>
             where
                 S: SeqAccess<'de>,
             {
                 // We consider this a complete request if we have no elements in the sequence.
                 let Some(txn_hash) = seq.next_element()? else {
                     // We consider this a complete request if we have no txn hash.
-                    return Ok(PaginationParams::new(None));
+                    return Ok(CursorPayload::new(None));
                 };
 
                 // For all other items, we require a score and a global transaction score key.
@@ -560,14 +560,14 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
                 let global_transaction_score_key = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
-                Ok(PaginationParams::new(Some(TxKey {
+                Ok(CursorPayload::new(Some(TxKey {
                     txn_hash,
                     score,
                     global_transaction_score_key,
                 })))
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<PaginationParams<TxKey>, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<CursorPayload<TxKey>, M::Error>
             where
                 M: MapAccess<'de>,
             {
@@ -611,7 +611,7 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
                                 &self,
                             ));
                         }
-                        return Ok(PaginationParams::new(None));
+                        return Ok(CursorPayload::new(None));
                     }
                 };
 
@@ -620,7 +620,7 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
                 let global_transaction_score_key = global_transaction_score_key
                     .ok_or_else(|| serde::de::Error::missing_field("globalTransactionScoreKey"))?;
 
-                Ok(PaginationParams::new(Some(TxKey {
+                Ok(CursorPayload::new(Some(TxKey {
                     txn_hash,
                     score,
                     global_transaction_score_key,
@@ -633,7 +633,7 @@ impl<'de> Deserialize<'de> for PaginationParams<TxKey> {
     }
 }
 
-impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
+impl<'de> Deserialize<'de> for CursorPayload<BundleKey> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -682,19 +682,19 @@ impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
             struct BundleKeyVisitor;
 
             impl<'de> Visitor<'de> for BundleKeyVisitor {
-                type Value = PaginationParams<BundleKey>;
+                type Value = CursorPayload<BundleKey>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter.write_str("a PaginationParams<BundleKey>")
                 }
 
-                fn visit_seq<S>(self, mut seq: S) -> Result<PaginationParams<BundleKey>, S::Error>
+                fn visit_seq<S>(self, mut seq: S) -> Result<CursorPayload<BundleKey>, S::Error>
                 where
                     S: SeqAccess<'de>,
                 {
                     // We consider this a complete request if we have no elements in the sequence.
                     let Some(id) = seq.next_element()? else {
-                        return Ok(PaginationParams::new(None));
+                        return Ok(CursorPayload::new(None));
                     };
 
                     // For all other items, we require a score and a global transaction score key.
@@ -704,14 +704,10 @@ impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
                     let global_bundle_score_key = seq
                         .next_element()?
                         .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
-                    Ok(PaginationParams::new(Some(BundleKey {
-                        id,
-                        score,
-                        global_bundle_score_key,
-                    })))
+                    Ok(CursorPayload::new(Some(BundleKey { id, score, global_bundle_score_key })))
                 }
 
-                fn visit_map<M>(self, mut map: M) -> Result<PaginationParams<BundleKey>, M::Error>
+                fn visit_map<M>(self, mut map: M) -> Result<CursorPayload<BundleKey>, M::Error>
                 where
                     M: MapAccess<'de>,
                 {
@@ -753,18 +749,14 @@ impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
                                 &self,
                             ));
                         }
-                        return Ok(PaginationParams::new(None));
+                        return Ok(CursorPayload::new(None));
                     };
 
                     // For all other items, we require a score and a global bundle score key.
                     let score = score.ok_or_else(|| serde::de::Error::missing_field("score"))?;
                     let global_bundle_score_key = global_bundle_score_key
                         .ok_or_else(|| serde::de::Error::missing_field("globalBundleScoreKey"))?;
-                    Ok(PaginationParams::new(Some(BundleKey {
-                        id,
-                        score,
-                        global_bundle_score_key,
-                    })))
+                    Ok(CursorPayload::new(Some(BundleKey { id, score, global_bundle_score_key })))
                 }
             }
 
@@ -774,7 +766,7 @@ impl<'de> Deserialize<'de> for PaginationParams<BundleKey> {
     }
 }
 
-impl<'de> Deserialize<'de> for PaginationParams<OrderKey> {
+impl<'de> Deserialize<'de> for CursorPayload<OrderKey> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -819,24 +811,24 @@ impl<'de> Deserialize<'de> for PaginationParams<OrderKey> {
             struct OrderKeyVisitor;
 
             impl<'de> Visitor<'de> for OrderKeyVisitor {
-                type Value = PaginationParams<OrderKey>;
+                type Value = CursorPayload<OrderKey>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     formatter.write_str("a PaginationParams<OrderKey>")
                 }
 
-                fn visit_seq<S>(self, mut seq: S) -> Result<PaginationParams<OrderKey>, S::Error>
+                fn visit_seq<S>(self, mut seq: S) -> Result<CursorPayload<OrderKey>, S::Error>
                 where
                     S: SeqAccess<'de>,
                 {
                     let Some(id) = seq.next_element()? else {
-                        return Ok(PaginationParams::new(None));
+                        return Ok(CursorPayload::new(None));
                     };
 
-                    Ok(PaginationParams::new(Some(OrderKey { id })))
+                    Ok(CursorPayload::new(Some(OrderKey { id })))
                 }
 
-                fn visit_map<M>(self, mut map: M) -> Result<PaginationParams<OrderKey>, M::Error>
+                fn visit_map<M>(self, mut map: M) -> Result<CursorPayload<OrderKey>, M::Error>
                 where
                     M: MapAccess<'de>,
                 {
@@ -854,10 +846,10 @@ impl<'de> Deserialize<'de> for PaginationParams<OrderKey> {
                     }
 
                     let Some(id) = id else {
-                        return Ok(PaginationParams::new(None));
+                        return Ok(CursorPayload::new(None));
                     };
 
-                    Ok(PaginationParams::new(Some(OrderKey { id })))
+                    Ok(CursorPayload::new(Some(OrderKey { id })))
                 }
             }
 
@@ -899,24 +891,22 @@ mod tests {
         let serialized = serde_urlencoded::to_string(&tx_key).unwrap();
         assert_eq!(serialized, "txnHash=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&score=100&globalTransactionScoreKey=gtsk");
 
-        let deserialized =
-            serde_urlencoded::from_str::<PaginationParams<TxKey>>(&serialized).unwrap();
+        let deserialized = serde_urlencoded::from_str::<CursorPayload<TxKey>>(&serialized).unwrap();
         assert_eq!(deserialized.cursor().unwrap(), &tx_key);
 
         let partial_query_string = "score=100&globalTransactionScoreKey=gtsk";
         let partial_params =
-            serde_urlencoded::from_str::<PaginationParams<TxKey>>(partial_query_string);
+            serde_urlencoded::from_str::<CursorPayload<TxKey>>(partial_query_string);
         assert!(partial_params.is_err());
 
         let partial_query_string =
             "txnHash=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&score=100";
         let partial_params =
-            serde_urlencoded::from_str::<PaginationParams<TxKey>>(partial_query_string);
+            serde_urlencoded::from_str::<CursorPayload<TxKey>>(partial_query_string);
         assert!(partial_params.is_err());
 
         let empty_query_string = "";
-        let empty_params =
-            serde_urlencoded::from_str::<PaginationParams<TxKey>>(empty_query_string);
+        let empty_params = serde_urlencoded::from_str::<CursorPayload<TxKey>>(empty_query_string);
         assert!(empty_params.is_ok());
         assert!(empty_params.unwrap().cursor().is_none());
     }
@@ -937,22 +927,22 @@ mod tests {
         );
 
         let deserialized =
-            serde_urlencoded::from_str::<PaginationParams<BundleKey>>(&serialized).unwrap();
+            serde_urlencoded::from_str::<CursorPayload<BundleKey>>(&serialized).unwrap();
         assert_eq!(deserialized.cursor().unwrap(), &bundle_key);
 
         let partial_query_string = "score=100&globalBundleScoreKey=gbsk";
         let partial_params =
-            serde_urlencoded::from_str::<PaginationParams<BundleKey>>(partial_query_string);
+            serde_urlencoded::from_str::<CursorPayload<BundleKey>>(partial_query_string);
         assert!(partial_params.is_err());
 
         let partial_query_string = "id=5932d4bb-58d9-41a9-851d-8dd7f04ccc33&score=100";
         let partial_params =
-            serde_urlencoded::from_str::<PaginationParams<BundleKey>>(partial_query_string);
+            serde_urlencoded::from_str::<CursorPayload<BundleKey>>(partial_query_string);
         assert!(partial_params.is_err());
 
         let empty_query_string = "";
         let empty_params =
-            serde_urlencoded::from_str::<PaginationParams<BundleKey>>(empty_query_string);
+            serde_urlencoded::from_str::<CursorPayload<BundleKey>>(empty_query_string);
         assert!(empty_params.is_ok());
         assert!(empty_params.unwrap().cursor().is_none());
     }
@@ -967,7 +957,7 @@ mod tests {
         );
 
         let deserialized =
-            serde_urlencoded::from_str::<PaginationParams<OrderKey>>(&serialized).unwrap();
+            serde_urlencoded::from_str::<CursorPayload<OrderKey>>(&serialized).unwrap();
         assert_eq!(deserialized.cursor().unwrap(), &order_key);
     }
 }
