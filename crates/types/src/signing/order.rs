@@ -1,7 +1,7 @@
 use crate::signing::{permit_signing_info, SignedPermitError, SigningError};
 use alloy::{
     network::TransactionBuilder,
-    primitives::{keccak256, Address, B256, U256},
+    primitives::{keccak256, Address, Bytes, B256, U256},
     rpc::types::TransactionRequest,
     signers::Signer,
     sol_types::{SolCall, SolValue},
@@ -12,7 +12,7 @@ use signet_constants::SignetSystemConstants;
 use signet_zenith::RollupOrders::{
     initiatePermit2Call, Input, Order, Output, Permit2Batch, TokenPermissions,
 };
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::OnceLock};
 
 /// A SignedOrder represents a single Order after it has been permit2-encoded and signed.
 /// It is the final format signed by Users and shared with Fillers to request that an Order be filled.
@@ -31,15 +31,35 @@ use std::borrow::Cow;
 pub struct SignedOrder {
     /// The permit batch.
     #[serde(flatten)]
-    pub permit: Permit2Batch,
+    permit: Permit2Batch,
     /// The desired outputs.
-    pub outputs: Vec<Output>,
+    outputs: Vec<Output>,
+
+    #[serde(skip)]
+    order_hash: OnceLock<B256>,
+    #[serde(skip)]
+    order_hash_pre_image: OnceLock<Bytes>,
 }
 
 impl SignedOrder {
     /// Creates a new signed order.
     pub const fn new(permit: Permit2Batch, outputs: Vec<Output>) -> Self {
-        Self { permit, outputs }
+        Self { permit, outputs, order_hash: OnceLock::new(), order_hash_pre_image: OnceLock::new() }
+    }
+
+    /// Get the permit batch.
+    pub const fn permit(&self) -> &Permit2Batch {
+        &self.permit
+    }
+
+    /// Get the outputs.
+    pub fn outputs(&self) -> &[Output] {
+        &self.outputs
+    }
+
+    /// Decompose the SignedOrder into its parts.
+    pub fn into_parts(self) -> (Permit2Batch, Vec<Output>) {
+        (self.permit, self.outputs)
     }
 
     /// Check that this can be syntactically used to initiate an order.
@@ -84,15 +104,21 @@ impl SignedOrder {
     /// - The permit2 batch signature, normalized and hashed.
     ///
     /// The components are then hashed together.
-    pub fn order_hash(&self) -> B256 {
-        keccak256(self.order_hash_pre_image())
+    pub fn order_hash(&self) -> &B256 {
+        self.order_hash.get_or_init(|| keccak256(self.order_hash_pre_image()))
     }
 
     /// Get the pre-image for the order hash.
     ///
     /// This is the raw bytes that are hashed to produce the order hash.
     #[doc(hidden)]
-    pub fn order_hash_pre_image(&self) -> Vec<u8> {
+    pub fn order_hash_pre_image(&self) -> &Bytes {
+        self.order_hash_pre_image.get_or_init(|| self.compute_order_hash_pre_image())
+    }
+
+    /// Compute the pre-image for the order hash.
+    #[doc(hidden)]
+    fn compute_order_hash_pre_image(&self) -> Bytes {
         // 4 * 32 bytes = 128 bytes
         let mut buf = Vec::with_capacity(128);
 
@@ -105,7 +131,7 @@ impl SignedOrder {
             alloy::primitives::Signature::from_raw(&self.permit.signature).unwrap().normalized_s();
         buf.extend_from_slice(keccak256(signature.as_bytes()).as_slice());
 
-        buf
+        buf.into()
     }
 }
 
@@ -241,14 +267,14 @@ impl<'a> UnsignedOrder<'a> {
         let signature = signer.sign_hash(&permit.signing_hash).await?;
 
         // return as a SignedOrder
-        Ok(SignedOrder {
-            permit: Permit2Batch {
+        Ok(SignedOrder::new(
+            Permit2Batch {
                 permit: permit.permit,
                 owner: signer.address(),
                 signature: signature.as_bytes().into(),
             },
-            outputs: permit.outputs,
-        })
+            permit.outputs,
+        ))
     }
 }
 
@@ -285,10 +311,10 @@ mod tests {
         let hash = order.order_hash();
         let pre_image = order.order_hash_pre_image();
 
-        assert_eq!(hash, keccak256(pre_image));
+        assert_eq!(hash, &keccak256(pre_image));
         assert_eq!(
             hash,
-            b256!("0xba359dd4f891bed0a2cf87c306e59fb6ee099e02b5b0fa86584cdcc44bf6c272")
+            &b256!("0xba359dd4f891bed0a2cf87c306e59fb6ee099e02b5b0fa86584cdcc44bf6c272")
         );
     }
 }
