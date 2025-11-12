@@ -6,19 +6,12 @@ use serde::{
 };
 use signet_bundle::SignetEthBundle;
 use signet_types::SignedOrder;
-use std::collections::HashMap;
 use uuid::Uuid;
-
-/// A trait for allowing crusor keys to be converted into an URL query object.
-pub trait CursorKey: Serialize {
-    /// Convert the cursor key into a URL query object.
-    fn to_query_object(&self) -> HashMap<String, String>;
-}
 
 /// A trait for types that can be used as a cache object.
 pub trait CacheObject {
     /// The cursor key type for the cache object.
-    type Key: CursorKey;
+    type Key: Serialize + for<'a> Deserialize<'a>;
 }
 
 /// A response from the transaction cache, containing an item.
@@ -117,10 +110,7 @@ where
 
     /// Consume the response and return the pagination info, if any.
     pub fn into_pagination_info(self) -> Option<PaginationInfo<T::Key>> {
-        match self {
-            Self::Paginated { pagination, .. } => Some(pagination),
-            Self::Unpaginated { .. } => None,
-        }
+        self.into_parts().1
     }
 }
 
@@ -450,12 +440,12 @@ impl TxCacheSendOrderResponse {
 /// Represents the pagination information from a transaction cache response.
 /// This applies to all GET endpoints that return a list of items.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginationInfo<C: CursorKey> {
+pub struct PaginationInfo<C> {
     /// The next cursor.
     next_cursor: Option<C>,
 }
 
-impl<C: CursorKey> PaginationInfo<C> {
+impl<C> PaginationInfo<C> {
     /// Create a new [`PaginationInfo`].
     pub const fn new(next_cursor: Option<C>) -> Self {
         Self { next_cursor }
@@ -494,19 +484,6 @@ pub struct TxKey {
     pub global_transaction_score_key: String,
 }
 
-impl CursorKey for TxKey {
-    fn to_query_object(&self) -> HashMap<String, String> {
-        let mut map = HashMap::new();
-        map.insert("txn_hash".to_string(), self.txn_hash.to_string());
-        map.insert("score".to_string(), self.score.to_string());
-        map.insert(
-            "global_transaction_score_key".to_string(),
-            self.global_transaction_score_key.to_string(),
-        );
-        map
-    }
-}
-
 /// The query object keys for the bundle GET endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -519,16 +496,6 @@ pub struct BundleKey {
     pub global_bundle_score_key: String,
 }
 
-impl CursorKey for BundleKey {
-    fn to_query_object(&self) -> HashMap<String, String> {
-        let mut map = HashMap::new();
-        map.insert("id".to_string(), self.id.to_string());
-        map.insert("score".to_string(), self.score.to_string());
-        map.insert("global_bundle_score_key".to_string(), self.global_bundle_score_key.to_string());
-        map
-    }
-}
-
 /// The query object keys for the order GET endpoint.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OrderKey {
@@ -536,23 +503,15 @@ pub struct OrderKey {
     pub id: B256,
 }
 
-impl CursorKey for OrderKey {
-    fn to_query_object(&self) -> HashMap<String, String> {
-        let mut map = HashMap::new();
-        map.insert("id".to_string(), self.id.to_string());
-        map
-    }
-}
-
 /// A query for pagination.
 #[derive(Clone, Debug, Serialize)]
-pub struct PaginationParams<C: CursorKey> {
+pub struct PaginationParams<C: Serialize + for<'a> Deserialize<'a>> {
     /// The cursor to start from.
     #[serde(flatten)]
     cursor: Option<C>,
 }
 
-impl<C: CursorKey> PaginationParams<C> {
+impl<C: Serialize + for<'a> Deserialize<'a>> PaginationParams<C> {
     /// Creates a new instance of [`PaginationParams`].
     pub const fn new(cursor: Option<C>) -> Self {
         Self { cursor }
