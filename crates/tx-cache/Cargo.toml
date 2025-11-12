@@ -22,3 +22,7 @@ reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tracing.workspace = true
 uuid = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+serde_urlencoded = "0.7.1"
+uuid = { workspace = true, features = ["serde", "v4"] }
