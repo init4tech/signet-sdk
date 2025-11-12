@@ -192,6 +192,7 @@ impl<'a> UnsignedOrder<'a> {
     }
 
     /// Add the chain id  and Order contract address to the UnsignedOrder.
+    /// MUST call before `sign`.
     pub fn with_chain(self, constants: &SignetSystemConstants) -> Self {
         Self {
             rollup_chain_id: Some(constants.ru_chain_id()),

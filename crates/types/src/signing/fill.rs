@@ -117,7 +117,8 @@ impl From<&SignedFill> for FillPermit2 {
 /// or [`AggregateOrders`] into a [`SignedFill`] with correct permit2 semantics.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct UnsignedFill<'a> {
-    /// The rollup chain id from which the Orders originated.
+    /// The rollup chain id from which the Orders originated
+    /// to which the Fill will be credited.
     ru_chain_id: Option<u64>,
     /// The set of Orders to fill. Multiple Orders can be aggregated into a single Fill,
     /// but they MUST all originate on the same rollup chain indicated by `ru_chain_id`.
@@ -215,18 +216,18 @@ impl<'a> UnsignedFill<'a> {
     }
 
     /// Add the rollup chain id to the UnsignedFill.
-    /// This is the rollup chain id from which the Orders originated,
-    /// to which the Fill should be credited.
-    /// MUST call this before signing, cannot be inferred.
+    #[deprecated(since = "0.14.1", note = "Use `with_chain` instead.")]
     pub fn with_ru_chain_id(self, ru_chain_id: u64) -> Self {
         Self { ru_chain_id: Some(ru_chain_id), ..self }
     }
 
-    /// Add the chain id and Order contract address to the UnsignedFill.
+    /// Add the chain ids and Orders contract addresses
+    /// used for signing the Fill.
+    /// MUST call before `sign` or `sign_for`.
     pub fn with_chain(mut self, constants: SignetSystemConstants) -> Self {
         self.target_chains.insert(constants.ru_chain_id(), constants.ru_orders());
         self.target_chains.insert(constants.host_chain_id(), constants.host_orders());
-        self
+        Self { ru_chain_id: Some(constants.ru_chain_id()), ..self }
     }
 
     /// Sign the UnsignedFill, generating a SignedFill for each target chain.
@@ -270,7 +271,7 @@ impl<'a> UnsignedFill<'a> {
             .ok_or(SigningError::MissingOrderContract(target_chain_id))?;
 
         // get the rollup chain id, or throw an error if not set
-        let ru_chain_id = self.ru_chain_id.ok_or(SigningError::MissingRollupChainId)?;
+        let ru_chain_id = self.ru_chain_id.ok_or(SigningError::MissingChainId)?;
 
         // get the outputs for the target chain from the AggregateOrders
         let outputs = self.orders.outputs_for(target_chain_id, ru_chain_id);
