@@ -964,7 +964,6 @@ mod tests {
         );
         let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}],"nextCursor":{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","score":100,"globalBundleScoreKey":"gbsk"}}"#;
         let serialized = serde_json::to_string(&cache_response).unwrap();
-        dbg!(&serialized);
         assert_eq!(serialized, expected_json);
         let deserialized =
             serde_json::from_str::<CacheResponse<TxCacheBundlesResponse>>(&expected_json).unwrap();
