@@ -17,10 +17,7 @@ pub trait CacheObject {
 /// A response from the transaction cache, containing an item.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum CacheResponse<T: CacheObject>
-where
-    T::Key: Serialize + for<'a> Deserialize<'a>,
-{
+pub enum CacheResponse<T: CacheObject> {
     /// A paginated response, containing the inner item and a pagination info.
     Paginated {
         /// The actual item.
@@ -37,17 +34,11 @@ where
     },
 }
 
-impl<T: CacheObject> CacheObject for CacheResponse<T>
-where
-    T::Key: Serialize + for<'a> Deserialize<'a>,
-{
+impl<T: CacheObject> CacheObject for CacheResponse<T> {
     type Key = T::Key;
 }
 
-impl<T: CacheObject> CacheResponse<T>
-where
-    T::Key: Serialize + for<'a> Deserialize<'a>,
-{
+impl<T: CacheObject> CacheResponse<T> {
     /// Create a new paginated response from a list of items and a pagination info.
     pub const fn paginated(inner: T, pagination: PaginationInfo<T::Key>) -> Self {
         Self::Paginated { inner, pagination }
