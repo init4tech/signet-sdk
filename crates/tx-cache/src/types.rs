@@ -460,7 +460,7 @@ pub struct CursorPayload<C: Serialize + for<'a> Deserialize<'a>> {
 }
 
 impl<C: Serialize + for<'a> Deserialize<'a>> CursorPayload<C> {
-    /// Creates a new instance of [`PaginationParams`].
+    /// Creates a new instance of [`CursorPayload`].
     pub const fn new(cursor: Option<C>) -> Self {
         Self { cursor }
     }
@@ -470,7 +470,7 @@ impl<C: Serialize + for<'a> Deserialize<'a>> CursorPayload<C> {
         self.cursor.as_ref()
     }
 
-    /// Consumes the [`PaginationParams`] and returns the cursor.
+    /// Consumes the [`CursorPayload`] and returns the cursor.
     pub fn into_cursor(self) -> Option<C> {
         self.cursor
     }
@@ -527,7 +527,7 @@ impl<'de> Deserialize<'de> for CursorPayload<TxKey> {
             type Value = CursorPayload<TxKey>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a PaginationParams<TxKey>")
+                formatter.write_str("a pagination cursor for the Signet Transaction Cache, of the type `CursorPayload<TxKey>`")
             }
 
             fn visit_seq<S>(self, mut seq: S) -> Result<CursorPayload<TxKey>, S::Error>
@@ -672,7 +672,7 @@ impl<'de> Deserialize<'de> for CursorPayload<BundleKey> {
                 type Value = CursorPayload<BundleKey>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    formatter.write_str("a PaginationParams<BundleKey>")
+                    formatter.write_str("a pagination cursor for the Signet Transaction Cache, of the type `CursorPayload<BundleKey>`")
                 }
 
                 fn visit_seq<S>(self, mut seq: S) -> Result<CursorPayload<BundleKey>, S::Error>
@@ -801,7 +801,7 @@ impl<'de> Deserialize<'de> for CursorPayload<OrderKey> {
                 type Value = CursorPayload<OrderKey>;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    formatter.write_str("a PaginationParams<OrderKey>")
+                    formatter.write_str("a pagination cursor for the Signet Transaction Cache, of the type `CursorPayload<OrderKey>`")
                 }
 
                 fn visit_seq<S>(self, mut seq: S) -> Result<CursorPayload<OrderKey>, S::Error>
