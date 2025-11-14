@@ -1,6 +1,6 @@
 use crate::types::{
-    TxCacheOrdersResponse, TxCacheSendBundleResponse, TxCacheSendTransactionResponse,
-    TxCacheTransactionsResponse,
+    CacheObject, CacheResponse, OrderKey, TxCacheOrdersResponse, TxCacheSendBundleResponse,
+    TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
 use eyre::Error;
@@ -93,22 +93,21 @@ impl TxCache {
         self.client.post(url).json(&obj).send().await?.error_for_status().map_err(Into::into)
     }
 
-    async fn get_inner<T>(&self, join: &'static str) -> Result<T, Error>
+    async fn get_inner<T>(&self, join: &'static str, query: Option<T::Key>) -> Result<T, Error>
     where
-        T: DeserializeOwned,
+        T: DeserializeOwned + CacheObject,
     {
-        // Append the path to the URL.
         let url = self
             .url
             .join(join)
             .inspect_err(|e| warn!(%e, "Failed to join URL. Not querying transaction cache."))?;
 
-        // Get the result.
         self.client
             .get(url)
+            .query(&query)
             .send()
             .await
-            .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache"))?
+            .inspect_err(|e| warn!(%e, "Failed to get object from transaction cache."))?
             .json::<T>()
             .await
             .map_err(Into::into)
@@ -140,17 +139,19 @@ impl TxCache {
 
     /// Get transactions from the URL.
     #[instrument(skip_all)]
-    pub async fn get_transactions(&self) -> Result<Vec<TxEnvelope>, Error> {
-        let response: TxCacheTransactionsResponse =
-            self.get_inner::<TxCacheTransactionsResponse>(TRANSACTIONS).await?;
-        Ok(response.transactions)
+    pub async fn get_transactions(
+        &self,
+        query: Option<TxKey>,
+    ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
+        self.get_inner(TRANSACTIONS, query).await
     }
 
     /// Get signed orders from the URL.
     #[instrument(skip_all)]
-    pub async fn get_orders(&self) -> Result<Vec<SignedOrder>, Error> {
-        let response: TxCacheOrdersResponse =
-            self.get_inner::<TxCacheOrdersResponse>(ORDERS).await?;
-        Ok(response.orders)
+    pub async fn get_orders(
+        &self,
+        query: Option<OrderKey>,
+    ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
+        self.get_inner(ORDERS, query).await
     }
 }
