@@ -22,6 +22,11 @@ impl SignetEnvironmentConstants {
         Self { host_name, rollup_name, transaction_cache }
     }
 
+    /// Get the hard-coded Mainnet environment constants.
+    pub const fn mainnet() -> Self {
+        crate::chains::mainnet::MAINNET_ENV
+    }
+
     /// Get the hard-coded Pecorino environment constants.
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::PECORINO_ENV
@@ -53,6 +58,7 @@ impl TryFrom<KnownChains> for SignetEnvironmentConstants {
 
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
+            KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

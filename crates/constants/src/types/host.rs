@@ -56,6 +56,11 @@ impl HostConstants {
         Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
     }
 
+    /// Get the hard-coded Mainnet host constants.
+    pub const fn mainnet() -> Self {
+        crate::chains::mainnet::HOST
+    }
+
     /// Get the hard-coded Pecorino host constants.
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::HOST
@@ -146,6 +151,7 @@ impl FromStr for HostConstants {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chain: KnownChains = s.parse()?;
         match chain {
+            KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
