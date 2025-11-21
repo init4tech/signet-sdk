@@ -306,7 +306,11 @@ where
                             return;
                         }
                         Err(e) => {
-                            trace!(?identifier, %e, "Simulation failed");
+                            let host_block_num = this_ref.host.block().number;
+                            let host_env_block_num = this_ref.host_env().block().number;
+                            let ru_block_num = this_ref.rollup.block().number;
+                            let ru_env_block_num = this_ref.rollup_env().block().number;
+                            trace!(?identifier, %e, %host_block_num, %host_env_block_num, %ru_block_num, %ru_env_block_num, "Simulation failed");
                         }
                     };
                     // fall through applies to all errors, occurs if
