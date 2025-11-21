@@ -224,11 +224,16 @@ where
         &mut self,
         mut trevm: EvmNeedsTx<RuDb, SignetEthBundleInsp<RuInsp>>,
     ) -> DriveBundleResult<Self, RuDb, SignetEthBundleInsp<RuInsp>> {
-        let bundle = &self.bundle.bundle;
         // -- STATELESS CHECKS --
 
-        // Ensure that the bundle has transactions
-        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
+        // Ensure that the bundle has rollup OR host transactions. Completely empty bundles are not allowed.
+        trevm_ensure!(
+            !self.bundle.bundle.txs.is_empty() && !self.bundle.host_txs.is_empty(),
+            trevm,
+            BundleError::BundleEmpty.into()
+        );
+
+        let bundle = &self.bundle.bundle;
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
