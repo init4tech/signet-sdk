@@ -299,11 +299,11 @@ where
                     })
                     .map_err(|err| {
                         let addr = tx.recover_signer().unwrap_or_default();
-                        let watned_nonce = trevm.try_read_nonce(addr);
+                        let wanted_nonce = trevm.try_read_nonce(addr);
                         let got_nonce = tx.nonce();
                         debug!(
                             host_tx = ?tx,
-                            wanted_nonce = ?watned_nonce,
+                            wanted_nonce = ?wanted_nonce,
                             got_nonce = ?got_nonce,
                         );
                         error!(host_tx = ?tx, ?block_number, err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
