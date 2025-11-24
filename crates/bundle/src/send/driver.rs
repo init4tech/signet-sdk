@@ -1,5 +1,5 @@
 use crate::send::SignetEthBundle;
-use alloy::{hex, primitives::U256};
+use alloy::{consensus::{Transaction, transaction::SignerRecoverable}, hex, primitives::U256};
 use signet_evm::{DriveBundleResult, EvmErrored, EvmNeedsTx, SignetInspector, SignetLayered};
 use signet_types::{AggregateFills, AggregateOrders, MarketError, SignedPermitError};
 use std::borrow::Cow;
@@ -224,6 +224,7 @@ where
         &mut self,
         mut trevm: EvmNeedsTx<RuDb, SignetEthBundleInsp<RuInsp>>,
     ) -> DriveBundleResult<Self, RuDb, SignetEthBundleInsp<RuInsp>> {
+        let block_number = trevm.block_number();
         let bundle = &self.bundle.bundle;
         // -- STATELESS CHECKS --
 
@@ -297,7 +298,15 @@ where
                         Ok(htrevm.accept_state())
                     })
                     .map_err(|err| {
-                        error!(err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
+                        let addr = tx.recover_signer().unwrap_or_default();
+                        let watned_nonce = trevm.try_read_nonce(addr);
+                        let got_nonce = tx.nonce();
+                        debug!(
+                            host_tx = ?tx,
+                            wanted_nonce = ?watned_nonce,
+                            got_nonce = ?got_nonce,
+                        );
+                        error!(host_tx = ?tx, ?block_number, err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
                         SignetEthBundleError::HostSimulation("host simulation error")
                     }),
                 trevm
