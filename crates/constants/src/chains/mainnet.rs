@@ -90,4 +90,4 @@ pub const MAINNET_ENV: SignetEnvironmentConstants = SignetEnvironmentConstants::
 pub const MAINNET: SignetConstants = SignetConstants::new(MAINNET_SYS, MAINNET_ENV);
 
 /// The URL of the Transaction Cache endpoint (empty for mainnet placeholder).
-pub const TX_CACHE_URL: &str = "TODO";
+pub const TX_CACHE_URL: &str = "https://transactions.signet.sh";
