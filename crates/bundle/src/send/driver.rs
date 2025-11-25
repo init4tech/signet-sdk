@@ -1,5 +1,5 @@
 use crate::send::SignetEthBundle;
-use alloy::{consensus::{Transaction, transaction::SignerRecoverable}, hex, primitives::U256};
+use alloy::{consensus::Transaction, hex, primitives::U256};
 use signet_evm::{DriveBundleResult, EvmErrored, EvmNeedsTx, SignetInspector, SignetLayered};
 use signet_types::{AggregateFills, AggregateOrders, MarketError, SignedPermitError};
 use std::borrow::Cow;
@@ -224,7 +224,6 @@ where
         &mut self,
         mut trevm: EvmNeedsTx<RuDb, SignetEthBundleInsp<RuInsp>>,
     ) -> DriveBundleResult<Self, RuDb, SignetEthBundleInsp<RuInsp>> {
-        let block_number = trevm.block_number();
         let bundle = &self.bundle.bundle;
         // -- STATELESS CHECKS --
 
@@ -263,6 +262,8 @@ where
         // changes into the host_evm's state. If any reverts, we error out the
         // simulation.
         for tx in host_txs.into_iter() {
+            let _span = tracing::debug_span!("host_txn loop", tx_hash = %tx.hash()).entered();
+
             self.output.host_evm = Some(trevm_try!(
                 self.output
                     .host_evm
@@ -298,15 +299,7 @@ where
                         Ok(htrevm.accept_state())
                     })
                     .map_err(|err| {
-                        let addr = tx.recover_signer().unwrap_or_default();
-                        let wanted_nonce = trevm.try_read_nonce(addr);
-                        let got_nonce = tx.nonce();
-                        debug!(
-                            host_tx = ?tx,
-                            wanted_nonce = ?wanted_nonce,
-                            got_nonce = ?got_nonce,
-                        );
-                        error!(host_tx = ?tx, ?block_number, err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
+                        error!(host_tx_nonce = ?tx.nonce(), host_tx_hash = ?tx.hash(), err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
                         SignetEthBundleError::HostSimulation("host simulation error")
                     }),
                 trevm
