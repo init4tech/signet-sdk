@@ -143,7 +143,6 @@ where
         let mut i = 1;
         // Run until the deadline is reached.
         loop {
-            let span = info_span!("build", round = i);
             let finish_by = self.finish_by.into();
 
             let next_round_time = Instant::now() + Duration::from_millis(SIM_SLEEP_MS);
@@ -163,19 +162,25 @@ where
                 continue;
             }
 
+            let span = info_span!("build", round = i);
+
             // If there are items to simulate, we run a simulation round.
-            let fut = self.round().instrument(span);
+            let fut = self.round().instrument(span.clone());
 
             select! {
                 biased;
                 _ = tokio::time::sleep_until(finish_by) => {
+                    // This event is not a round event. It's a control flow
+                    // event for the outer loop. As such it's not in span
                     debug!("Deadline reached, stopping sim loop");
                     break;
                 },
                 _ = fut => {
-                    i+= 1;
-                    let remaining = self.env.sim_items().len();
-                    trace!(%remaining, round = i, "Round completed");
+                    i += 1;
+                    let remaining_items = self.env.sim_items().len();
+                    span.in_scope(|| {
+                        trace!(remaining_items, "Round completed");
+                    });
                 }
             }
         }
