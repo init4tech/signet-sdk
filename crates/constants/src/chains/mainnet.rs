@@ -12,7 +12,7 @@ pub const HOST_NAME: &str = "Mainnet";
 /// Chain ID for the Mainnet host chain.
 pub const HOST_CHAIN_ID: u64 = 1;
 /// Deployment height of the rollup on Mainnet host chain.
-pub const DEPLOY_HEIGHT: u64 = 23734244;
+pub const DEPLOY_HEIGHT: u64 = 0;
 /// `Zenith` contract address for the Mainnet host chain.
 pub const HOST_ZENITH: Address = address!("0xBCe84D45d7be8859bcBd838d4a7b3448B55E6869");
 /// `Orders` contract address for the Mainnet host chain.
