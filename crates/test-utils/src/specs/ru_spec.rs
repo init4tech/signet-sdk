@@ -40,6 +40,11 @@ impl RuBlockSpec {
         Self { constants, tx: vec![], gas_limit: None, reward_address: None }
     }
 
+    /// Create a new empty RU block spec with the Mainnet constants.
+    pub const fn mainnet() -> Self {
+        Self::new(SignetSystemConstants::mainnet())
+    }
+
     /// Create a new empty RU block spec with the Pecorino constants.
     pub const fn pecorino() -> Self {
         Self::new(SignetSystemConstants::pecorino())
@@ -148,6 +153,7 @@ impl TryFrom<KnownChains> for RuBlockSpec {
 
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
+            KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

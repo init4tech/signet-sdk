@@ -17,9 +17,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod chains;
-pub use chains::test_utils;
-
+pub use chains::mainnet;
 pub use chains::pecorino;
+pub use chains::test_utils;
 
 mod types;
 pub use types::{
