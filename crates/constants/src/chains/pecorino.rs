@@ -12,24 +12,24 @@ pub const HOST_NAME: &str = "Pecorino Host";
 /// Chain ID for the Pecorino testnet host chain.
 pub const HOST_CHAIN_ID: u64 = 3151908;
 /// Deployment height for the Pecorino testnet host chain.
-pub const DEPLOY_HEIGHT: u64 = 366;
+pub const DEPLOY_HEIGHT: u64 = 1095;
 /// `Zenith` contract address for the Pecorino testnet host chain.
-pub const HOST_ZENITH: Address = address!("0xf17E98baF73F7C78a42D73DF4064de5B7A20EcA6");
+pub const HOST_ZENITH: Address = address!("0x143A5BE4E559cA49Dbf0966d4B9C398425C5Fc19");
 /// `Orders` contract address for the Pecorino testnet host chain.
-pub const HOST_ORDERS: Address = address!("0x0A4f505364De0Aa46c66b15aBae44eBa12ab0380");
+pub const HOST_ORDERS: Address = address!("0x96f44ddc3Bc8892371305531F1a6d8ca2331fE6C");
 /// `Passage` contract address for the Pecorino testnet host chain.
-pub const HOST_PASSAGE: Address = address!("0x12585352AA1057443D6163B539EfD4487f023182");
+pub const HOST_PASSAGE: Address = address!("0x90AD86678ad4868F095865b5CC2ce4B500810F68");
 /// `Transactor` contract address for the Pecorino testnet host chain.
-pub const HOST_TRANSACTOR: Address = address!("0x3903279B59D3F5194053dA8d1f0C7081C8892Ce4");
+pub const HOST_TRANSACTOR: Address = address!("0xe940FAB7CC7c56d1f20ef676F90e901E4E9cC93E");
 
 /// USDC token for the Pecorino testnet host chain.
-pub const HOST_USDC: Address = address!("0x65fb255585458de1f9a246b476aa8d5c5516f6fd");
+pub const HOST_USDC: Address = address!("0x65Fb255585458De1F9A246b476aa8d5C5516F6fd");
 /// USDT token for the Pecorino testnet host chain.
-pub const HOST_USDT: Address = address!("0xb9df1b911b6cf6935b2a918ba03df2372e94e267");
+pub const HOST_USDT: Address = address!("0xb9Df1b911B6cf6935b2a918Ba03dF2372E94e267");
 /// WBTC token for the Pecorino testnet host chain.
-pub const HOST_WBTC: Address = address!("0xfb29f7d7a4ce607d6038d44150315e5f69bea08a");
+pub const HOST_WBTC: Address = address!("0xfb29F7d7a4CE607D6038d44150315e5F69BEa08A");
 /// WETH token for the Pecorino testnet host chain.
-pub const HOST_WETH: Address = address!("0xd03d085B78067A18155d3B29D64914df3D19A53C");
+pub const HOST_WETH: Address = address!("0xd3933eB79E6849f7C29EBa2F9642Af93b29B0C18");
 
 /// USDC token record for the Pecorino testnet host chain.
 pub const HOST_USDC_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDC, Cow::Borrowed("USDC"), 6);
