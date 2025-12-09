@@ -12,15 +12,15 @@ pub const HOST_NAME: &str = "Parmigiana Host";
 /// Chain ID for the Parmigiana testnet host chain.
 pub const HOST_CHAIN_ID: u64 = 3151908;
 /// Deployment height for the Parmigiana testnet host chain.
-pub const DEPLOY_HEIGHT: u64 = 366;
+pub const DEPLOY_HEIGHT: u64 = 0;
 /// `Zenith` contract address for the Parmigiana testnet host chain.
-pub const HOST_ZENITH: Address = address!("0xf17E98baF73F7C78a42D73DF4064de5B7A20EcA6");
+pub const HOST_ZENITH: Address = address!("0x143A5BE4E559cA49Dbf0966d4B9C398425C5Fc19");
 /// `Orders` contract address for the Parmigiana testnet host chain.
-pub const HOST_ORDERS: Address = address!("0x0A4f505364De0Aa46c66b15aBae44eBa12ab0380");
+pub const HOST_ORDERS: Address = address!("0x96f44ddc3Bc8892371305531F1a6d8ca2331fE6C");
 /// `Passage` contract address for the Parmigiana testnet host chain.
-pub const HOST_PASSAGE: Address = address!("0x12585352AA1057443D6163B539EfD4487f023182");
+pub const HOST_PASSAGE: Address = address!("0x28524D2a753925Ef000C3f0F811cDf452C6256aF");
 /// `Transactor` contract address for the Parmigiana testnet host chain.
-pub const HOST_TRANSACTOR: Address = address!("0x3903279B59D3F5194053dA8d1f0C7081C8892Ce4");
+pub const HOST_TRANSACTOR: Address = address!("0x0B4fc18e78c585687E01c172a1087Ea687943db9");
 
 /// USDC token for the Parmigiana testnet host chain.
 pub const HOST_USDC: Address = address!("0x65fb255585458de1f9a246b476aa8d5c5516f6fd");
@@ -29,7 +29,7 @@ pub const HOST_USDT: Address = address!("0xb9df1b911b6cf6935b2a918ba03df2372e94e
 /// WBTC token for the Parmigiana testnet host chain.
 pub const HOST_WBTC: Address = address!("0xfb29f7d7a4ce607d6038d44150315e5f69bea08a");
 /// WETH token for the Parmigiana testnet host chain.
-pub const HOST_WETH: Address = address!("0xd03d085B78067A18155d3B29D64914df3D19A53C");
+pub const HOST_WETH: Address = address!("0xD1278f17e86071f1E658B656084c65b7FD3c90eF");
 
 /// USDC token record for the Parmigiana testnet host chain.
 pub const HOST_USDC_RECORD: HostUsdRecord = HostUsdRecord::new(HOST_USDC, Cow::Borrowed("USDC"), 6);
@@ -59,7 +59,7 @@ pub const HOST: HostConstants = crate::HostConstants::new(
 /// Name for the network.
 pub const RU_NAME: &str = "Parmigiana";
 /// Chain ID for the Parmigiana testnet RU chain.
-pub const RU_CHAIN_ID: u64 = 14174;
+pub const RU_CHAIN_ID: u64 = 88888;
 
 /// WETH token for the Parmigiana testnet RU chain.
 pub const RU_WETH: Address = address!("0x0000000000000000007369676e65742d77657468");
