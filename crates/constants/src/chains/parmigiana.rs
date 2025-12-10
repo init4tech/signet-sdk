@@ -73,7 +73,7 @@ pub const RU_PASSAGE: Address = address!("0x0000000000007369676E65742D7061737361
 /// The WETH9-based wrapped native USD token contract.
 /// This is signet's native token in wrapped form.
 pub const WRAPPED: Address = address!("0x0000000000000000007369676e65742D77757364");
-    /// RU pre-approved system tokens for Parmigiana.
+/// RU pre-approved system tokens for Parmigiana.
 pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
 
 /// Base fee recipient address for the Parmigiana testnet RU chain.

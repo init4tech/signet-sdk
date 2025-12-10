@@ -6,6 +6,8 @@ use alloy::consensus::TxEnvelope;
 use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
+use signet_constants::parmigiana;
+#[allow(deprecated)]
 use signet_constants::pecorino;
 use signet_types::SignedOrder;
 use tracing::{instrument, warn};
@@ -42,12 +44,29 @@ impl TxCache {
         Ok(Self::new(url))
     }
 
+    /// Connect to the transaction cache with the Parmigiana URL.
+    pub fn parmigiana() -> Self {
+        Self::new_from_string(parmigiana::TX_CACHE_URL).expect("parmigiana tx cache URL is invalid")
+    }
+
+    /// Create a new cache with the Parmigiana URL and a specific [`reqwest::Client`].
+    pub fn parmigiana_with_client(client: reqwest::Client) -> Self {
+        Self::new_with_client(
+            parmigiana::TX_CACHE_URL.parse().expect("parmigiana tx cache URL is invalid"),
+            client,
+        )
+    }
+
     /// Connect to the transaction cache with the Pecorino URL.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub fn pecorino() -> Self {
         Self::new_from_string(pecorino::TX_CACHE_URL).expect("pecorino tx cache URL is invalid")
     }
 
     /// Connect to the transaction cache with the Pecorino URL and a specific [`reqwest::Client`].
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub fn pecorino_with_client(client: reqwest::Client) -> Self {
         Self::new_with_client(
             pecorino::TX_CACHE_URL.parse().expect("pecorino tx cache URL is invalid"),

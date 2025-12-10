@@ -61,7 +61,14 @@ impl HostConstants {
         crate::chains::mainnet::HOST
     }
 
+    /// Get the hard-coded Parmigiana host constants.
+    pub const fn parmigiana() -> Self {
+        crate::chains::parmigiana::HOST
+    }
+
     /// Get the hard-coded Pecorino host constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::HOST
     }
@@ -152,6 +159,8 @@ impl FromStr for HostConstants {
         let chain: KnownChains = s.parse()?;
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

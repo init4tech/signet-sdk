@@ -45,7 +45,14 @@ impl RuBlockSpec {
         Self::new(SignetSystemConstants::mainnet())
     }
 
+    /// Create a new empty RU block spec with the Parmigiana constants.
+    pub const fn parmigiana() -> Self {
+        Self::new(SignetSystemConstants::parmigiana())
+    }
+
     /// Create a new empty RU block spec with the Pecorino constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         Self::new(SignetSystemConstants::pecorino())
     }
@@ -154,6 +161,8 @@ impl TryFrom<KnownChains> for RuBlockSpec {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

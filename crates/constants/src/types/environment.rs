@@ -27,7 +27,14 @@ impl SignetEnvironmentConstants {
         crate::chains::mainnet::MAINNET_ENV
     }
 
+    /// Get the hard-coded Parmigiana environment constants.
+    pub const fn parmigiana() -> Self {
+        crate::chains::parmigiana::PARMIGIANA_ENV
+    }
+
     /// Get the hard-coded Pecorino environment constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::PECORINO_ENV
     }
@@ -59,6 +66,8 @@ impl TryFrom<KnownChains> for SignetEnvironmentConstants {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
@@ -82,9 +91,9 @@ mod test {
         // deserialize json
 
         let json = serde_json::json!({
-            "host_name": "pecorino",
-            "rollup_name": "pecorino",
-            "transaction_cache": "https://pecorino.com"
+            "host_name": "parmigiana",
+            "rollup_name": "parmigiana",
+            "transaction_cache": "https://parmigiana.com"
         });
 
         let s = serde_json::from_value::<SignetEnvironmentConstants>(json.clone()).unwrap();
