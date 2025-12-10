@@ -12,7 +12,7 @@ use alloy::{
 use signet_bundle::{
     BundleInspector, SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError,
 };
-use signet_constants::pecorino::{HOST_WBTC, HOST_WETH};
+use signet_constants::parmigiana::{HOST_WBTC, HOST_WETH};
 use signet_evm::EvmNeedsTx;
 use signet_test_utils::{
     chain::{HOST_CHAIN_ID, RU_CHAIN_ID, RU_ORDERS},

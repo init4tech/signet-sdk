@@ -48,7 +48,14 @@ impl RollupConstants {
         crate::chains::mainnet::ROLLUP
     }
 
+    /// Get the hard-coded Parmigiana rollup constants.
+    pub const fn parmigiana() -> Self {
+        crate::chains::parmigiana::ROLLUP
+    }
+
     /// Get the hard-coded Pecorino rollup constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::ROLLUP
     }
@@ -117,6 +124,8 @@ impl TryFrom<KnownChains> for RollupConstants {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

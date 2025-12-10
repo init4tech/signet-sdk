@@ -90,11 +90,19 @@ impl HostBlockSpec {
         }
     }
 
+    /// Make a new block spec with Mainnet constants.
     pub const fn mainnet() -> Self {
         Self::new(SignetSystemConstants::mainnet())
     }
 
+    /// Make a new block spec with Parmigiana constants.
+    pub const fn parmigiana() -> Self {
+        Self::new(SignetSystemConstants::parmigiana())
+    }
+
     /// Make a new block spec with Pecorino constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         Self::new(SignetSystemConstants::pecorino())
     }
@@ -421,6 +429,8 @@ impl TryFrom<KnownChains> for HostBlockSpec {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }

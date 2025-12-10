@@ -52,7 +52,14 @@ impl SignetSystemConstants {
         crate::chains::mainnet::MAINNET_SYS
     }
 
+    /// Get the hard-coded Parmigiana constants.
+    pub const fn parmigiana() -> Self {
+        crate::chains::parmigiana::PARMIGIANA_SYS
+    }
+
     /// Get the hard-coded Pecorino constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::PECORINO_SYS
     }
@@ -231,6 +238,8 @@ impl TryFrom<KnownChains> for SignetSystemConstants {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
@@ -268,7 +277,14 @@ impl SignetConstants {
         crate::chains::mainnet::MAINNET
     }
 
+    /// Get the hard-coded Parmigiana rollup constants.
+    pub const fn parmigiana() -> Self {
+        crate::chains::parmigiana::PARMIGIANA
+    }
+
     /// Get the hard-coded Pecorino rollup constants.
+    #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
+    #[allow(deprecated)]
     pub const fn pecorino() -> Self {
         crate::chains::pecorino::PECORINO
     }
@@ -305,6 +321,8 @@ impl TryFrom<KnownChains> for SignetConstants {
     fn try_from(chain: KnownChains) -> Result<Self, Self::Error> {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
+            KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
         }
