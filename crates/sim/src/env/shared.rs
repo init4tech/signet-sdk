@@ -2,7 +2,7 @@ use crate::{env::RollupEnv, outcome::SimulatedItem, HostEnv, SimCache, SimDb, Si
 use core::fmt;
 use std::{ops::Deref, sync::Arc};
 use tokio::{select, sync::watch};
-use tracing::{instrument, trace};
+use tracing::{debug, info_span, trace};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
@@ -89,25 +89,30 @@ where
     }
 
     /// Run a simulation round, returning the best item.
-    #[instrument(skip(self))]
     pub async fn sim_round(&mut self, max_gas: u64, max_host_gas: u64) -> Option<SimulatedItem> {
+        let span = info_span!("sim_round", max_gas, max_host_gas);
+
+        // These will be moved into the blocking task.
+        let scope_span = span.clone();
+        let this = self.inner.clone();
         let (best_tx, mut best_watcher) = watch::channel(None);
 
-        let this = self.inner.clone();
-
         // Spawn a blocking task to run the simulations.
-        let sim_task =
-            tokio::task::spawn_blocking(move || this.sim_round(max_gas, max_host_gas, best_tx));
+        let sim_task = tokio::task::spawn_blocking(move || {
+            scope_span.in_scope(|| this.sim_round(max_gas, max_host_gas, best_tx))
+        });
 
         // Either simulation is done, or we time out
         select! {
             _ = tokio::time::sleep_until(self.finish_by().into()) => {
-                trace!("Sim round timed out");
+                span.in_scope(|| trace!("Sim round timed out"));
             },
             _ = sim_task => {
-                trace!("Sim round done");
+                span.in_scope(|| trace!("Sim round done"));
             },
         }
+
+        let _guard = span.entered();
 
         // Check what the current best outcome is.
         let best = best_watcher.borrow_and_update();
@@ -117,6 +122,7 @@ where
         // Remove the item from the cache.
         let item = self.sim_items().remove(outcome.cache_rank)?;
 
+        // We can expect here as all of our simulations are done and cleaned up.
         let inner = Arc::get_mut(&mut self.inner).expect("sims dropped already");
 
         // Accept the cache from the simulation.
@@ -128,6 +134,14 @@ where
             .rollup_mut()
             .accept_aggregates(&outcome.bundle_fills, &outcome.bundle_orders)
             .expect("checked during simulation");
+
+        debug!(
+            score = %outcome.score,
+            gas_used = outcome.gas_used,
+            host_gas_used = outcome.host_gas_used,
+            identifier = %item.identifier(),
+            "Selected simulated item",
+        );
 
         Some(SimulatedItem {
             gas_used: outcome.gas_used,

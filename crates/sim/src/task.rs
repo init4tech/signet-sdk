@@ -1,7 +1,7 @@
 use crate::{env::SimEnv, BuiltBlock, HostEnv, RollupEnv, SharedSimEnv, SimCache, SimDb};
 use std::time::Duration;
 use tokio::{select, time::Instant};
-use tracing::{debug, info_span, trace, Instrument};
+use tracing::{debug, trace};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
@@ -115,7 +115,7 @@ where
         let host_gas_allowed = self.max_host_gas - self.block.host_gas_used();
 
         if let Some(simulated) = self.env.sim_round(gas_allowed, host_gas_allowed).await {
-            tracing::debug!(
+            debug!(
                 score = %simulated.score,
                 gas_used = simulated.gas_used,
                 host_gas_used = simulated.host_gas_used,
@@ -162,10 +162,8 @@ where
                 continue;
             }
 
-            let span = info_span!("build", round = i);
-
             // If there are items to simulate, we run a simulation round.
-            let fut = self.round().instrument(span.clone());
+            let fut = self.round();
 
             select! {
                 biased;
@@ -178,9 +176,7 @@ where
                 _ = fut => {
                     i += 1;
                     let remaining_items = self.env.sim_items().len();
-                    span.in_scope(|| {
-                        trace!(remaining_items, "Round completed");
-                    });
+                    trace!(remaining_items, "Round completed");
                 }
             }
         }

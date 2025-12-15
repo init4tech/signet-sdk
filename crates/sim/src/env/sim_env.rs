@@ -254,7 +254,6 @@ where
         }
     }
 
-    #[instrument(skip_all)]
     pub(crate) fn sim_round(
         self: Arc<Self>,
         max_gas: u64,

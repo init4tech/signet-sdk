@@ -11,5 +11,4 @@ jobs:
   rust-library-base:
     uses: init4tech/actions/.github/workflows/rust-library-base.yml@main
     with:
-      require-lockfile: true
       rust-profile: "ci-rust"
