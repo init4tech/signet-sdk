@@ -2,7 +2,7 @@ use crate::{env::RollupEnv, outcome::SimulatedItem, HostEnv, SimCache, SimDb, Si
 use core::fmt;
 use std::{ops::Deref, sync::Arc};
 use tokio::{select, sync::watch};
-use tracing::{debug, info_span, trace};
+use tracing::{debug, trace, trace_span};
 use trevm::{
     helpers::Ctx,
     revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
@@ -90,7 +90,7 @@ where
 
     /// Run a simulation round, returning the best item.
     pub async fn sim_round(&mut self, max_gas: u64, max_host_gas: u64) -> Option<SimulatedItem> {
-        let span = info_span!("sim_round", max_gas, max_host_gas);
+        let span = trace_span!("sim_round", max_gas, max_host_gas).or_current();
 
         // These will be moved into the blocking task.
         let scope_span = span.clone();
