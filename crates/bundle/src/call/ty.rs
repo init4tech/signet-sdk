@@ -18,8 +18,6 @@ use trevm::{
 /// The Signet bundle contains the following:
 ///
 /// - A standard [`EthCallBundle`] with the transactions to simulate.
-/// - A mapping of assets to users to amounts, which are the host fills to be
-///   checked against market orders after simulation.
 ///
 /// This is based on the flashbots `eth_callBundle` bundle. See [their docs].
 ///
