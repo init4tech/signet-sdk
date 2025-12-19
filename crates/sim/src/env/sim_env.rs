@@ -266,7 +266,7 @@ where
         // Create a channel to send the results back.
         let (candidates, mut candidates_rx) = mpsc::channel(self.concurrency_limit);
 
-        let outer = trace_span!("sim_thread", candidates = active_sim.len());
+        let outer = trace_span!("sim_thread", candidates = active_sim.len()).or_current();
         let outer_ref = &outer;
         let _og = outer.enter();
 
