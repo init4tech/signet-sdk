@@ -3,7 +3,7 @@ use alloy::{hex, primitives::U256};
 use signet_evm::{DriveBundleResult, EvmErrored, EvmNeedsTx, SignetInspector, SignetLayered};
 use signet_types::{AggregateFills, AggregateOrders, MarketError, SignedPermitError};
 use std::borrow::Cow;
-use tracing::{debug, error};
+use tracing::{debug, debug_span, enabled, error};
 use trevm::{
     helpers::Ctx,
     inspectors::{Layered, TimeLimit},
@@ -272,7 +272,14 @@ where
                         let result = htrevm.result();
                         if let Some(output) = result.output()  {
                             if !result.is_success() {
-                                debug!(output = hex::encode(output), "host transaction reverted");
+                                debug!(
+                                    tx_hash = %tx.hash(),
+                                    callee = ?htrevm.callee(),
+                                    sender = ?htrevm.caller(),
+                                    input = hex::encode(htrevm.input()),
+                                    output = hex::encode(output),
+                                    "host transaction reverted"
+                                );
                             }
                         }
 
@@ -306,7 +313,14 @@ where
 
         // -- ROLLUP PORTION --
         for tx in txs.into_iter() {
-            let _span = tracing::debug_span!("bundle_tx_loop", tx_hash = %tx.hash()).entered();
+            let span = debug_span!(
+                "bundle_tx_loop",
+                tx_hash = %tx.hash(),
+                caller = tracing::field::Empty,
+                callee = tracing::field::Empty,
+                input = tracing::field::Empty,
+            );
+            let _guard = span.enter();
 
             // Update the inner deadline.
             let limit = trevm.inner_mut_unchecked().ctx_inspector().1.outer_mut().outer_mut();
@@ -320,6 +334,16 @@ where
             let mut t = trevm.run_tx(&tx).map_err(EvmErrored::err_into).inspect_err(
                 |err| error!(err = %err.error(), "error while running rollup transaction"),
             )?;
+
+            // Record tx details to the span for debugging.
+            if enabled!(tracing::Level::DEBUG) {
+                span.record("caller", t.caller().to_string());
+                span.record(
+                    "callee",
+                    t.callee().map(|c| c.to_string()).unwrap_or_else(|| "CREATE".to_string()),
+                );
+                span.record("input", hex::encode(t.input()));
+            }
 
             // Check the result of the transaction.
             let result = t.result();
@@ -365,7 +389,10 @@ where
                 // not marked as revertible by the bundle, we error our
                 // simulation.
                 if !self.bundle.reverting_tx_hashes().contains(tx_hash) {
-                    debug!("transaction reverted, not marked as revertible");
+                    debug!(
+                        output = result.output().map(hex::encode),
+                        "transaction reverted, not marked as revertible"
+                    );
                     return Err(t.errored(BundleError::BundleReverted.into()));
                 }
             }
