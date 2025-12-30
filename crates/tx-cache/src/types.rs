@@ -1,5 +1,6 @@
 //! The endpoints for the transaction cache.
 use alloy::{consensus::TxEnvelope, primitives::B256};
+use core::ops::{Deref, DerefMut};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_types::SignedOrder;
@@ -27,6 +28,20 @@ impl<T: CacheObject> CacheObject for CacheResponse<T> {
     type Key = T::Key;
 }
 
+impl<T: CacheObject> Deref for CacheResponse<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: CacheObject> DerefMut for CacheResponse<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl<T: CacheObject> CacheResponse<T> {
     /// Create a new paginated response from a list of items and a pagination info.
     pub const fn paginated(inner: T, pagination: T::Key) -> Self {
@@ -39,6 +54,7 @@ impl<T: CacheObject> CacheResponse<T> {
     }
 
     /// Return a reference to the inner value.
+    #[deprecated = "use deref instead"]
     pub const fn inner(&self) -> &T {
         match self {
             Self { inner, .. } => inner,
@@ -46,6 +62,7 @@ impl<T: CacheObject> CacheResponse<T> {
     }
 
     /// Return a mutable reference to the inner value.
+    #[deprecated = "use deref_mut instead"]
     pub const fn inner_mut(&mut self) -> &mut T {
         match self {
             Self { inner, .. } => inner,
@@ -585,5 +602,29 @@ mod tests {
         let empty_serialized = serde_urlencoded::to_string(&empty_params).unwrap();
         assert_eq!(serialized, "txnHash=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&score=100&globalTransactionScoreKey=gtsk");
         assert_eq!(empty_serialized, "");
+    }
+
+    #[test]
+    fn test_cache_response_deref() {
+        let uuid = Uuid::new_v4();
+        let response =
+            CacheResponse::unpaginated(TxCacheBundlesResponse::new(vec![dummy_bundle_with_id(
+                uuid,
+            )]));
+
+        assert_eq!(response.bundles.len(), 1);
+        assert_eq!(response.bundles[0].id, uuid);
+    }
+
+    #[test]
+    fn test_cache_response_deref_mut() {
+        let uuid = Uuid::new_v4();
+        let mut response =
+            CacheResponse::unpaginated(TxCacheBundlesResponse::new(vec![dummy_bundle_with_id(
+                uuid,
+            )]));
+
+        response.bundles.clear();
+        assert!(response.bundles.is_empty());
     }
 }
