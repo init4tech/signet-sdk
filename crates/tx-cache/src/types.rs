@@ -54,6 +54,7 @@ impl<T: CacheObject> CacheResponse<T> {
     }
 
     /// Return a reference to the inner value.
+    #[deprecated = "use deref instead"]
     pub const fn inner(&self) -> &T {
         match self {
             Self { inner, .. } => inner,
@@ -61,6 +62,7 @@ impl<T: CacheObject> CacheResponse<T> {
     }
 
     /// Return a mutable reference to the inner value.
+    #[deprecated = "use deref_mut instead"]
     pub const fn inner_mut(&mut self) -> &mut T {
         match self {
             Self { inner, .. } => inner,
@@ -610,7 +612,6 @@ mod tests {
                 uuid,
             )]));
 
-        // Access field directly via Deref
         assert_eq!(response.bundles.len(), 1);
         assert_eq!(response.bundles[0].id, uuid);
     }
@@ -623,7 +624,6 @@ mod tests {
                 uuid,
             )]));
 
-        // Mutate via DerefMut
         response.bundles.clear();
         assert!(response.bundles.is_empty());
     }
