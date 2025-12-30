@@ -1,9 +1,9 @@
+use crate::error::Result;
 use crate::types::{
     CacheObject, CacheResponse, OrderKey, TxCacheOrdersResponse, TxCacheSendBundleResponse,
     TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
-use eyre::Error;
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_constants::parmigiana;
@@ -39,7 +39,7 @@ impl TxCache {
     }
 
     /// Create a new cache given a string URL.
-    pub fn new_from_string(url: &str) -> Result<Self, Error> {
+    pub fn new_from_string(url: &str) -> Result<Self> {
         let url = reqwest::Url::parse(url)?;
         Ok(Self::new(url))
     }
@@ -88,7 +88,7 @@ impl TxCache {
         &self,
         join: &'static str,
         obj: T,
-    ) -> Result<R, Error> {
+    ) -> Result<R> {
         self.forward_inner_raw(join, obj)
             .await?
             .json::<R>()
@@ -101,7 +101,7 @@ impl TxCache {
         &self,
         join: &'static str,
         obj: T,
-    ) -> Result<reqwest::Response, Error> {
+    ) -> Result<reqwest::Response> {
         // Append the path to the URL.
         let url = self
             .url
@@ -112,7 +112,7 @@ impl TxCache {
         self.client.post(url).json(&obj).send().await?.error_for_status().map_err(Into::into)
     }
 
-    async fn get_inner<T>(&self, join: &'static str, query: Option<T::Key>) -> Result<T, Error>
+    async fn get_inner<T>(&self, join: &'static str, query: Option<T::Key>) -> Result<T>
     where
         T: DeserializeOwned + CacheObject,
     {
@@ -137,7 +137,7 @@ impl TxCache {
     pub async fn forward_raw_transaction(
         &self,
         tx: TxEnvelope,
-    ) -> Result<TxCacheSendTransactionResponse, Error> {
+    ) -> Result<TxCacheSendTransactionResponse> {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
@@ -146,13 +146,13 @@ impl TxCache {
     pub async fn forward_bundle(
         &self,
         bundle: SignetEthBundle,
-    ) -> Result<TxCacheSendBundleResponse, Error> {
+    ) -> Result<TxCacheSendBundleResponse> {
         self.forward_inner(BUNDLES, bundle).await
     }
 
     /// Forward an order to the URL.
     #[instrument(skip_all)]
-    pub async fn forward_order(&self, order: SignedOrder) -> Result<(), Error> {
+    pub async fn forward_order(&self, order: SignedOrder) -> Result<()> {
         self.forward_inner_raw(ORDERS, order).await.map(drop)
     }
 
@@ -161,7 +161,7 @@ impl TxCache {
     pub async fn get_transactions(
         &self,
         query: Option<TxKey>,
-    ) -> Result<CacheResponse<TxCacheTransactionsResponse>, Error> {
+    ) -> Result<CacheResponse<TxCacheTransactionsResponse>> {
         self.get_inner(TRANSACTIONS, query).await
     }
 
@@ -170,7 +170,7 @@ impl TxCache {
     pub async fn get_orders(
         &self,
         query: Option<OrderKey>,
-    ) -> Result<CacheResponse<TxCacheOrdersResponse>, Error> {
+    ) -> Result<CacheResponse<TxCacheOrdersResponse>> {
         self.get_inner(ORDERS, query).await
     }
 }

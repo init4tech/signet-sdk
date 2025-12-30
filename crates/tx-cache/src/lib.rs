@@ -13,9 +13,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 /// The [`TxCache`] client.
-pub mod client;
+mod client;
+pub use client::TxCache;
 
 /// Response types for the [`TxCache`].
 ///
 /// [`TxCache`]: crate::client::TxCache
 pub mod types;
+
+/// Errors returned by the [`TxCache`] client.
+pub mod error;
+pub use error::TxCacheError;
