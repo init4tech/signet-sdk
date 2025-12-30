@@ -17,11 +17,12 @@ signet-types.workspace = true
 
 alloy.workspace = true
 
-eyre.workspace = true
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tracing.workspace = true
 uuid = { workspace = true, features = ["serde"] }
+thiserror.workspace = true
+url = "2.5.7"
 
 [dev-dependencies]
 serde_urlencoded = "0.7.1"
