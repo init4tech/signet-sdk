@@ -91,6 +91,7 @@ impl TxCache {
     ) -> Result<R> {
         self.forward_inner_raw(join, obj)
             .await?
+            .error_for_status()?
             .json::<R>()
             .await
             .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
