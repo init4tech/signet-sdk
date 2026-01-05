@@ -329,7 +329,7 @@ mod orders {
     }
 
     impl Orders::Filled {
-        pub fn outputs(&self) -> &[IOrders::Output] {
+        pub const fn outputs(&self) -> &[IOrders::Output] {
             self.outputs.as_slice()
         }
     }

@@ -40,12 +40,12 @@ impl<T> ExecutionOutcome<T> {
     }
 
     /// Number of blocks in the execution outcome.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.receipts.len()
     }
 
     /// Check if the execution outcome is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.receipts.is_empty()
     }
 
@@ -55,7 +55,7 @@ impl<T> ExecutionOutcome<T> {
     }
 
     /// Return last block of the execution outcome
-    pub fn last_block(&self) -> BlockNumber {
+    pub const fn last_block(&self) -> BlockNumber {
         (self.first_block + self.len() as u64).saturating_sub(1)
     }
 

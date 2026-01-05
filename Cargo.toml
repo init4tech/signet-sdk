@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.16.0-rc.4"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.87"
 authors = ["init4"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/init4tech/signet-sdk"

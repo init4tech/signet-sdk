@@ -238,7 +238,7 @@ impl TxCacheBundlesResponse {
     }
 
     /// Check if the response is empty (has no bundles).
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.bundles.is_empty()
     }
 }
@@ -315,7 +315,7 @@ impl TxCacheTransactionsResponse {
     }
 
     /// Check if the response is empty (has no transactions).
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.transactions.is_empty()
     }
 }
@@ -438,7 +438,7 @@ impl TxCacheSendOrderResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct TxKey {
-    /// The transaction hash    
+    /// The transaction hash
     pub txn_hash: B256,
     /// The transaction score
     pub score: u64,

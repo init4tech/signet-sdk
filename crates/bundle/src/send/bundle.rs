@@ -1,8 +1,8 @@
 //! Signet bundle types.
 use alloy::{
-    consensus::TxEnvelope,
-    eips::Decodable2718,
-    primitives::{Bytes, B256},
+    consensus::{transaction::SignerRecoverable, TxEnvelope},
+    eips::{eip2718::Eip2718Result, Decodable2718},
+    primitives::{Address, Bytes, TxHash, B256},
     rlp::Buf,
     rpc::types::mev::EthSendBundle,
 };
@@ -39,10 +39,62 @@ pub struct SignetEthBundle {
 }
 
 impl SignetEthBundle {
+    /// Creates a new [`SignetEthBundle`] from an existing [`EthSendBundle`].
+    pub const fn new(bundle: EthSendBundle, host_txs: Vec<Bytes>) -> Self {
+        Self { bundle, host_txs }
+    }
+
+    /// Decomposes the [`SignetEthBundle`] into its parts.
+    pub fn into_parts(self) -> (EthSendBundle, Vec<Bytes>) {
+        (self.bundle, self.host_txs)
+    }
+
     /// Returns the transactions in this bundle.
-    #[allow(clippy::missing_const_for_fn)] // false positive
-    pub fn txs(&self) -> &[Bytes] {
-        &self.bundle.txs
+    pub const fn txs(&self) -> &[Bytes] {
+        self.bundle.txs.as_slice()
+    }
+
+    /// Returns the host transactions in this bundle.
+    pub const fn host_txs(&self) -> &[Bytes] {
+        self.host_txs.as_slice()
+    }
+
+    /// Get a mutable reference to the host transactions.
+    pub const fn host_txs_mut(&mut self) -> &mut Vec<Bytes> {
+        &mut self.host_txs
+    }
+
+    /// Return an iterator over decoded transactions in this bundle.
+    pub fn decode_txs(&self) -> impl Iterator<Item = Eip2718Result<TxEnvelope>> + '_ {
+        self.txs().iter().map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+    }
+
+    /// Return an iterator over decoded host transactions in this bundle.
+    ///
+    /// This may be empty if no host transactions were included.
+    pub fn decode_host_txs(&self) -> impl Iterator<Item = Eip2718Result<TxEnvelope>> + '_ {
+        self.host_txs.iter().map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+    }
+
+    /// Return an iterator over the signers of the transactions in this bundle.
+    /// The iterator yields `Option<(TxHash, Address)>` for each transaction,
+    /// where `None` indicates that the signer could not be recovered.
+    ///
+    /// Computing this may be expensive, as it requires decoding and recovering
+    /// the signer for each transaction. It is recommended to memoize the
+    /// results
+    pub fn signers(&self) -> impl Iterator<Item = Option<(TxHash, Address)>> + '_ {
+        self.txs().iter().map(|tx| {
+            TxEnvelope::decode_2718(&mut tx.chunk())
+                .ok()
+                .and_then(|envelope| envelope.recover_signer().ok().map(|s| (*envelope.hash(), s)))
+        })
+    }
+
+    /// Return an iterator over the signers of the transactions in this bundle,
+    /// skipping any transactions where the signer could not be recovered.
+    pub fn signers_lossy(&self) -> impl Iterator<Item = (TxHash, Address)> + '_ {
+        self.signers().flatten()
     }
 
     /// Returns the block number for this bundle.
@@ -61,13 +113,15 @@ impl SignetEthBundle {
     }
 
     /// Returns the reverting tx hashes for this bundle.
-    pub fn reverting_tx_hashes(&self) -> &[B256] {
+    pub const fn reverting_tx_hashes(&self) -> &[B256] {
         self.bundle.reverting_tx_hashes.as_slice()
     }
 
     /// Returns the replacement uuid for this bundle.
-    pub fn replacement_uuid(&self) -> Option<&str> {
-        self.bundle.replacement_uuid.as_deref()
+    pub const fn replacement_uuid(&self) -> Option<&str> {
+        let Some(uuid) = &self.bundle.replacement_uuid else { return None };
+
+        Some(uuid.as_str())
     }
 
     /// Checks if the bundle is valid at a given timestamp.
@@ -88,9 +142,7 @@ impl SignetEthBundle {
     ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
         // Decode and validate the transactions in the bundle
         let txs = self
-            .txs()
-            .iter()
-            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+            .decode_txs()
             .collect::<Result<Vec<_>, _>>()
             .map_err(|err| BundleError::TransactionDecodingError(err))?;
 
@@ -105,15 +157,9 @@ impl SignetEthBundle {
     pub fn decode_and_validate_host_txs<Db: Database>(
         &self,
     ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
-        // Decode and validate the host transactions in the bundle
-        let txs = self
-            .host_txs
-            .iter()
-            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
+        self.decode_host_txs()
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| BundleError::TransactionDecodingError(err))?;
-
-        Ok(txs)
+            .map_err(|err| BundleError::TransactionDecodingError(err))
     }
 }
 
@@ -123,8 +169,8 @@ mod test {
 
     #[test]
     fn send_bundle_ser_roundtrip() {
-        let bundle = SignetEthBundle {
-            bundle: EthSendBundle {
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
                 txs: vec![b"tx1".into(), b"tx2".into()],
                 block_number: 1,
                 min_timestamp: Some(2),
@@ -133,8 +179,8 @@ mod test {
                 replacement_uuid: Some("uuid".to_owned()),
                 ..Default::default()
             },
-            host_txs: vec![b"host_tx1".into(), b"host_tx2".into()],
-        };
+            vec![b"host_tx1".into(), b"host_tx2".into()],
+        );
 
         let serialized = serde_json::to_string(&bundle).unwrap();
         let deserialized: SignetEthBundle = serde_json::from_str(&serialized).unwrap();
@@ -144,8 +190,8 @@ mod test {
 
     #[test]
     fn send_bundle_ser_roundtrip_no_host_no_fills() {
-        let bundle = SignetEthBundle {
-            bundle: EthSendBundle {
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
                 txs: vec![b"tx1".into(), b"tx2".into()],
                 block_number: 1,
                 min_timestamp: Some(2),
@@ -154,8 +200,8 @@ mod test {
                 replacement_uuid: Some("uuid".to_owned()),
                 ..Default::default()
             },
-            host_txs: vec![],
-        };
+            vec![],
+        );
 
         let serialized = serde_json::to_string(&bundle).unwrap();
         let deserialized: SignetEthBundle = serde_json::from_str(&serialized).unwrap();

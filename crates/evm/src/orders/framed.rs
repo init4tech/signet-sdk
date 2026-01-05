@@ -33,12 +33,12 @@ impl<T> Framed<T> {
 
     /// Returns the number of events found, including those that may yet be
     /// reverted.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.events.len()
     }
 
     /// Returns `true` if the run has no events.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
 
@@ -73,7 +73,7 @@ impl<T> Framed<T> {
     }
 
     /// True if all frames have been exited.
-    pub fn is_complete(&self) -> bool {
+    pub const fn is_complete(&self) -> bool {
         self.frame_boundaries.is_empty()
     }
 }
