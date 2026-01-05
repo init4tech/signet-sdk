@@ -1,8 +1,8 @@
 use crate::{item::SimIdentifier, CacheError, SimItem};
-use alloy::consensus::TxEnvelope;
+use alloy::consensus::{transaction::Recovered, TxEnvelope};
 use core::fmt;
 use parking_lot::RwLock;
-use signet_bundle::SignetEthBundle;
+use signet_bundle::{RecoveredBundle, SignetEthBundle};
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -121,7 +121,7 @@ impl SimCache {
     pub fn add_bundles<I, Item>(&self, item: I, basefee: u64)
     where
         I: IntoIterator<Item = Item>,
-        Item: Into<SignetEthBundle>,
+        Item: Into<RecoveredBundle>,
     {
         let mut inner = self.inner.write();
 
@@ -137,7 +137,7 @@ impl SimCache {
     }
 
     /// Add a transaction to the cache.
-    pub fn add_tx(&self, tx: TxEnvelope, basefee: u64) {
+    pub fn add_tx(&self, tx: Recovered<TxEnvelope>, basefee: u64) {
         let item = SimItem::from(tx);
         let cache_rank = item.calculate_total_fee(basefee);
 
@@ -148,7 +148,7 @@ impl SimCache {
     /// Add an iterator of transactions to the cache. This locks the cache only once
     pub fn add_txs<I>(&self, item: I, basefee: u64)
     where
-        I: IntoIterator<Item = TxEnvelope>,
+        I: IntoIterator<Item = Recovered<TxEnvelope>>,
     {
         let mut inner = self.inner.write();
 
@@ -221,7 +221,8 @@ impl CacheInner {
 
 #[cfg(test)]
 mod test {
-    use alloy::{eips::Encodable2718, primitives::b256};
+
+    use alloy::primitives::{b256, Address};
 
     use super::*;
 
@@ -295,42 +296,54 @@ mod test {
         gas_limit: u64,
         mpfpg: u128,
         replacement_uuid: String,
-    ) -> signet_bundle::SignetEthBundle {
+    ) -> signet_bundle::RecoveredBundle {
         let tx = invalid_tx_with_score(gas_limit, mpfpg);
-        signet_bundle::SignetEthBundle {
-            bundle: alloy::rpc::types::mev::EthSendBundle {
-                txs: vec![tx.encoded_2718().into()],
-                block_number: 1,
-                min_timestamp: Some(2),
-                max_timestamp: Some(3),
-                replacement_uuid: Some(replacement_uuid),
-                ..Default::default()
-            },
-            host_txs: vec![],
-        }
+        signet_bundle::RecoveredBundle::new(
+            vec![tx],
+            vec![],
+            1,
+            Some(2),
+            Some(3),
+            vec![],
+            Some(replacement_uuid.clone()),
+            vec![],
+            None,
+            None,
+            vec![],
+            Default::default(),
+        )
     }
 
-    fn invalid_tx_with_score(gas_limit: u64, mpfpg: u128) -> alloy::consensus::TxEnvelope {
+    fn invalid_tx_with_score(
+        gas_limit: u64,
+        mpfpg: u128,
+    ) -> Recovered<alloy::consensus::TxEnvelope> {
         let tx = build_alloy_tx(gas_limit, mpfpg);
 
-        TxEnvelope::Eip1559(alloy::consensus::Signed::new_unhashed(
-            tx,
-            alloy::signers::Signature::test_signature(),
-        ))
+        Recovered::new_unchecked(
+            TxEnvelope::Eip1559(alloy::consensus::Signed::new_unhashed(
+                tx,
+                alloy::signers::Signature::test_signature(),
+            )),
+            Address::with_last_byte(7),
+        )
     }
 
     fn invalid_tx_with_score_and_hash(
         gas_limit: u64,
         mpfpg: u128,
         hash: alloy::primitives::B256,
-    ) -> alloy::consensus::TxEnvelope {
+    ) -> Recovered<alloy::consensus::TxEnvelope> {
         let tx = build_alloy_tx(gas_limit, mpfpg);
 
-        TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
-            tx,
-            alloy::signers::Signature::test_signature(),
-            hash,
-        ))
+        Recovered::new_unchecked(
+            TxEnvelope::Eip1559(alloy::consensus::Signed::new_unchecked(
+                tx,
+                alloy::signers::Signature::test_signature(),
+                hash,
+            )),
+            Address::with_last_byte(8),
+        )
     }
 
     fn build_alloy_tx(gas_limit: u64, mpfpg: u128) -> alloy::consensus::TxEip1559 {

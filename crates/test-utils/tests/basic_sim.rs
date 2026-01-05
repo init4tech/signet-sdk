@@ -1,5 +1,7 @@
 use alloy::{
-    consensus::{constants::GWEI_TO_WEI, Signed, TxEip1559, TxEnvelope},
+    consensus::{
+        constants::GWEI_TO_WEI, transaction::SignerRecoverable, Signed, TxEip1559, TxEnvelope,
+    },
     network::TxSigner,
     primitives::{Address, TxKind, U256},
     signers::Signature,
@@ -17,16 +19,14 @@ pub async fn complex_simulation() {
 
     // Set up 10 simple sends with escalating priority fee
     for (i, sender) in TEST_SIGNERS.iter().enumerate() {
-        builder.sim_items().add_tx(
-            signed_send_with_mfpg(
-                sender,
-                TEST_USERS[i],
-                U256::from(1000),
-                (10 - i) as u128 * GWEI_TO_WEI as u128,
-            )
-            .await,
-            0,
-        );
+        let tx = signed_send_with_mfpg(
+            sender,
+            TEST_USERS[i],
+            U256::from(1000),
+            (10 - i) as u128 * GWEI_TO_WEI as u128,
+        )
+        .await;
+        builder.sim_items().add_tx(tx.try_into_recovered().unwrap(), 0);
     }
 
     // Set up the simulator

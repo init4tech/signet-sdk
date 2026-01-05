@@ -1,44 +1,63 @@
+use crate::CacheError;
 use alloy::{
-    consensus::{Transaction, TxEnvelope},
-    eips::Decodable2718,
+    consensus::{
+        transaction::{Recovered, SignerRecoverable},
+        Transaction, TxEnvelope,
+    },
     primitives::TxHash,
 };
-use signet_bundle::SignetEthBundle;
+use signet_bundle::{RecoveredBundle, SignetEthBundle};
 use std::{
     borrow::{Borrow, Cow},
     hash::Hash,
 };
 
 /// An item that can be simulated.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SimItem {
     /// A bundle to be simulated.
-    Bundle(SignetEthBundle),
+    Bundle(Box<RecoveredBundle>),
     /// A transaction to be simulated.
-    Tx(TxEnvelope),
+    Tx(Box<Recovered<TxEnvelope>>),
 }
 
 impl TryFrom<SignetEthBundle> for SimItem {
-    type Error = crate::CacheError;
+    type Error = CacheError;
 
     fn try_from(bundle: SignetEthBundle) -> Result<Self, Self::Error> {
+        bundle.try_into_recovered().map_err(CacheError::BundleRecover).and_then(TryInto::try_into)
+    }
+}
+
+impl TryFrom<RecoveredBundle> for SimItem {
+    type Error = CacheError;
+
+    fn try_from(bundle: RecoveredBundle) -> Result<Self, Self::Error> {
         if bundle.replacement_uuid().is_some() {
-            Ok(Self::Bundle(bundle))
+            Ok(Self::Bundle(bundle.into()))
         } else {
-            Err(crate::CacheError::BundleWithoutReplacementUuid)
+            Err(CacheError::BundleWithoutReplacementUuid)
         }
     }
 }
 
-impl From<TxEnvelope> for SimItem {
-    fn from(tx: TxEnvelope) -> Self {
-        Self::Tx(tx)
+impl From<Recovered<TxEnvelope>> for SimItem {
+    fn from(tx: Recovered<TxEnvelope>) -> Self {
+        Self::Tx(tx.into())
+    }
+}
+
+impl TryFrom<TxEnvelope> for SimItem {
+    type Error = CacheError;
+
+    fn try_from(tx: TxEnvelope) -> Result<Self, Self::Error> {
+        tx.try_into_recovered().map_err(Into::into).map(Self::from)
     }
 }
 
 impl SimItem {
     /// Get the bundle if it is a bundle.
-    pub const fn as_bundle(&self) -> Option<&SignetEthBundle> {
+    pub const fn as_bundle(&self) -> Option<&RecoveredBundle> {
         match self {
             Self::Bundle(bundle) => Some(bundle),
             Self::Tx(_) => None,
@@ -46,7 +65,7 @@ impl SimItem {
     }
 
     /// Get the transaction if it is a transaction.
-    pub const fn as_tx(&self) -> Option<&TxEnvelope> {
+    pub const fn as_tx(&self) -> Option<&Recovered<TxEnvelope>> {
         match self {
             Self::Bundle(_) => None,
             Self::Tx(tx) => Some(tx),
@@ -59,10 +78,7 @@ impl SimItem {
         match self {
             Self::Bundle(bundle) => {
                 let mut total_tx_fee = 0;
-                for tx in bundle.bundle.txs.iter() {
-                    let Ok(tx) = TxEnvelope::decode_2718(&mut tx.as_ref()) else {
-                        continue;
-                    };
+                for tx in bundle.txs() {
                     total_tx_fee += tx.effective_gas_price(Some(basefee)) * tx.gas_limit() as u128;
                 }
                 total_tx_fee
@@ -81,7 +97,7 @@ impl SimItem {
             Self::Bundle(bundle) => {
                 SimIdentifier::Bundle(Cow::Borrowed(bundle.replacement_uuid().unwrap()))
             }
-            Self::Tx(tx) => SimIdentifier::Tx(*tx.hash()),
+            Self::Tx(tx) => SimIdentifier::Tx(*tx.inner().hash()),
         }
     }
 
@@ -91,7 +107,7 @@ impl SimItem {
             Self::Bundle(bundle) => {
                 SimIdentifier::Bundle(Cow::Owned(bundle.replacement_uuid().unwrap().to_string()))
             }
-            Self::Tx(tx) => SimIdentifier::Tx(*tx.hash()),
+            Self::Tx(tx) => SimIdentifier::Tx(*tx.inner().hash()),
         }
     }
 }

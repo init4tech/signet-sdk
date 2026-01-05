@@ -1,6 +1,9 @@
 //! Signet bundle types.
 use alloy::{
-    consensus::{transaction::SignerRecoverable, TxEnvelope},
+    consensus::{
+        transaction::{Recovered, SignerRecoverable},
+        TxEnvelope,
+    },
     eips::{eip2718::Eip2718Result, Decodable2718},
     primitives::{Address, Bytes, TxHash, B256},
     rlp::Buf,
@@ -12,6 +15,8 @@ use trevm::{
     revm::{inspector::NoOpInspector, Database},
     BundleError,
 };
+
+use crate::{BundleRecoverError, RecoveredBundle};
 
 /// The inspector type required by the Signet bundle driver.
 pub type BundleInspector<I = NoOpInspector> = Layered<TimeLimit, I>;
@@ -76,6 +81,61 @@ impl SignetEthBundle {
         self.host_txs.iter().map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
     }
 
+    /// Return an iterator over recovered transactions in this bundle. This
+    /// iterator may include errors.
+    pub fn recover_txs(
+        &self,
+    ) -> impl Iterator<Item = Result<Recovered<TxEnvelope>, BundleRecoverError>> + '_ {
+        self.decode_txs().enumerate().map(|(index, res)| match res {
+            Ok(tx) => {
+                tx.try_into_recovered().map_err(|err| BundleRecoverError::new(err, false, index))
+            }
+            Err(err) => Err(BundleRecoverError::new(err, false, index)),
+        })
+    }
+
+    /// Return an iterator over recovered host transactions in this bundle. This
+    /// iterator may include errors.
+    pub fn recover_host_txs(
+        &self,
+    ) -> impl Iterator<Item = Result<Recovered<TxEnvelope>, BundleRecoverError>> + '_ {
+        self.decode_host_txs().enumerate().map(|(index, res)| match res {
+            Ok(tx) => {
+                tx.try_into_recovered().map_err(|err| BundleRecoverError::new(err, true, index))
+            }
+            Err(err) => Err(BundleRecoverError::new(err, true, index)),
+        })
+    }
+
+    /// Create a [`RecoveredBundle`] from this bundle by decoding and recovering
+    /// all transactions, taking ownership of the bundle.
+    pub fn try_into_recovered(self) -> Result<RecoveredBundle, BundleRecoverError> {
+        let txs = self.recover_txs().collect::<Result<Vec<_>, _>>()?;
+
+        let host_txs = self.recover_host_txs().collect::<Result<Vec<_>, _>>()?;
+
+        Ok(RecoveredBundle {
+            txs,
+            host_txs,
+            block_number: self.bundle.block_number,
+            min_timestamp: self.bundle.min_timestamp,
+            max_timestamp: self.bundle.max_timestamp,
+            reverting_tx_hashes: self.bundle.reverting_tx_hashes,
+            replacement_uuid: self.bundle.replacement_uuid,
+            dropping_tx_hashes: self.bundle.dropping_tx_hashes,
+            refund_percent: self.bundle.refund_percent,
+            refund_recipient: self.bundle.refund_recipient,
+            refund_tx_hashes: self.bundle.refund_tx_hashes,
+            extra_fields: self.bundle.extra_fields,
+        })
+    }
+
+    /// Create a [`RecoveredBundle`] from this bundle by decoding and recovering
+    /// all transactions, cloning other fields as necessary.
+    pub fn try_to_recovered(&self) -> Result<RecoveredBundle, BundleRecoverError> {
+        self.clone().try_into_recovered()
+    }
+
     /// Return an iterator over the signers of the transactions in this bundle.
     /// The iterator yields `Option<(TxHash, Address)>` for each transaction,
     /// where `None` indicates that the signer could not be recovered.
@@ -126,9 +186,10 @@ impl SignetEthBundle {
 
     /// Checks if the bundle is valid at a given timestamp.
     pub fn is_valid_at_timestamp(&self, timestamp: u64) -> bool {
-        let min_timestamp = self.bundle.min_timestamp.unwrap_or(0);
-        let max_timestamp = self.bundle.max_timestamp.unwrap_or(u64::MAX);
-        timestamp >= min_timestamp && timestamp <= max_timestamp
+        let min_timestamp = self.min_timestamp().unwrap_or(0);
+        let max_timestamp = self.max_timestamp().unwrap_or(u64::MAX);
+
+        (min_timestamp..=max_timestamp).contains(&timestamp)
     }
 
     /// Checks if the bundle is valid at a given block number.

@@ -140,6 +140,7 @@ fn test_bundle_ok() {
     let trevm = bundle_evm();
 
     let bundle = counter_bundle(false);
+    let bundle = bundle.try_to_recovered().unwrap();
 
     let mut driver =
         SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
@@ -160,6 +161,7 @@ fn test_bundle_revert() {
     let trevm = bundle_evm();
 
     let bundle = counter_bundle(true);
+    let bundle = bundle.try_to_recovered().unwrap();
 
     let mut driver =
         SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
@@ -184,6 +186,7 @@ fn test_bundle_droppable() {
     let hash = keccak256(&bundle.txs()[1]);
     bundle.bundle.reverting_tx_hashes.push(hash);
 
+    let bundle = bundle.try_to_recovered().unwrap();
     let mut driver =
         SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 
@@ -207,6 +210,7 @@ fn test_order_bundle() {
     agg_fills.add_fill(HOST_CHAIN_ID, &host_fills);
 
     let bundle = order_bundle(vec![]);
+    let bundle = bundle.try_to_recovered().unwrap();
 
     let mut driver = SignetEthBundleDriver::new_with_fill_state(
         &bundle,
@@ -238,6 +242,7 @@ fn test_order_bundle_revert() {
 
     // This should cause the order to be invalid, as no fill is provided.
     let bundle = order_bundle(vec![]);
+    let bundle = bundle.try_to_recovered().unwrap();
 
     let mut driver =
         SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
@@ -267,6 +272,7 @@ fn test_order_bundle_droppable() {
     bundle.bundle.reverting_tx_hashes.push(hash);
     dbg!(hash);
 
+    let bundle = bundle.try_to_recovered().unwrap();
     let mut driver =
         SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
 

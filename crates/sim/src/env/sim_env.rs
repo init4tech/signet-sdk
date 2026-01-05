@@ -1,7 +1,7 @@
 use crate::{env::RollupEnv, HostEnv, SimCache, SimDb, SimItem, SimOutcomeWithCache};
 use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
-use signet_bundle::{SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError};
+use signet_bundle::{RecoveredBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetInspector;
 use signet_types::constants::SignetSystemConstants;
 use std::{borrow::Cow, sync::Arc};
@@ -192,7 +192,7 @@ where
     fn simulate_bundle(
         &self,
         cache_rank: u128,
-        bundle: &SignetEthBundle,
+        bundle: &RecoveredBundle,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>>
     where
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
