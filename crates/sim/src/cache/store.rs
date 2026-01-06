@@ -72,11 +72,9 @@ impl SimCache {
         std::thread::spawn(move || {
             let mut inner = inner.write();
 
-            for rank in never {
-                if let Some(item) = inner.items.remove(&rank) {
-                    inner.seen.remove(&item.identifier_owned());
-                }
-            }
+            never.into_iter().for_each(|rank| {
+                inner.remove(rank);
+            });
         });
     }
 
@@ -186,33 +184,7 @@ impl SimCache {
     /// Remove an item by key.
     pub fn remove(&self, cache_rank: u128) -> Option<SimItem> {
         let mut inner = self.inner.write();
-        if let Some(item) = inner.items.remove(&cache_rank) {
-            inner.seen.remove(item.identifier().as_bytes());
-            Some(item)
-        } else {
-            None
-        }
-    }
-
-    fn add_inner(inner: &mut CacheStore, mut cache_rank: u128, item: SimItem, capacity: usize) {
-        // Check if we've already seen this item - if so, don't add it
-        if !inner.seen.insert(item.identifier_owned()) {
-            return;
-        }
-
-        // If it has the same cache_rank, we decrement (prioritizing earlier items)
-        while inner.items.contains_key(&cache_rank) && cache_rank != 0 {
-            cache_rank = cache_rank.saturating_sub(1);
-        }
-
-        if inner.items.len() >= capacity {
-            // If we are at capacity, we need to remove the lowest score
-            if let Some((_, item)) = inner.items.pop_first() {
-                inner.seen.remove(&item.identifier_owned());
-            }
-        }
-
-        inner.items.insert(cache_rank, item.clone());
+        inner.remove(cache_rank)
     }
 
     /// Add a bundle to the cache.
@@ -226,7 +198,7 @@ impl SimCache {
         let cache_rank = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
-        Self::add_inner(&mut inner, cache_rank, item, self.capacity);
+        inner.add_inner(cache_rank, item, self.capacity);
 
         Ok(())
     }
@@ -240,16 +212,7 @@ impl SimCache {
         Item: Into<RecoveredBundle>,
     {
         let mut inner = self.inner.write();
-
-        for item in item.into_iter() {
-            let item = item.into();
-            let Ok(item) = SimItem::try_from(item) else {
-                // Skip invalid bundles
-                continue;
-            };
-            let cache_rank = item.calculate_total_fee(basefee);
-            Self::add_inner(&mut inner, cache_rank, item, self.capacity);
-        }
+        inner.add_bundles(item, basefee, self.capacity);
     }
 
     /// Add a transaction to the cache.
@@ -258,7 +221,7 @@ impl SimCache {
         let cache_rank = item.calculate_total_fee(basefee);
 
         let mut inner = self.inner.write();
-        Self::add_inner(&mut inner, cache_rank, item, self.capacity);
+        inner.add_inner(cache_rank, item, self.capacity);
     }
 
     /// Add an iterator of transactions to the cache. This locks the cache only once
@@ -267,51 +230,20 @@ impl SimCache {
         I: IntoIterator<Item = Recovered<TxEnvelope>>,
     {
         let mut inner = self.inner.write();
-
-        for item in item.into_iter() {
-            let item = SimItem::from(item);
-            let cache_rank = item.calculate_total_fee(basefee);
-            Self::add_inner(&mut inner, cache_rank, item, self.capacity);
-        }
+        inner.add_txs(item, basefee, self.capacity);
     }
 
     /// Clean the cache by removing bundles that are not valid in the current
     /// block.
     pub fn clean(&self, block_number: u64, block_timestamp: u64) {
         let mut inner = self.inner.write();
-
-        // Trim to capacity by dropping lower fees.
-        while inner.items.len() > self.capacity {
-            if let Some((_, item)) = inner.items.pop_first() {
-                // Drop the identifier from the seen cache as well.
-                inner.seen.remove(item.identifier().as_bytes());
-            }
-        }
-
-        let CacheStore { ref mut items, ref mut seen } = *inner;
-
-        items.retain(|_, item| {
-            // Retain only items that are not bundles or are valid in the current block.
-            if let SimItem::Bundle(bundle) = item.deref() {
-                let should_keep = bundle.is_valid_at_block_number(block_number)
-                    && bundle.is_valid_at_timestamp(block_timestamp);
-
-                if !should_keep {
-                    seen.remove(item.identifier().as_bytes());
-                }
-
-                should_keep
-            } else {
-                true // Non-bundle items are retained
-            }
-        });
+        inner.clean(self.capacity, block_number, block_timestamp);
     }
 
     /// Clear the cache.
     pub fn clear(&self) {
         let mut inner = self.inner.write();
-        inner.items.clear();
-        inner.seen.clear();
+        inner.clear();
     }
 }
 
@@ -319,7 +251,8 @@ impl SimCache {
 struct CacheStore {
     /// Key is the cache_rank, unique ID within the cache && the item's order in the cache. Value is [`SimItem`] itself.
     items: BTreeMap<u128, SimItem>,
-    /// Key is the unique identifier for the [`SimItem`] - the UUID for bundles, tx hash for transactions.
+    /// Key is the unique identifier for the [`SimItem`] - the UUID for
+    /// bundles, tx hash for transactions.
     seen: HashSet<SimIdentifier<'static>>,
 }
 
@@ -332,6 +265,95 @@ impl fmt::Debug for CacheStore {
 impl CacheStore {
     fn new() -> Self {
         Self { items: BTreeMap::new(), seen: HashSet::new() }
+    }
+
+    /// Add an item to the cache.
+    fn add_inner(&mut self, mut cache_rank: u128, item: SimItem, capacity: usize) {
+        // Check if we've already seen this item - if so, don't add it
+        if !self.seen.insert(item.identifier_owned()) {
+            return;
+        }
+
+        // If it has the same cache_rank, we decrement (prioritizing earlier items)
+        while self.items.contains_key(&cache_rank) && cache_rank != 0 {
+            cache_rank = cache_rank.saturating_sub(1);
+        }
+
+        if self.items.len() >= capacity {
+            // If we are at capacity, we need to remove the lowest score
+            if let Some((_, item)) = self.items.pop_first() {
+                self.seen.remove(&item.identifier_owned());
+            }
+        }
+
+        self.items.insert(cache_rank, item.clone());
+    }
+
+    fn add_bundles<I, T>(&mut self, item: I, basefee: u64, capacity: usize)
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<RecoveredBundle>,
+    {
+        for item in item.into_iter() {
+            let item = item.into();
+            let Ok(item) = SimItem::try_from(item) else {
+                // Skip invalid bundles
+                continue;
+            };
+            let cache_rank = item.calculate_total_fee(basefee);
+            self.add_inner(cache_rank, item, capacity);
+        }
+    }
+
+    fn add_txs<I>(&mut self, item: I, basefee: u64, capacity: usize)
+    where
+        I: IntoIterator<Item = Recovered<TxEnvelope>>,
+    {
+        for item in item.into_iter() {
+            let item = SimItem::from(item);
+            let cache_rank = item.calculate_total_fee(basefee);
+            self.add_inner(cache_rank, item, capacity);
+        }
+    }
+
+    /// Remove an item by key.
+    fn remove(&mut self, cache_rank: u128) -> Option<SimItem> {
+        if let Some(item) = self.items.remove(&cache_rank) {
+            self.seen.remove(item.identifier().as_bytes());
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn clean(&mut self, capacity: usize, block_number: u64, block_timestamp: u64) {
+        // Trim to capacity by dropping lower fees.
+        while self.items.len() > capacity {
+            if let Some(key) = self.items.keys().next() {
+                self.remove(*key);
+            }
+        }
+
+        self.items.retain(|_, item| {
+            // Retain only items that are not bundles or are valid in the current block.
+            if let SimItem::Bundle(bundle) = item.deref() {
+                let should_keep = bundle.is_valid_at_block_number(block_number)
+                    && bundle.is_valid_at_timestamp(block_timestamp);
+
+                if !should_keep {
+                    self.seen.remove(item.identifier().as_bytes());
+                }
+
+                should_keep
+            } else {
+                true // Non-bundle items are retained
+            }
+        });
+    }
+
+    fn clear(&mut self) {
+        self.items.clear();
+        self.seen.clear();
     }
 }
 
