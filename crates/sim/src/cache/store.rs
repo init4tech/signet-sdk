@@ -1,11 +1,13 @@
 use crate::cache::{CacheError, SimIdentifier, SimItem, StateSource};
 use alloy::consensus::{transaction::Recovered, TxEnvelope};
 use core::fmt;
+use lru::LruCache;
 use parking_lot::RwLock;
 use signet_bundle::{RecoveredBundle, SignetEthBundle};
 use std::{
     collections::{BTreeMap, HashSet},
     mem::MaybeUninit,
+    num::NonZeroUsize,
     ops::Deref,
     sync::Arc,
 };
@@ -187,6 +189,12 @@ impl SimCache {
         inner.remove(cache_rank)
     }
 
+    /// Remove an item by key, and prevent it from being re-added for a while.
+    pub fn remove_and_disallow(&self, cache_rank: u128) -> Option<SimItem> {
+        let mut inner = self.inner.write();
+        inner.remove_and_disallow(cache_rank)
+    }
+
     /// Add a bundle to the cache.
     pub fn add_bundle(&self, bundle: SignetEthBundle, basefee: u64) -> Result<(), CacheError> {
         if bundle.replacement_uuid().is_none() {
@@ -251,9 +259,14 @@ impl SimCache {
 struct CacheStore {
     /// Key is the cache_rank, unique ID within the cache && the item's order in the cache. Value is [`SimItem`] itself.
     items: BTreeMap<u128, SimItem>,
+
     /// Key is the unique identifier for the [`SimItem`] - the UUID for
     /// bundles, tx hash for transactions.
     seen: HashSet<SimIdentifier<'static>>,
+
+    /// Identifiers of items that have been removed from the cache, as
+    /// they will never be valid again
+    disallowed: LruCache<SimIdentifier<'static>, ()>,
 }
 
 impl fmt::Debug for CacheStore {
@@ -264,7 +277,11 @@ impl fmt::Debug for CacheStore {
 
 impl CacheStore {
     fn new() -> Self {
-        Self { items: BTreeMap::new(), seen: HashSet::new() }
+        Self {
+            items: BTreeMap::new(),
+            seen: HashSet::new(),
+            disallowed: LruCache::new(NonZeroUsize::new(128).unwrap()),
+        }
     }
 
     /// Add an item to the cache.
@@ -316,7 +333,7 @@ impl CacheStore {
         }
     }
 
-    /// Remove an item by key.
+    /// Remove an item by key. This will also remove it from the seen set.
     fn remove(&mut self, cache_rank: u128) -> Option<SimItem> {
         if let Some(item) = self.items.remove(&cache_rank) {
             self.seen.remove(item.identifier().as_bytes());
@@ -325,26 +342,49 @@ impl CacheStore {
             None
         }
     }
+    /// Remove an item by key, and prevent it from being re-added for a while.
+    /// This will also remove it from the seen set.
+    fn remove_and_disallow(&mut self, cache_rank: u128) -> Option<SimItem> {
+        self.remove(cache_rank).inspect(|item| {
+            self.disallowed.put(item.identifier_owned(), ());
+        })
+    }
 
+    /// Clean the cache by evicting the lowest-score items and removing bundles
+    /// that are not valid in the current block.
     fn clean(&mut self, capacity: usize, block_number: u64, block_timestamp: u64) {
         // Trim to capacity by dropping lower fees.
         while self.items.len() > capacity {
             if let Some(key) = self.items.keys().next() {
-                self.remove(*key);
+                self.remove_and_disallow(*key);
             }
         }
 
         self.items.retain(|_, item| {
             // Retain only items that are not bundles or are valid in the current block.
             if let SimItem::Bundle(bundle) = item.deref() {
-                let should_keep = bundle.is_valid_at_block_number(block_number)
-                    && bundle.is_valid_at_timestamp(block_timestamp);
+                let ts_range = bundle.valid_timestamp_range();
+                let bundle_block = bundle.block_number();
 
-                if !should_keep {
+                // NB: we don't need to recheck max_timestamp here, as never
+                // covers that.
+                let now = block_number == bundle_block && ts_range.contains(&block_timestamp);
+
+                // Neve valid if the block number is past the bundle's target
+                // block or timestamp is past the bundle's max timestamp
+                let never =
+                    !now && (block_number > bundle_block || block_timestamp > *ts_range.end());
+
+                if never {
+                    self.seen.remove(item.identifier().as_bytes());
+                    self.disallowed.put(item.identifier_owned(), ());
+                }
+
+                if !now {
                     self.seen.remove(item.identifier().as_bytes());
                 }
 
-                should_keep
+                now
             } else {
                 true // Non-bundle items are retained
             }

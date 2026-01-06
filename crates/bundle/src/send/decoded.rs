@@ -144,14 +144,39 @@ impl RecoveredBundle {
         self.block_number
     }
 
+    /// Get the valid timestamp range for this bundle.
+    pub const fn valid_timestamp_range(&self) -> std::ops::RangeInclusive<u64> {
+        let min = if let Some(min) = self.min_timestamp { min } else { 0 };
+        let max = if let Some(max) = self.max_timestamp { max } else { u64::MAX };
+        min..=max
+    }
+
     /// Getter for min_timestamp, a standard bundle prop.
-    pub const fn min_timestamp(&self) -> Option<u64> {
+    pub const fn raw_min_timestamp(&self) -> Option<u64> {
         self.min_timestamp
     }
 
+    /// Getter for [`Self::raw_min_timestamp`], with default of 0.
+    pub const fn min_timestamp(&self) -> u64 {
+        if let Some(min) = self.min_timestamp {
+            min
+        } else {
+            0
+        }
+    }
+
     /// Getter for max_timestamp, a standard bundle prop.
-    pub const fn max_timestamp(&self) -> Option<u64> {
+    pub const fn raw_max_timestamp(&self) -> Option<u64> {
         self.max_timestamp
+    }
+
+    /// Getter for [`Self::raw_max_timestamp`], with default of `u64::MAX`.
+    pub const fn max_timestamp(&self) -> u64 {
+        if let Some(max) = self.max_timestamp {
+            max
+        } else {
+            u64::MAX
+        }
     }
 
     /// Getter for reverting_tx_hashes, a standard bundle prop.
