@@ -64,22 +64,6 @@ impl SimCache {
         vec
     }
 
-    /// Schedule cleaning of items that are never valid on a separate thread.
-    fn defer_remove(&self, never: Vec<u128>) {
-        if never.is_empty() {
-            return;
-        }
-
-        let inner = self.inner.clone();
-        std::thread::spawn(move || {
-            let mut inner = inner.write();
-
-            never.into_iter().for_each(|rank| {
-                inner.remove(rank);
-            });
-        });
-    }
-
     /// Iter over the best items in the cache, writing only those that pass
     /// preflight validity checks (nonce and initial fee) to the buffer.
     ///
@@ -101,7 +85,7 @@ impl SimCache {
         S: StateSource,
         S2: StateSource,
     {
-        let cache = self.inner.read();
+        let mut cache = self.inner.upgradable_read();
         let mut slots = buf.iter_mut();
         let start = slots.len();
 
@@ -137,7 +121,12 @@ impl SimCache {
             })
             .map(|_| start - slots.len());
 
-        self.defer_remove(never);
+        cache.with_upgraded(|cache| {
+            // Remove never valid items from the cache
+            never.iter().for_each(|rank| {
+                cache.remove_and_disallow(*rank);
+            });
+        });
 
         res
     }
@@ -370,18 +359,17 @@ impl CacheStore {
                 // covers that.
                 let now = block_number == bundle_block && ts_range.contains(&block_timestamp);
 
-                // Neve valid if the block number is past the bundle's target
+                // Never valid if the block number is past the bundle's target
                 // block or timestamp is past the bundle's max timestamp
                 let never =
                     !now && (block_number > bundle_block || block_timestamp > *ts_range.end());
 
-                if never {
-                    self.seen.remove(item.identifier().as_bytes());
-                    self.disallowed.put(item.identifier_owned(), ());
-                }
-
                 if !now {
                     self.seen.remove(item.identifier().as_bytes());
+                }
+
+                if never {
+                    self.disallowed.put(item.identifier_owned(), ());
                 }
 
                 now
