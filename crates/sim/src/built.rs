@@ -78,12 +78,12 @@ impl BuiltBlock {
     }
 
     /// Get the number of transactions in the block.
-    pub fn tx_count(&self) -> usize {
+    pub const fn tx_count(&self) -> usize {
         self.transactions.len()
     }
 
     /// Check if the block is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.transactions.is_empty()
     }
 
