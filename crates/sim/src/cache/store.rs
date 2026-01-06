@@ -1,10 +1,12 @@
-use crate::{item::SimIdentifier, CacheError, SimItem};
+use crate::cache::{CacheError, SimIdentifier, SimItem, StateSource};
 use alloy::consensus::{transaction::Recovered, TxEnvelope};
 use core::fmt;
 use parking_lot::RwLock;
 use signet_bundle::{RecoveredBundle, SignetEthBundle};
 use std::{
     collections::{BTreeMap, HashSet},
+    mem::MaybeUninit,
+    ops::Deref,
     sync::Arc,
 };
 
@@ -13,7 +15,7 @@ use std::{
 /// This cache is used to store the items that are being simulated.
 #[derive(Clone)]
 pub struct SimCache {
-    inner: Arc<RwLock<CacheInner>>,
+    inner: Arc<RwLock<CacheStore>>,
     capacity: usize,
 }
 
@@ -32,24 +34,138 @@ impl Default for SimCache {
 impl SimCache {
     /// Create a new `SimCache` instance, with a default capacity of `100`.
     pub fn new() -> Self {
-        Self { inner: Arc::new(RwLock::new(CacheInner::new())), capacity: 100 }
+        Self { inner: Arc::new(RwLock::new(CacheStore::new())), capacity: 100 }
     }
 
     /// Create a new `SimCache` instance with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { inner: Arc::new(RwLock::new(CacheInner::new())), capacity }
+        Self { inner: Arc::new(RwLock::new(CacheStore::new())), capacity }
+    }
+
+    /// Fill a buffer with up to its capacity
+    pub fn write_best_to(&self, buf: &mut [MaybeUninit<(u128, SimItem)>]) -> usize {
+        let cache = self.inner.read();
+        cache.items.iter().rev().zip(buf.iter_mut()).for_each(|((cache_rank, item), slot)| {
+            // Cloning the Arc into the MaybeUninit slot
+            slot.write((*cache_rank, item.clone()));
+        });
+        // We wrote the minimum of what was in the cache and the buffer
+        std::cmp::min(cache.items.len(), buf.len())
     }
 
     /// Get an iterator over the best items in the cache.
     pub fn read_best(&self, n: usize) -> Vec<(u128, SimItem)> {
-        self.inner
-            .read()
+        let mut vec = Vec::with_capacity(n);
+        let n = self.write_best_to(vec.spare_capacity_mut());
+        // SAFETY: We just wrote n items.
+        unsafe { vec.set_len(n) };
+        vec
+    }
+
+    /// Schedule cleaning of items that are never valid on a separate thread.
+    fn defer_remove(&self, never: Vec<u128>) {
+        if never.is_empty() {
+            return;
+        }
+
+        let inner = self.inner.clone();
+        std::thread::spawn(move || {
+            let mut inner = inner.write();
+
+            for rank in never {
+                if let Some(item) = inner.items.remove(&rank) {
+                    inner.seen.remove(&item.identifier_owned());
+                }
+            }
+        });
+    }
+
+    /// Iter over the best items in the cache, writing only those that pass
+    /// preflight validity checks (nonce and initial fee) to the buffer.
+    ///
+    /// The state sources are used to validate the items against the current
+    /// nonce and balance, to prevent simulating invalid items.
+    ///
+    /// This will additionally remove items that can _never_ be valid from the
+    /// cache.
+    ///
+    /// When an error is encountered, the process stops and the error is
+    /// returned. At this point, the buffer may be partially written.
+    pub fn write_best_valid_to<S, S2>(
+        &self,
+        buf: &mut [MaybeUninit<(u128, SimItem)>],
+        source: &S,
+        host_source: &S2,
+    ) -> Result<usize, Box<dyn std::error::Error>>
+    where
+        S: StateSource,
+        S2: StateSource,
+    {
+        let cache = self.inner.read();
+        let mut slots = buf.iter_mut();
+        let start = slots.len();
+
+        let mut never = Vec::new();
+
+        // Traverse the cache in reverse order (best items first), checking
+        // each item.
+        //
+        // Errors are shortcut by `try_for_each`. Passes are written to the
+        // buffer, consuming slots. Once no slots are left, the try_for_each
+        // returns early.
+        let res = cache
             .items
             .iter()
             .rev()
-            .take(n)
-            .map(|(cache_rank, item)| (*cache_rank, item.clone()))
-            .collect()
+            .map(|(rank, item)| {
+                item.check(source, host_source).map(|validity| (validity, rank, item))
+            })
+            .try_for_each(|result| {
+                if slots.len() == 0 {
+                    return Ok(());
+                }
+                let (validity, rank, item) = result?;
+
+                if validity.is_valid_now() {
+                    slots.next().expect("checked by len").write((*rank, item.clone()));
+                }
+                if validity.is_never_valid() {
+                    never.push(*rank);
+                }
+
+                Ok(())
+            })
+            .map(|_| start - slots.len());
+
+        self.defer_remove(never);
+
+        res
+    }
+
+    /// Get up to the `n` best items in the cache that pass preflight validity
+    /// checks (nonce and initial fee). The returned vector may be smaller than
+    /// `n` if not enough valid items are found.
+    ///
+    /// This will additionally remove items that can _never_ be valid from the
+    /// cache.
+    ///
+    /// The state sources are used to validate the items against the current
+    /// nonce and balance, to prevent simulating invalid items.
+    pub fn read_best_valid<S, S2>(
+        &self,
+        n: usize,
+        source: &S,
+        host_source: &S2,
+    ) -> Result<Vec<(u128, SimItem)>, Box<dyn std::error::Error>>
+    where
+        S: StateSource,
+        S2: StateSource,
+    {
+        let mut vec = Vec::with_capacity(n);
+        let n = self.write_best_valid_to(vec.spare_capacity_mut(), source, host_source)?;
+        // SAFETY: We just wrote n items.
+        unsafe { vec.set_len(n) };
+        Ok(vec)
     }
 
     /// Get the number of items in the cache.
@@ -78,7 +194,7 @@ impl SimCache {
         }
     }
 
-    fn add_inner(inner: &mut CacheInner, mut cache_rank: u128, item: SimItem, capacity: usize) {
+    fn add_inner(inner: &mut CacheStore, mut cache_rank: u128, item: SimItem, capacity: usize) {
         // Check if we've already seen this item - if so, don't add it
         if !inner.seen.insert(item.identifier_owned()) {
             return;
@@ -172,11 +288,11 @@ impl SimCache {
             }
         }
 
-        let CacheInner { ref mut items, ref mut seen } = *inner;
+        let CacheStore { ref mut items, ref mut seen } = *inner;
 
         items.retain(|_, item| {
             // Retain only items that are not bundles or are valid in the current block.
-            if let SimItem::Bundle(bundle) = item {
+            if let SimItem::Bundle(bundle) = item.deref() {
                 let should_keep = bundle.is_valid_at_block_number(block_number)
                     && bundle.is_valid_at_timestamp(block_timestamp);
 
@@ -200,20 +316,20 @@ impl SimCache {
 }
 
 /// Internal cache data, meant to be protected by a lock.
-struct CacheInner {
+struct CacheStore {
     /// Key is the cache_rank, unique ID within the cache && the item's order in the cache. Value is [`SimItem`] itself.
     items: BTreeMap<u128, SimItem>,
     /// Key is the unique identifier for the [`SimItem`] - the UUID for bundles, tx hash for transactions.
     seen: HashSet<SimIdentifier<'static>>,
 }
 
-impl fmt::Debug for CacheInner {
+impl fmt::Debug for CacheStore {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CacheInner").finish()
     }
 }
 
-impl CacheInner {
+impl CacheStore {
     fn new() -> Self {
         Self { items: BTreeMap::new(), seen: HashSet::new() }
     }

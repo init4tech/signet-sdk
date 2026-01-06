@@ -1,24 +1,26 @@
-use crate::CacheError;
+use crate::{cache::StateSource, CacheError, SimItemValidity};
 use alloy::{
     consensus::{
         transaction::{Recovered, SignerRecoverable},
         Transaction, TxEnvelope,
     },
-    primitives::TxHash,
+    primitives::{Address, TxHash, U256},
 };
-use signet_bundle::{RecoveredBundle, SignetEthBundle};
+use signet_bundle::{RecoveredBundle, SignetEthBundle, TxRequirement};
 use std::{
     borrow::{Borrow, Cow},
+    collections::BTreeMap,
     hash::Hash,
+    sync::Arc,
 };
 
-/// An item that can be simulated.
+/// An item that can be simulated, wrapped in an Arc for cheap cloning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SimItem {
     /// A bundle to be simulated.
-    Bundle(Box<RecoveredBundle>),
+    Bundle(Arc<RecoveredBundle>),
     /// A transaction to be simulated.
-    Tx(Box<Recovered<TxEnvelope>>),
+    Tx(Arc<Recovered<TxEnvelope>>),
 }
 
 impl TryFrom<SignetEthBundle> for SimItem {
@@ -57,7 +59,7 @@ impl TryFrom<TxEnvelope> for SimItem {
 
 impl SimItem {
     /// Get the bundle if it is a bundle.
-    pub const fn as_bundle(&self) -> Option<&RecoveredBundle> {
+    pub fn as_bundle(&self) -> Option<&RecoveredBundle> {
         match self {
             Self::Bundle(bundle) => Some(bundle),
             Self::Tx(_) => None,
@@ -65,7 +67,7 @@ impl SimItem {
     }
 
     /// Get the transaction if it is a transaction.
-    pub const fn as_tx(&self) -> Option<&Recovered<TxEnvelope>> {
+    pub fn as_tx(&self) -> Option<&Recovered<TxEnvelope>> {
         match self {
             Self::Bundle(_) => None,
             Self::Tx(tx) => Some(tx),
@@ -108,6 +110,125 @@ impl SimItem {
                 SimIdentifier::Bundle(Cow::Owned(bundle.replacement_uuid().unwrap().to_string()))
             }
             Self::Tx(tx) => SimIdentifier::Tx(*tx.inner().hash()),
+        }
+    }
+
+    fn check_tx<S>(&self, source: &S) -> Result<SimItemValidity, Box<dyn std::error::Error>>
+    where
+        S: StateSource,
+    {
+        let item = self.as_tx().expect("SimItem is not a Tx");
+
+        let total = item.max_fee_per_gas() * item.gas_limit() as u128;
+
+        source
+            .map(&item.signer(), |info| {
+                if info.nonce < item.nonce() {
+                    return SimItemValidity::Never;
+                }
+                if info.nonce > item.nonce() {
+                    return SimItemValidity::Future;
+                }
+                // this coveres the case where nonce is equal
+                if info.balance < U256::from(total) {
+                    return SimItemValidity::Future;
+                }
+
+                SimItemValidity::Now
+            })
+            .map_err(Into::into)
+    }
+
+    fn check_bundle_tx_list<S>(
+        items: impl Iterator<Item = TxRequirement>,
+        source: &S,
+    ) -> Result<SimItemValidity, S::Error>
+    where
+        S: StateSource,
+    {
+        // For bundles, we want to check the nonce of each transaction. To do
+        // this, we build a small in memory cache so that if the same signer
+        // appears, we can reuse the nonce info. We do not check balances after
+        // the first tx, as they may have changed due to prior txs in the
+        // bundle.
+
+        let mut nonce_cache: BTreeMap<Address, u64> = BTreeMap::new();
+        let mut items = items.peekable();
+
+        // Peek to perform the balance check for the first tx
+        if let Some(first) = items.peek() {
+            let info = source.account_details(&first.signer)?;
+
+            // check balance for the first tx is sufficient
+            if first.max_fee > info.balance {
+                return Ok(SimItemValidity::Future);
+            }
+
+            // Cache the nonce. This will be used for the first tx.
+            nonce_cache.insert(first.signer, info.nonce);
+        }
+
+        for requirement in items {
+            let state_nonce = match nonce_cache.get(&requirement.signer) {
+                Some(cached_nonce) => *cached_nonce,
+                None => {
+                    let nonce = source.nonce(&requirement.signer)?;
+                    nonce_cache.insert(requirement.signer, nonce);
+                    nonce
+                }
+            };
+
+            if requirement.nonce < state_nonce {
+                return Ok(SimItemValidity::Never);
+            }
+            if requirement.nonce > state_nonce {
+                return Ok(SimItemValidity::Future);
+            }
+
+            // Increment the cached nonce for the next transaction from this
+            // signer. Map _must_ have the entry as we just either loaded or
+            // stored it above
+            nonce_cache.entry(requirement.signer).and_modify(|n| *n += 1);
+        }
+
+        // All transactions passed
+        Ok(SimItemValidity::Now)
+    }
+
+    fn check_bundle<S, S2>(
+        &self,
+        source: &S,
+        host_source: &S2,
+    ) -> Result<SimItemValidity, Box<dyn std::error::Error>>
+    where
+        S: StateSource,
+        S2: StateSource,
+    {
+        let item = self.as_bundle().expect("SimItem is not a Bundle");
+
+        let ru_tx = Self::check_bundle_tx_list(item.tx_reqs(), source)?;
+        let host_tx = Self::check_bundle_tx_list(item.host_tx_reqs(), host_source)?;
+
+        // Check both the regular txs and the host txs.
+        Ok(ru_tx.min(host_tx))
+    }
+
+    /// Check if the item is valid against the provided state sources.
+    ///
+    /// This will check that nonces and balances are sufficient for the item to
+    /// be included on the current state.
+    pub fn check<S, S2>(
+        &self,
+        source: &S,
+        host_source: &S2,
+    ) -> Result<SimItemValidity, Box<dyn std::error::Error>>
+    where
+        S: StateSource,
+        S2: StateSource,
+    {
+        match self {
+            SimItem::Bundle(_) => self.check_bundle(source, host_source),
+            SimItem::Tx(_) => self.check_tx(source),
         }
     }
 }

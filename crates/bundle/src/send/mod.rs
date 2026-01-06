@@ -2,7 +2,7 @@ mod bundle;
 pub use bundle::{BundleInspector, SignetEthBundle};
 
 mod decoded;
-pub use decoded::RecoveredBundle;
+pub use decoded::{RecoveredBundle, TxRequirement};
 
 mod driver;
 pub use driver::{SignetEthBundleDriver, SignetEthBundleInsp};
