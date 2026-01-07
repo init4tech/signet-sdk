@@ -123,17 +123,20 @@ impl SimItem {
 
         source
             .map(&item.signer(), |info| {
-                if info.nonce < item.nonce() {
+                // if the chain nonce is greater than the tx nonce, it is
+                // no longer valid
+                if info.nonce > item.nonce() {
                     return SimItemValidity::Never;
                 }
-                if info.nonce > item.nonce() {
+                // if the chain nonce is less than the tx nonce, we need to wait
+                if info.nonce < item.nonce() {
                     return SimItemValidity::Future;
                 }
-                // this coveres the case where nonce is equal
+                // if the balance is insufficient, we need to wait
                 if info.balance < U256::from(total) {
                     return SimItemValidity::Future;
                 }
-
+                // nonce is equal and balance is sufficient
                 SimItemValidity::Now
             })
             .map_err(Into::into)
