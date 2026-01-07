@@ -1,24 +1,22 @@
 use crate::{outcome::SimulatedItem, SimItem};
 use alloy::{
-    consensus::{SidecarBuilder, SidecarCoder, TxEnvelope},
-    eips::Decodable2718,
+    consensus::{transaction::Recovered, SidecarBuilder, SidecarCoder, TxEnvelope},
     primitives::{keccak256, Bytes, B256},
-    rlp::Buf,
 };
 use core::fmt;
-use signet_bundle::SignetEthBundle;
+use signet_bundle::RecoveredBundle;
 use signet_zenith::{encode_txns, Alloy2718Coder};
 use std::sync::OnceLock;
-use tracing::{error, trace};
+use tracing::trace;
 
 /// A block that has been built by the simulator.
 #[derive(Clone, Default)]
 pub struct BuiltBlock {
     /// The host transactions to be included in a resulting bundle.
-    pub(crate) host_txns: Vec<Bytes>,
+    pub(crate) host_txns: Vec<Recovered<TxEnvelope>>,
 
     /// Transactions in the block.
-    pub(crate) transactions: Vec<TxEnvelope>,
+    pub(crate) transactions: Vec<Recovered<TxEnvelope>>,
 
     /// The block number for the Signet block.
     pub(crate) block_number: u64,
@@ -89,14 +87,13 @@ impl BuiltBlock {
 
     /// Get the current list of transactions included in this block.
     #[allow(clippy::missing_const_for_fn)] // false positive, const deref
-    pub fn transactions(&self) -> &[TxEnvelope] {
+    pub fn transactions(&self) -> &[Recovered<TxEnvelope>] {
         &self.transactions
     }
 
     /// Get the current list of host transactions included in this block.
-    #[allow(clippy::missing_const_for_fn)] // false positive, const deref
-    pub fn host_transactions(&self) -> &[Bytes] {
-        &self.host_txns
+    pub const fn host_transactions(&self) -> &[Recovered<TxEnvelope>] {
+        self.host_txns.as_slice()
     }
 
     /// Unseal the block
@@ -108,12 +105,15 @@ impl BuiltBlock {
     /// Seal the block by encoding the transactions and calculating the hash of
     /// the block contents.
     pub(crate) fn seal(&self) {
-        self.raw_encoding.get_or_init(|| encode_txns::<Alloy2718Coder>(&self.transactions).into());
+        self.raw_encoding.get_or_init(|| {
+            let iter = self.transactions.iter().map(Recovered::inner);
+            encode_txns::<Alloy2718Coder>(iter).into()
+        });
         self.hash.get_or_init(|| keccak256(self.raw_encoding.get().unwrap().as_ref()));
     }
 
     /// Ingest a transaction into the in-progress block.
-    pub fn ingest_tx(&mut self, tx: TxEnvelope) {
+    pub fn ingest_tx(&mut self, tx: Recovered<TxEnvelope>) {
         trace!(hash = %tx.tx_hash(), "ingesting tx");
         self.unseal();
         self.transactions.push(tx);
@@ -121,25 +121,14 @@ impl BuiltBlock {
 
     /// Ingest a bundle into the in-progress block.
     /// Ignores Signed Orders for now.
-    pub fn ingest_bundle(&mut self, bundle: SignetEthBundle) {
+    pub fn ingest_bundle(&mut self, mut bundle: RecoveredBundle) {
         trace!(replacement_uuid = bundle.replacement_uuid(), "adding bundle to block");
 
-        let txs = bundle
-            .bundle
-            .txs
-            .into_iter()
-            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
-            .collect::<Result<Vec<_>, _>>();
-
-        if let Ok(txs) = txs {
-            self.unseal();
-            // extend the transactions with the decoded transactions.
-            // As this builder does not provide bundles landing "top of block", its fine to just extend.
-            self.transactions.extend(txs);
-            self.host_txns.extend(bundle.host_txs);
-        } else {
-            error!("failed to decode bundle. dropping");
-        }
+        self.unseal();
+        // extend the transactions with the decoded transactions.
+        // As this builder does not provide bundles landing "top of block", its fine to just extend.
+        self.transactions.extend(bundle.drain_txns());
+        self.host_txns.extend(bundle.drain_host_txns());
     }
 
     /// Ingest a simulated item, extending the block.
@@ -148,8 +137,8 @@ impl BuiltBlock {
         self.host_gas_used += item.host_gas_used;
 
         match item.item {
-            SimItem::Bundle(bundle) => self.ingest_bundle(bundle),
-            SimItem::Tx(tx) => self.ingest_tx(tx),
+            SimItem::Bundle(bundle) => self.ingest_bundle(*bundle),
+            SimItem::Tx(tx) => self.ingest_tx(*tx),
         }
     }
 

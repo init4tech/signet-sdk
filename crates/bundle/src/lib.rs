@@ -51,6 +51,6 @@ pub use call::{SignetBundleDriver, SignetCallBundle, SignetCallBundleResponse};
 
 mod send;
 pub use send::{
-    BundleInspector, SignetEthBundle, SignetEthBundleDriver, SignetEthBundleError,
-    SignetEthBundleInsp,
+    BundleInspector, BundleRecoverError, RecoverError, RecoveredBundle, SignetEthBundle,
+    SignetEthBundleDriver, SignetEthBundleError, SignetEthBundleInsp,
 };

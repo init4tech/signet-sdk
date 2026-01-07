@@ -1,7 +1,7 @@
-use crate::send::SignetEthBundle;
+use crate::{RecoveredBundle, SignetEthBundleError};
 use alloy::{hex, primitives::U256};
 use signet_evm::{DriveBundleResult, EvmErrored, EvmNeedsTx, SignetInspector, SignetLayered};
-use signet_types::{AggregateFills, AggregateOrders, MarketError, SignedPermitError};
+use signet_types::{AggregateFills, AggregateOrders};
 use std::borrow::Cow;
 use tracing::{debug, debug_span, enabled, error};
 use trevm::{
@@ -71,58 +71,6 @@ where
     }
 }
 
-/// Errors while running a [`SignetEthBundle`] on the EVM.
-#[derive(thiserror::Error)]
-pub enum SignetEthBundleError<Db: Database> {
-    /// Bundle error.
-    #[error(transparent)]
-    Bundle(#[from] BundleError<Db>),
-
-    /// SignedPermitError.
-    #[error(transparent)]
-    SignetPermit(#[from] SignedPermitError),
-
-    /// Contract error.
-    #[error(transparent)]
-    Contract(#[from] alloy::contract::Error),
-
-    /// Market error.
-    #[error(transparent)]
-    Market(#[from] MarketError),
-
-    /// Host simulation error.
-    #[error("{0}")]
-    HostSimulation(&'static str),
-}
-
-impl<Db: Database> core::fmt::Debug for SignetEthBundleError<Db> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SignetEthBundleError::Bundle(bundle_error) => {
-                f.debug_tuple("BundleError").field(bundle_error).finish()
-            }
-            SignetEthBundleError::SignetPermit(signed_order_error) => {
-                f.debug_tuple("SignedPermitError").field(signed_order_error).finish()
-            }
-            SignetEthBundleError::Contract(contract_error) => {
-                f.debug_tuple("ContractError").field(contract_error).finish()
-            }
-            SignetEthBundleError::Market(market_error) => {
-                f.debug_tuple("MarketError").field(market_error).finish()
-            }
-            SignetEthBundleError::HostSimulation(msg) => {
-                f.debug_tuple("HostSimulationError").field(msg).finish()
-            }
-        }
-    }
-}
-
-impl<Db: Database> From<EVMError<Db::Error>> for SignetEthBundleError<Db> {
-    fn from(err: EVMError<Db::Error>) -> Self {
-        Self::Bundle(BundleError::from(err))
-    }
-}
-
 /// Driver for applying a Signet Ethereum bundle to an EVM.
 #[derive(Debug)]
 pub struct SignetEthBundleDriver<'a, 'b, Db, Insp>
@@ -131,7 +79,7 @@ where
     Insp: Inspector<Ctx<Db>>,
 {
     /// The bundle to apply.
-    bundle: &'a SignetEthBundle,
+    bundle: &'a RecoveredBundle,
 
     /// Reference to the fill state to check against.
     pub fill_state: Cow<'b, AggregateFills>,
@@ -152,7 +100,7 @@ where
     /// Creates a new [`SignetEthBundleDriver`] with the given bundle and
     /// response.
     pub fn new(
-        bundle: &'a SignetEthBundle,
+        bundle: &'a RecoveredBundle,
         host_evm: signet_evm::EvmNeedsTx<Db, Insp>,
         deadline: std::time::Instant,
     ) -> Self {
@@ -164,7 +112,7 @@ where
     ///
     /// This is useful for testing, and for combined host-rollup simulation.
     pub fn new_with_fill_state(
-        bundle: &'a SignetEthBundle,
+        bundle: &'a RecoveredBundle,
         host_evm: signet_evm::EvmNeedsTx<Db, Insp>,
         deadline: std::time::Instant,
         fill_state: Cow<'b, AggregateFills>,
@@ -185,7 +133,7 @@ where
     }
 
     /// Get a reference to the bundle.
-    pub const fn bundle(&self) -> &SignetEthBundle {
+    pub const fn bundle(&self) -> &RecoveredBundle {
         self.bundle
     }
 
@@ -224,15 +172,14 @@ where
         &mut self,
         mut trevm: EvmNeedsTx<RuDb, SignetEthBundleInsp<RuInsp>>,
     ) -> DriveBundleResult<Self, RuDb, SignetEthBundleInsp<RuInsp>> {
-        let bundle = &self.bundle.bundle;
         // -- STATELESS CHECKS --
 
         // Ensure that the bundle has transactions
-        trevm_ensure!(!bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
+        trevm_ensure!(!self.bundle.txs.is_empty(), trevm, BundleError::BundleEmpty.into());
 
         // Check if the block we're in is valid for this bundle. Both must match
         trevm_ensure!(
-            trevm.block_number().to::<u64>() == bundle.block_number,
+            trevm.block_number().to::<u64>() == self.bundle.block_number,
             trevm,
             BundleError::BlockNumberMismatch.into()
         );
@@ -244,10 +191,6 @@ where
             trevm,
             BundleError::TimestampOutOfRange.into()
         );
-
-        // Decode and validate the transactions in the bundle
-        let host_txs = trevm_try!(self.bundle.decode_and_validate_host_txs(), trevm);
-        let txs = trevm_try!(self.bundle.decode_and_validate_txs(), trevm);
 
         // -- STATEFUL ACTIONS --
 
@@ -261,13 +204,13 @@ where
         // We simply run all host transactions first, accumulating their state
         // changes into the host_evm's state. If any reverts, we error out the
         // simulation.
-        for tx in host_txs.into_iter() {
+        for tx in self.bundle.host_txs().iter() {
             self.output.host_evm = Some(trevm_try!(
                 self.output
                     .host_evm
                     .take()
                     .expect("host_evm missing")
-                    .run_tx(&tx)
+                    .run_tx(tx)
                     .and_then(|mut htrevm| {
                         let result = htrevm.result();
                         if let Some(output) = result.output()  {
@@ -312,7 +255,7 @@ where
         }
 
         // -- ROLLUP PORTION --
-        for tx in txs.into_iter() {
+        for tx in self.bundle.txs().iter() {
             let span = debug_span!(
                 "bundle_tx_loop",
                 tx_hash = %tx.hash(),
@@ -331,7 +274,7 @@ where
             // Temporary rebinding of trevm within each loop iteration.
             // The type of t is `EvmTransacted`, while the type of trevm is
             // `EvmNeedsTx`.
-            let mut t = trevm.run_tx(&tx).map_err(EvmErrored::err_into).inspect_err(
+            let mut t = trevm.run_tx(tx).map_err(EvmErrored::err_into).inspect_err(
                 |err| error!(err = %err.error(), "error while running rollup transaction"),
             )?;
 
