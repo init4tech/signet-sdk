@@ -119,8 +119,9 @@ where
         trace!(score = %best.as_ref().map(|candidate| candidate.score).unwrap_or_default(), "Read outcome from channel");
         let outcome = best.as_ref()?;
 
-        // Remove the item from the cache.
-        let item = self.sim_items().remove(outcome.cache_rank)?;
+        // Remove the item from the cache. Disallow it, as it will never be
+        // valid again.
+        let item = self.sim_items().remove_and_disallow(outcome.cache_rank)?;
 
         // We can expect here as all of our simulations are done and cleaned up.
         let inner = Arc::get_mut(&mut self.inner).expect("sims dropped already");

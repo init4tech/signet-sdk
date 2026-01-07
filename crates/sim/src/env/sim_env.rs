@@ -1,10 +1,11 @@
 use crate::{env::RollupEnv, HostEnv, SimCache, SimDb, SimItem, SimOutcomeWithCache};
 use alloy::{consensus::TxEnvelope, hex};
 use core::fmt;
+use parking_lot::Mutex;
 use signet_bundle::{RecoveredBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetInspector;
 use signet_types::constants::SignetSystemConstants;
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
 use tokio::sync::{mpsc, watch};
 use tracing::{instrument, trace, trace_span, warn};
 use trevm::{
@@ -33,6 +34,9 @@ pub struct SimEnv<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspector
 
     /// The maximum number of concurrent simulations to run.
     concurrency_limit: usize,
+
+    /// A buffer for simulation results.
+    sim_buffer: Mutex<Vec<(u128, SimItem)>>,
 }
 
 impl<RuDb, HostDb, RuInsp, HostInsp> fmt::Debug for SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
@@ -46,14 +50,21 @@ impl<RuDb, HostDb, RuInsp, HostInsp> fmt::Debug for SimEnv<RuDb, HostDb, RuInsp,
 
 impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     /// Create a new `SimEnv` instance.
-    pub const fn new(
+    pub fn new(
         rollup: RollupEnv<RuDb, RuInsp>,
         host: HostEnv<HostDb, HostInsp>,
         finish_by: std::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
     ) -> Self {
-        Self { rollup, host, finish_by, concurrency_limit, sim_items }
+        Self {
+            rollup,
+            host,
+            finish_by,
+            concurrency_limit,
+            sim_items,
+            sim_buffer: Mutex::new(Vec::with_capacity(concurrency_limit)),
+        }
     }
 
     /// Get a reference to the rollup environment.
@@ -255,14 +266,16 @@ where
     }
 
     pub(crate) fn sim_round(
-        self: Arc<Self>,
+        &self,
         max_gas: u64,
         max_host_gas: u64,
         best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
     ) {
-        // Pull the `n` best items from the cache.
-        let active_sim = match self.sim_items.read_best_valid(
-            self.concurrency_limit,
+        // This lock is cheap. There should never be contention.
+        let mut active_sim = self.sim_buffer.lock();
+
+        match self.sim_items.write_best_valid_to(
+            active_sim.spare_capacity_mut(),
             &self.rollup_env().db(),
             &self.host_env().db(),
         ) {
@@ -280,14 +293,10 @@ where
         let outer_ref = &outer;
         let _og = outer.enter();
 
-        // to be used in the scope
-        let this_ref = self.clone();
-
         std::thread::scope(|scope| {
             // Spawn a thread per bundle to simulate.
-            for (cache_rank, item) in active_sim.into_iter() {
+            for (cache_rank, item) in active_sim.drain(..) {
                 let c = candidates.clone();
-                let this_ref = this_ref.clone();
                 scope.spawn(move || {
                     let identifier = item.identifier();
                     let _ig = trace_span!(parent: outer_ref, "sim_task", %identifier).entered();
@@ -295,7 +304,7 @@ where
                     // If simulation is succesful, send the outcome via the
                     // channel.
 
-                    match this_ref.simulate(cache_rank, &item) {
+                    match self.simulate(cache_rank, &item) {
                         Ok(candidate) if candidate.score.is_zero() => {
                             trace!("zero score candidate, skipping");
                         }
@@ -320,7 +329,7 @@ where
                     };
                     // fall through applies to all errors, occurs if
                     // the simulation fails or the gas limit is exceeded.
-                    this_ref.sim_items.remove(cache_rank);
+                    self.sim_items.remove(cache_rank);
                 });
             }
             // Drop the TX so that the channel is closed when all threads
