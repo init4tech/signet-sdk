@@ -60,14 +60,15 @@ pub struct RecoveredBundle {
 impl RecoveredBundle {
     /// Instantiator. Generally recommend instantiating via conversion from
     /// [`SignetEthBundle`] via [`SignetEthBundle::try_into_recovered`] or
-    /// [`SignetEthBundle::try_to_recovered`].
+    /// [`SignetEthBundle::try_to_recovered`]. This allows instantiating empty
+    /// bundles, which are otherwise disallowed and is used for testing.
     ///
     /// [`SignetEthBundle`]: crate::send::bundle::SignetEthBundle
     /// [`SignetEthBundle::try_into_recovered`]: crate::send::bundle::SignetEthBundle::try_into_recovered
     /// [`SignetEthBundle::try_to_recovered`]: crate::send::bundle::SignetEthBundle::try_to_recovered
     #[doc(hidden)]
     #[allow(clippy::too_many_arguments)]
-    pub const fn new(
+    pub const fn new_unchecked(
         txs: Vec<Recovered<TxEnvelope>>,
         host_txs: Vec<Recovered<TxEnvelope>>,
         block_number: u64,

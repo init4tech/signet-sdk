@@ -275,6 +275,11 @@ impl CacheStore {
 
     /// Add an item to the cache.
     fn add_inner(&mut self, mut cache_rank: u128, item: SimItem, capacity: usize) {
+        // If the item is disallowed, we don't add it
+        if self.disallowed.contains(&item.identifier_owned()) {
+            return;
+        }
+
         // Check if we've already seen this item - if so, don't add it
         if !self.seen.insert(item.identifier_owned()) {
             return;
@@ -464,7 +469,7 @@ mod test {
         replacement_uuid: String,
     ) -> signet_bundle::RecoveredBundle {
         let tx = invalid_tx_with_score(gas_limit, mpfpg);
-        signet_bundle::RecoveredBundle::new(
+        signet_bundle::RecoveredBundle::new_unchecked(
             vec![tx],
             vec![],
             1,
