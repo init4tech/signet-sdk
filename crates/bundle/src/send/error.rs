@@ -9,9 +9,14 @@ use trevm::{
 /// bundles.
 #[derive(Debug, thiserror::Error)]
 pub enum RecoverError {
+    /// Bundle is empty. Bundles must contain at least one RU transaction.
+    #[error("Bundle must contain at least one RU transaction")]
+    EmptyBundle,
+
     /// Error occurred while decoding the transaction.
     #[error(transparent)]
     Decoding(#[from] Eip2718Error),
+
     /// Error occurred while recovering the signature.
     #[error(transparent)]
     Recovering(#[from] alloy::consensus::crypto::RecoveryError),

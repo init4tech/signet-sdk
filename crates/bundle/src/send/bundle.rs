@@ -16,7 +16,7 @@ use trevm::{
     BundleError,
 };
 
-use crate::{BundleRecoverError, RecoveredBundle};
+use crate::{BundleRecoverError, RecoverError, RecoveredBundle};
 
 /// The inspector type required by the Signet bundle driver.
 pub type BundleInspector<I = NoOpInspector> = Layered<TimeLimit, I>;
@@ -110,6 +110,10 @@ impl SignetEthBundle {
     /// Create a [`RecoveredBundle`] from this bundle by decoding and recovering
     /// all transactions, taking ownership of the bundle.
     pub fn try_into_recovered(self) -> Result<RecoveredBundle, BundleRecoverError> {
+        if self.txs().is_empty() {
+            return Err(BundleRecoverError::new(RecoverError::EmptyBundle, false, 0));
+        }
+
         let txs = self.recover_txs().collect::<Result<Vec<_>, _>>()?;
 
         let host_txs = self.recover_host_txs().collect::<Result<Vec<_>, _>>()?;

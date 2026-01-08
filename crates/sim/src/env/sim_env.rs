@@ -6,7 +6,7 @@ use signet_evm::SignetInspector;
 use signet_types::constants::SignetSystemConstants;
 use std::{borrow::Cow, sync::Arc};
 use tokio::sync::{mpsc, watch};
-use tracing::{instrument, trace, trace_span};
+use tracing::{instrument, trace, trace_span, warn};
 use trevm::{
     helpers::Ctx,
     revm::{
@@ -104,9 +104,9 @@ impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
 
 impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp>
 where
-    RuDb: DatabaseRef + Send + Sync,
+    RuDb: DatabaseRef<Error: 'static> + Send + Sync,
     RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
-    HostDb: DatabaseRef + Send + Sync,
+    HostDb: DatabaseRef<Error: 'static> + Send + Sync,
     HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync,
 {
     /// Simulates a transaction in the context of a block.
@@ -261,7 +261,17 @@ where
         best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
     ) {
         // Pull the `n` best items from the cache.
-        let active_sim = self.sim_items.read_best(self.concurrency_limit);
+        let active_sim = match self.sim_items.read_best_valid(
+            self.concurrency_limit,
+            &self.rollup_env().db(),
+            &self.host_env().db(),
+        ) {
+            Ok(items) => items,
+            Err(error) => {
+                warn!(%error, "State access error during sim round preflight");
+                return;
+            }
+        };
 
         // Create a channel to send the results back.
         let (candidates, mut candidates_rx) = mpsc::channel(self.concurrency_limit);
