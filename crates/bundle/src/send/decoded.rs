@@ -11,8 +11,8 @@ pub struct TxRequirement {
     pub signer: Address,
     /// Nonce
     pub nonce: u64,
-    /// Max fee (max_fee_per_gas * gas_limit)
-    pub max_fee: U256,
+    /// Max spend (max_fee_per_gas * gas_limit) + value
+    pub balance: U256,
 }
 
 /// Version of [`SignetEthBundle`] with decoded transactions.
@@ -121,22 +121,22 @@ impl RecoveredBundle {
     /// Get an iterator over the transaction requirements:
     /// - signer address
     /// - nonce
-    /// - max fee (max_fee_per_gas * gas_limit)
+    /// - min_balance ((max_fee_per_gas * gas_limit) + value)
     pub fn tx_reqs(&self) -> impl Iterator<Item = TxRequirement> + '_ {
         self.txs.iter().map(|tx| {
-            let max_fee = U256::from(tx.max_fee_per_gas() * tx.gas_limit() as u128);
-            TxRequirement { signer: tx.signer(), nonce: tx.nonce(), max_fee }
+            let balance = U256::from(tx.max_fee_per_gas() * tx.gas_limit() as u128) + tx.value();
+            TxRequirement { signer: tx.signer(), nonce: tx.nonce(), balance }
         })
     }
 
     /// Get an iterator over the host transaction requirements:
     /// - signer address
     /// - nonce
-    /// - max fee (max_fee_per_gas * gas_limit)
+    /// - min_balance ((max_fee_per_gas * gas_limit) + value)
     pub fn host_tx_reqs(&self) -> impl Iterator<Item = TxRequirement> + '_ {
         self.host_txs.iter().map(|tx| {
-            let max_fee = U256::from(tx.max_fee_per_gas() * tx.gas_limit() as u128);
-            TxRequirement { signer: tx.signer(), nonce: tx.nonce(), max_fee }
+            let balance = U256::from(tx.max_fee_per_gas() * tx.gas_limit() as u128) + tx.value();
+            TxRequirement { signer: tx.signer(), nonce: tx.nonce(), balance }
         })
     }
 

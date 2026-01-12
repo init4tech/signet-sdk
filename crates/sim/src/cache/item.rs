@@ -133,7 +133,7 @@ impl SimItem {
                     return SimItemValidity::Future;
                 }
                 // if the balance is insufficient, we need to wait
-                if info.balance < U256::from(total) {
+                if info.balance < total {
                     return SimItemValidity::Future;
                 }
                 // nonce is equal and balance is sufficient
@@ -163,7 +163,7 @@ impl SimItem {
             let info = source.account_details(&first.signer)?;
 
             // check balance for the first tx is sufficient
-            if first.max_fee > info.balance {
+            if first.balance > info.balance {
                 return Ok(SimItemValidity::Future);
             }
 
