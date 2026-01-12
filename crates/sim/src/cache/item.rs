@@ -119,7 +119,7 @@ impl SimItem {
     {
         let item = self.as_tx().expect("SimItem is not a Tx");
 
-        let total = item.max_fee_per_gas() * item.gas_limit() as u128;
+        let total = U256::from(item.max_fee_per_gas() * item.gas_limit() as u128) + item.value();
 
         source
             .map(&item.signer(), |info| {
