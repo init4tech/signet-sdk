@@ -8,9 +8,7 @@ use signet_zenith::RollupOrders;
 use trevm::{
     helpers::Ctx,
     revm::{
-        interpreter::{
-            CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter, InterpreterTypes,
-        },
+        interpreter::{CallInputs, CallOutcome, CreateInputs, CreateOutcome, InterpreterTypes},
         Database, Inspector,
     },
 };
@@ -127,7 +125,7 @@ where
     Db: Database,
     Int: InterpreterTypes,
 {
-    fn log(&mut self, _interp: &mut Interpreter<Int>, _context: &mut Ctx<Db>, log: Log) {
+    fn log(&mut self, _context: &mut Ctx<Db>, log: Log) {
         // skip if the log is not from a configured orders contract
         if !self.is_contract(log.address) {
             return;

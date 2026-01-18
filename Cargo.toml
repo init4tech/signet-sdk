@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.16.0-rc.4"
+version = "0.16.0-rc.5"
 edition = "2021"
 rust-version = "1.87"
 authors = ["init4"]
@@ -48,7 +48,7 @@ signet-zenith = { version = "0.16.0-rc.4", path = "crates/zenith" }
 signet-test-utils = { version = "0.16.0-rc.4", path = "crates/test-utils" }
 
 # trevm
-trevm = { version = "0.31.0", features = ["full_env_cfg"] }
+trevm = { version = "0.33.0", features = ["full_env_cfg"] }
 
 # Alloy periphery crates
 alloy-core = "1.4"
