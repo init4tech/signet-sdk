@@ -1,8 +1,19 @@
 use alloy::{
-    consensus::{transaction::Recovered, TxEnvelope},
-    primitives::{Address, TxHash},
+    consensus::{transaction::Recovered, Transaction, TxEnvelope},
+    primitives::{Address, TxHash, U256},
     serde::OtherFields,
 };
+
+/// Transaction requirement info for a single transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TxRequirement {
+    /// Signer address
+    pub signer: Address,
+    /// Nonce
+    pub nonce: u64,
+    /// Max spend (max_fee_per_gas * gas_limit) + value
+    pub balance: U256,
+}
 
 /// Version of [`SignetEthBundle`] with decoded transactions.
 ///
@@ -49,14 +60,15 @@ pub struct RecoveredBundle {
 impl RecoveredBundle {
     /// Instantiator. Generally recommend instantiating via conversion from
     /// [`SignetEthBundle`] via [`SignetEthBundle::try_into_recovered`] or
-    /// [`SignetEthBundle::try_to_recovered`].
+    /// [`SignetEthBundle::try_to_recovered`]. This allows instantiating empty
+    /// bundles, which are otherwise disallowed and is used for testing.
     ///
     /// [`SignetEthBundle`]: crate::send::bundle::SignetEthBundle
     /// [`SignetEthBundle::try_into_recovered`]: crate::send::bundle::SignetEthBundle::try_into_recovered
     /// [`SignetEthBundle::try_to_recovered`]: crate::send::bundle::SignetEthBundle::try_to_recovered
     #[doc(hidden)]
     #[allow(clippy::too_many_arguments)]
-    pub const fn new(
+    pub const fn new_unchecked(
         txs: Vec<Recovered<TxEnvelope>>,
         host_txs: Vec<Recovered<TxEnvelope>>,
         block_number: u64,
@@ -106,19 +118,66 @@ impl RecoveredBundle {
         self.host_txs.drain(..)
     }
 
+    /// Get an iterator over the transaction requirements:
+    /// - signer address
+    /// - nonce
+    /// - min_balance ((max_fee_per_gas * gas_limit) + value)
+    pub fn tx_reqs(&self) -> impl Iterator<Item = TxRequirement> + '_ {
+        self.txs.iter().map(|tx| {
+            let balance = U256::from(tx.max_fee_per_gas() * tx.gas_limit() as u128) + tx.value();
+            TxRequirement { signer: tx.signer(), nonce: tx.nonce(), balance }
+        })
+    }
+
+    /// Get an iterator over the host transaction requirements:
+    /// - signer address
+    /// - nonce
+    /// - min_balance ((max_fee_per_gas * gas_limit) + value)
+    pub fn host_tx_reqs(&self) -> impl Iterator<Item = TxRequirement> + '_ {
+        self.host_txs.iter().map(|tx| {
+            let balance = U256::from(tx.max_fee_per_gas() * tx.gas_limit() as u128) + tx.value();
+            TxRequirement { signer: tx.signer(), nonce: tx.nonce(), balance }
+        })
+    }
+
     /// Getter for block_number, a standard bundle prop.
     pub const fn block_number(&self) -> u64 {
         self.block_number
     }
 
+    /// Get the valid timestamp range for this bundle.
+    pub const fn valid_timestamp_range(&self) -> std::ops::RangeInclusive<u64> {
+        let min = if let Some(min) = self.min_timestamp { min } else { 0 };
+        let max = if let Some(max) = self.max_timestamp { max } else { u64::MAX };
+        min..=max
+    }
+
     /// Getter for min_timestamp, a standard bundle prop.
-    pub const fn min_timestamp(&self) -> Option<u64> {
+    pub const fn raw_min_timestamp(&self) -> Option<u64> {
         self.min_timestamp
     }
 
+    /// Getter for [`Self::raw_min_timestamp`], with default of 0.
+    pub const fn min_timestamp(&self) -> u64 {
+        if let Some(min) = self.min_timestamp {
+            min
+        } else {
+            0
+        }
+    }
+
     /// Getter for max_timestamp, a standard bundle prop.
-    pub const fn max_timestamp(&self) -> Option<u64> {
+    pub const fn raw_max_timestamp(&self) -> Option<u64> {
         self.max_timestamp
+    }
+
+    /// Getter for [`Self::raw_max_timestamp`], with default of `u64::MAX`.
+    pub const fn max_timestamp(&self) -> u64 {
+        if let Some(max) = self.max_timestamp {
+            max
+        } else {
+            u64::MAX
+        }
     }
 
     /// Getter for reverting_tx_hashes, a standard bundle prop.

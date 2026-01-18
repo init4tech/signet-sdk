@@ -146,6 +146,26 @@ impl<T, H> SealedBlock<T, H> {
     pub const fn new_unchecked(header: SealedHeader<H>, body: AlloyBlockBody<T, H>) -> Self {
         Self { header, body }
     }
+
+    /// Create a new empty sealed block for testing.
+    #[doc(hidden)]
+    pub fn blank_for_testing() -> Self
+    where
+        H: Default,
+    {
+        Self { header: SealedHeader::new(H::default()), body: AlloyBlockBody::default() }
+    }
+
+    /// Create a new empty sealed block with the given header for testing.
+    #[doc(hidden)]
+    pub fn blank_with_header(header: H) -> Self {
+        Self { header: SealedHeader::new(header), body: AlloyBlockBody::default() }
+    }
+
+    /// Get the transactions in the block.
+    fn transactions(&self) -> &[T] {
+        &self.body.transactions
+    }
 }
 
 impl<T, H: BlockHeader> BlockHeader for SealedBlock<T, H> {
@@ -247,6 +267,26 @@ impl<T, H> RecoveredBlock<T, H> {
     /// Create a new recovered block.
     pub const fn new(block: SealedBlock<T, H>, senders: Vec<Address>) -> Self {
         Self { block, senders }
+    }
+
+    /// Create a new empty recovered block for testing.
+    #[doc(hidden)]
+    pub fn blank_for_testing() -> Self
+    where
+        H: Default,
+    {
+        Self { block: SealedBlock::blank_for_testing(), senders: Vec::new() }
+    }
+
+    /// Create a new empty recovered block with the given header for testing.
+    #[doc(hidden)]
+    pub fn blank_with_header(header: H) -> Self {
+        Self { block: SealedBlock::blank_with_header(header), senders: Vec::new() }
+    }
+
+    /// Get the transactions in the block.
+    pub fn transactions(&self) -> &[T] {
+        self.block.transactions()
     }
 }
 

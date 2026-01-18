@@ -23,6 +23,7 @@ trevm.workspace = true
 thiserror.workspace = true
 
 parking_lot.workspace = true
+lru = "0.16.2"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

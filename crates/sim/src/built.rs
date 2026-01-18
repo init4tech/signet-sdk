@@ -6,7 +6,7 @@ use alloy::{
 use core::fmt;
 use signet_bundle::RecoveredBundle;
 use signet_zenith::{encode_txns, Alloy2718Coder};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
 /// A block that has been built by the simulator.
@@ -137,8 +137,8 @@ impl BuiltBlock {
         self.host_gas_used += item.host_gas_used;
 
         match item.item {
-            SimItem::Bundle(bundle) => self.ingest_bundle(*bundle),
-            SimItem::Tx(tx) => self.ingest_tx(*tx),
+            SimItem::Bundle(bundle) => self.ingest_bundle(Arc::unwrap_or_clone(bundle)),
+            SimItem::Tx(tx) => self.ingest_tx(Arc::unwrap_or_clone(tx)),
         }
     }
 
