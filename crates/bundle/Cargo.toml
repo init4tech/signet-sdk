@@ -16,6 +16,7 @@ signet-evm.workspace = true
 trevm.workspace = true
 
 alloy.workspace = true
+async-trait.workspace = true
 
 serde.workspace = true
 tracing.workspace = true
