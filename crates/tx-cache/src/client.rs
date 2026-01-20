@@ -133,7 +133,25 @@ impl TxCache {
             .map_err(Into::into)
     }
 
-    /// Forwards a raw transaction to the URL.
+    /// Forward a raw transaction to the transaction cache.
+    ///
+    /// This method submits a signed transaction envelope to the cache for
+    /// inclusion in a future block. The transaction will be validated and
+    /// stored, returning a response containing its cache identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `tx` - A signed [`TxEnvelope`] containing the transaction to forward.
+    ///
+    /// # Returns
+    ///
+    /// A [`TxCacheSendTransactionResponse`] containing the transaction's cache
+    /// identifier on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the transaction cache rejects
+    /// the transaction.
     #[instrument(skip_all)]
     pub async fn forward_raw_transaction(
         &self,
@@ -142,7 +160,25 @@ impl TxCache {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
-    /// Forward a bundle to the URL.
+    /// Forward a bundle to the transaction cache.
+    ///
+    /// This method submits a signed bundle to the cache for inclusion in a
+    /// future block. Bundles allow multiple transactions to be submitted
+    /// atomically with ordering guarantees.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle` - A [`SignetEthBundle`] containing the bundle to forward.
+    ///
+    /// # Returns
+    ///
+    /// A [`TxCacheSendBundleResponse`] containing the bundle's cache identifier
+    /// (UUID) on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the transaction cache rejects
+    /// the bundle.
     #[instrument(skip_all)]
     pub async fn forward_bundle(
         &self,
@@ -151,13 +187,45 @@ impl TxCache {
         self.forward_inner(BUNDLES, bundle).await
     }
 
-    /// Forward an order to the URL.
+    /// Forward a signed order to the transaction cache.
+    ///
+    /// This method submits a signed order to the cache. Orders represent
+    /// user intents that can be filled by solvers or market makers.
+    ///
+    /// # Arguments
+    ///
+    /// * `order` - A [`SignedOrder`] containing the order to forward.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the transaction cache rejects
+    /// the order.
     #[instrument(skip_all)]
     pub async fn forward_order(&self, order: SignedOrder) -> Result<()> {
         self.forward_inner_raw(ORDERS, order).await.map(drop)
     }
 
-    /// Get transactions from the URL.
+    /// Get transactions from the transaction cache.
+    ///
+    /// Retrieves transactions from the cache, optionally filtered by a query
+    /// key for pagination. When no query is provided, returns the first page
+    /// of transactions.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - An optional [`TxKey`] for pagination. Use `None` to get the
+    ///   first page, or pass the key from a previous response to get subsequent
+    ///   pages.
+    ///
+    /// # Returns
+    ///
+    /// A [`CacheResponse`] containing a [`TxCacheTransactionsResponse`] with
+    /// the transactions and pagination information. If more transactions are
+    /// available, the response will contain a key to fetch the next page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed.
     #[instrument(skip_all)]
     pub async fn get_transactions(
         &self,
@@ -166,7 +234,27 @@ impl TxCache {
         self.get_inner(TRANSACTIONS, query).await
     }
 
-    /// Get signed orders from the URL.
+    /// Get signed orders from the transaction cache.
+    ///
+    /// Retrieves signed orders from the cache, optionally filtered by a query
+    /// key for pagination. When no query is provided, returns the first page
+    /// of orders.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - An optional [`OrderKey`] for pagination. Use `None` to get
+    ///   the first page, or pass the key from a previous response to get
+    ///   subsequent pages.
+    ///
+    /// # Returns
+    ///
+    /// A [`CacheResponse`] containing a [`TxCacheOrdersResponse`] with the
+    /// orders and pagination information. If more orders are available, the
+    /// response will contain a key to fetch the next page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response cannot be parsed.
     #[instrument(skip_all)]
     pub async fn get_orders(
         &self,
