@@ -35,3 +35,14 @@ where
         self.client().request("signet_callBundle", (bundle,)).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::network::Ethereum;
+    use alloy::providers::RootProvider;
+
+    #[allow(dead_code)]
+    const fn assert_impl<T: SignetApi>() {}
+    const _: () = assert_impl::<RootProvider<Ethereum>>();
+}
