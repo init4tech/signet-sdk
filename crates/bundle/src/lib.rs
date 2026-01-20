@@ -47,7 +47,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod call;
-pub use call::{SignetApi, SignetBundleDriver, SignetCallBundle, SignetCallBundleResponse};
+pub use call::{SignetBundleApi, SignetBundleDriver, SignetCallBundle, SignetCallBundleResponse};
 
 mod send;
 pub use send::{

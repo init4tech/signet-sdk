@@ -1,4 +1,4 @@
-//! This module extends the Alloy provider with the Signet namespace's RPC methods.
+//! This module extends the Alloy provider with the Signet namespace's bundle-related RPC methods.
 
 use alloy::{network::Network, providers::Provider, transports::TransportResult};
 
@@ -7,7 +7,7 @@ use crate::{SignetCallBundle, SignetCallBundleResponse};
 /// Signet namespace RPC interface.
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-pub trait SignetApi<N: Network = alloy::network::Ethereum>: Send + Sync {
+pub trait SignetBundleApi<N: Network = alloy::network::Ethereum>: Send + Sync {
     /// Simulates a bundle of transactions against a specific block and returns
     /// the execution results.
     ///
@@ -23,7 +23,7 @@ pub trait SignetApi<N: Network = alloy::network::Ethereum>: Send + Sync {
 
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-impl<N, P> SignetApi<N> for P
+impl<N, P> SignetBundleApi<N> for P
 where
     N: Network,
     P: Provider<N>,
@@ -43,6 +43,6 @@ mod tests {
     use alloy::providers::RootProvider;
 
     #[allow(dead_code)]
-    const fn assert_impl<T: SignetApi>() {}
+    const fn assert_impl<T: SignetBundleApi>() {}
     const _: () = assert_impl::<RootProvider<Ethereum>>();
 }
