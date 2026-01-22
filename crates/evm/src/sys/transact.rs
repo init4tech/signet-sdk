@@ -1,6 +1,6 @@
 use crate::sys::{MeteredSysTx, SysBase, SysTx, TransactSysLog};
 use alloy::{
-    consensus::{EthereumTxEnvelope, Transaction},
+    consensus::{EthereumTxEnvelope, Transaction, TxEip1559, TxType},
     hex,
     primitives::{utils::format_ether, Address, Bytes, Log, TxKind, U256},
 };
@@ -30,6 +30,11 @@ impl TransactSysTx {
         let magic_sig = transact.magic_sig(aliased);
         let tx = transact.make_transaction(0, aliased);
         Self { tx, nonce: None, magic_sig }
+    }
+
+    /// Get a reference to the inner EIP-1559 transaction.
+    pub const fn as_tx(&self) -> &TxEip1559 {
+        self.tx.as_eip1559().expect("set on construction").tx()
     }
 
     /// Check if the sender was aliased (i.e. the sender is a smart contract on
@@ -74,8 +79,37 @@ impl Clone for TransactSysTx {
 
 impl Tx for TransactSysTx {
     fn fill_tx_env(&self, tx_env: &mut TxEnv) {
-        self.tx.as_eip1559().unwrap().fill_tx_env(tx_env);
-        tx_env.caller = self.magic_sig.rollup_sender();
+        let tx = self.as_tx();
+        let TxEnv {
+            tx_type,
+            caller,
+            gas_limit,
+            gas_price,
+            kind,
+            value,
+            data,
+            nonce,
+            chain_id,
+            access_list,
+            gas_priority_fee,
+            blob_hashes,
+            max_fee_per_blob_gas,
+            authorization_list,
+        } = tx_env;
+        *tx_type = TxType::Eip1559 as u8;
+        *caller = self.magic_sig.rollup_sender();
+        *gas_limit = tx.gas_limit;
+        *gas_price = tx.max_fee_per_gas;
+        *kind = tx.to;
+        *value = tx.value;
+        *data = tx.input.clone();
+        *nonce = tx.nonce;
+        *chain_id = Some(tx.chain_id);
+        access_list.clone_from(&tx.access_list);
+        *gas_priority_fee = Some(tx.max_priority_fee_per_gas);
+        blob_hashes.clear();
+        *max_fee_per_blob_gas = 0;
+        authorization_list.clear();
     }
 }
 
