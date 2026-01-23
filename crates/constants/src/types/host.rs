@@ -50,6 +50,10 @@ impl std::fmt::Display for HostConstants {
 
 impl HostConstants {
     /// Create a new host configuration.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "symptom of this struct being essentially a collection of consts"
+    )]
     pub const fn new(
         chain_id: u64,
         deploy_height: u64,
