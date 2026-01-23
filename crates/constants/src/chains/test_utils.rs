@@ -70,6 +70,13 @@ pub const BASE_FEE_RECIPIENT: Address = Address::repeat_byte(0xab);
 /// Host system tokens.
 pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USDS, HOST_WBTC, HOST_WETH);
 
+/// Start timestamp for the test chain slot calculator.
+pub const HOST_START_TIMESTAMP: u64 = 12;
+/// Slot offset for the test chain slot calculator.
+pub const HOST_SLOT_OFFSET: u64 = 0;
+/// Slot duration for the test chain slot calculator.
+pub const HOST_SLOT_DURATION: u64 = 12;
+
 /// RU system tokens.
 pub const RU_TOKENS: RollupTokens = RollupTokens::new(RU_WBTC, RU_WETH);
 
@@ -85,6 +92,9 @@ pub const HOST: HostConstants = HostConstants::new(
     HOST_PASSAGE,
     HOST_TRANSACTOR,
     HOST_TOKENS,
+    HOST_START_TIMESTAMP,
+    HOST_SLOT_OFFSET,
+    HOST_SLOT_DURATION,
 );
 
 /// Rollup config

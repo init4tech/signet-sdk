@@ -10,7 +10,7 @@ use std::str::FromStr;
 ///
 /// These are system constants which may vary between chains, and are used to
 /// determine the behavior of the chain, such as which contracts the Signet
-/// node should listen to, and the addresses of system-priveleged tokens.
+/// node should listen to, and the addresses of system-privileged tokens.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostConstants {
@@ -30,6 +30,12 @@ pub struct HostConstants {
     /// USD tokens for the native asset, and permissioned tokens for bridged
     /// assets.
     tokens: HostTokens,
+    /// The start timestamp for the slot calculator.
+    start_timestamp: u64,
+    /// The slot number of the first block in the chain.
+    slot_offset: u64,
+    /// The slot duration (in seconds).
+    slot_duration: u64,
 }
 
 impl std::fmt::Display for HostConstants {
@@ -44,6 +50,10 @@ impl std::fmt::Display for HostConstants {
 
 impl HostConstants {
     /// Create a new host configuration.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "symptom of this struct being essentially a collection of consts"
+    )]
     pub const fn new(
         chain_id: u64,
         deploy_height: u64,
@@ -52,8 +62,22 @@ impl HostConstants {
         passage: Address,
         transactor: Address,
         tokens: HostTokens,
+        start_timestamp: u64,
+        slot_offset: u64,
+        slot_duration: u64,
     ) -> Self {
-        Self { chain_id, deploy_height, zenith, orders, passage, transactor, tokens }
+        Self {
+            chain_id,
+            deploy_height,
+            zenith,
+            orders,
+            passage,
+            transactor,
+            tokens,
+            start_timestamp,
+            slot_offset,
+            slot_duration,
+        }
     }
 
     /// Get the hard-coded Mainnet host constants.
@@ -139,6 +163,21 @@ impl HostConstants {
     /// Get the host tokens.
     pub const fn tokens(&self) -> &HostTokens {
         &self.tokens
+    }
+
+    /// Get the start timestamp for slot calculations.
+    pub const fn start_timestamp(&self) -> u64 {
+        self.start_timestamp
+    }
+
+    /// Get the slot offset for slot calculations.
+    pub const fn slot_offset(&self) -> u64 {
+        self.slot_offset
+    }
+
+    /// Get the slot duration for slot calculations.
+    pub const fn slot_duration(&self) -> u64 {
+        self.slot_duration
     }
 
     /// Get the host USD record for the given address, if it is a host USD.

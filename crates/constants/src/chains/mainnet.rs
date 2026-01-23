@@ -40,6 +40,13 @@ pub const HOST_USD_RECORDS: UsdRecords = UsdRecords::new();
 /// Host system tokens for Mainnet (placeholders).
 pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
 
+/// Start timestamp for the Mainnet host chain slot calculator (Ethereum Mainnet merge timestamp).
+pub const HOST_START_TIMESTAMP: u64 = 1663224179;
+/// Slot offset for the Mainnet host chain slot calculator.
+pub const HOST_SLOT_OFFSET: u64 = 4700013;
+/// Slot duration for the Mainnet host chain slot calculator.
+pub const HOST_SLOT_DURATION: u64 = 12;
+
 /// Host system constants for Mainnet.
 pub const HOST: HostConstants = crate::HostConstants::new(
     HOST_CHAIN_ID,
@@ -49,6 +56,9 @@ pub const HOST: HostConstants = crate::HostConstants::new(
     HOST_PASSAGE,
     HOST_TRANSACTOR,
     HOST_TOKENS,
+    HOST_START_TIMESTAMP,
+    HOST_SLOT_OFFSET,
+    HOST_SLOT_DURATION,
 );
 
 /// Name for the network.
