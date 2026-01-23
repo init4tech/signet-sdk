@@ -45,6 +45,13 @@ pub const HOST_USD_RECORDS: UsdRecords = {
 /// Host system tokens for Pecorino.
 pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
 
+/// Start timestamp for the Pecorino host chain slot calculator.
+pub const HOST_START_TIMESTAMP: u64 = 1754584265;
+/// Slot offset for the Pecorino host chain slot calculator.
+pub const HOST_SLOT_OFFSET: u64 = 0;
+/// Slot duration for the Pecorino host chain slot calculator.
+pub const HOST_SLOT_DURATION: u64 = 12;
+
 /// Host system constants for Pecorino.
 pub const HOST: HostConstants = crate::HostConstants::new(
     HOST_CHAIN_ID,
@@ -54,6 +61,9 @@ pub const HOST: HostConstants = crate::HostConstants::new(
     HOST_PASSAGE,
     HOST_TRANSACTOR,
     HOST_TOKENS,
+    HOST_START_TIMESTAMP,
+    HOST_SLOT_OFFSET,
+    HOST_SLOT_DURATION,
 );
 
 /// Name for the network.
