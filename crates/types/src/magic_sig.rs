@@ -225,21 +225,26 @@ impl From<MagicSig> for Signature {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
+    use alloy::{primitives::address, uint};
 
     // Enter token transaction, from Pecorino.
     // Corresponding to tx hash 0xb67ee8b269385dee5e4b454a3fe64a75e1073144cf1b71836e00e35b38e8ee5a
     const ENTER_TOKEN_TX: &str = include_str!("../../../tests/artifacts/enter_tx.json");
+
+    // Test helper to do roundtrip tests.
+    #[track_caller]
+    fn test_roundtrip(msig: MagicSig) {
+        let sig: Signature = msig.into();
+        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig))
+    }
 
     #[test]
     fn test_enter_roundtrip() {
         let txid = B256::repeat_byte(0xcc);
 
         let msig = MagicSig::enter_token(txid, 333);
-        let sig: Signature = msig.into();
-
-        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig))
+        test_roundtrip(msig);
     }
 
     #[test]
@@ -247,9 +252,7 @@ mod test {
         let txid = B256::repeat_byte(0xcc);
 
         let msig = MagicSig::enter_token(txid, 3821);
-        let sig: Signature = msig.into();
-
-        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig))
+        test_roundtrip(msig);
     }
 
     #[test]
@@ -258,12 +261,10 @@ mod test {
         let sender = Address::repeat_byte(0x12);
 
         let msig = MagicSig::transact(txid, false, u32::MAX as usize, sender);
-        let sig: Signature = msig.into();
-        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig));
+        test_roundtrip(msig);
 
         let msig = MagicSig::transact(txid, true, 0, sender);
-        let sig: Signature = msig.into();
-        assert_eq!(MagicSig::try_from_signature(&sig), Some(msig));
+        test_roundtrip(msig);
     }
 
     #[test]
@@ -275,5 +276,27 @@ mod test {
         // Only on transact events the sender is the actual caller of the
         // transaction on L1
         assert_eq!(msig.rollup_sender(), MINTER_ADDRESS)
+    }
+
+    #[test]
+    fn test_2026_01_27() {
+        // Diagnosis test for issue observed on 2026-01-27
+        // Transact magic signature from a transaction RPC is failing to return
+        let r = uint!(0x78916445ee265c92ca42976d7150d426bc75a46d47daff441e545e423965772_U256);
+        let s = uint!(0xffeeddcc000000000300000086973f6c0ad9d1a1519254f2b89cb341865e8b4e_U256);
+        let sig = Signature::new(r, s, false);
+
+        let msig = MagicSig::try_from_signature(&sig).unwrap();
+        assert_eq!(
+            msig,
+            MagicSig {
+                txid: r.to_le_bytes().into(),
+                event_idx: 0,
+                ty: MagicSigInfo::Transact {
+                    sender: address!("0x86973f6c0ad9d1a1519254f2b89cb341865e8b4e"),
+                    aliased: false
+                }
+            }
+        );
     }
 }
