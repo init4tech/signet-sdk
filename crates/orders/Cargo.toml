@@ -1,0 +1,10 @@
+[package]
+name = "signet-orders"
+description = "Utilities for placing and filling orders on Signet."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
