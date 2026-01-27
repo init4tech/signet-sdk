@@ -139,12 +139,14 @@ pub(crate) mod test {
             AcctDiff {
                 outcome: InfoOutcome::Diff {
                     old: Cow::Owned(AccountInfo {
+                        account_id: None,
                         balance: U256::from(38),
                         nonce: 7,
                         code_hash: KECCAK256_EMPTY,
                         code: None,
                     }),
                     new: Cow::Owned(AccountInfo {
+                        account_id: None,
                         balance: U256::from(23828839),
                         nonce: 83,
                         code_hash,
