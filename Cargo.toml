@@ -40,6 +40,7 @@ signet-evm = { version = "0.16.0-rc.7", path = "crates/evm" }
 signet-extract = { version = "0.16.0-rc.7", path = "crates/extract" }
 signet-journal = { version = "0.16.0-rc.7", path = "crates/journal" }
 signet-node = { version = "0.16.0-rc.7", path = "crates/node" }
+signet-orders = { version = "0.16.0-rc.7", path = "crates/orders" }
 signet-sim = { version = "0.16.0-rc.7", path = "crates/sim" }
 signet-types = { version = "0.16.0-rc.7", path = "crates/types" }
 signet-tx-cache = { version = "0.16.0-rc.7", path = "crates/tx-cache" }
