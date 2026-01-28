@@ -12,3 +12,10 @@ authors.workspace = true
 license.workspace = true
 homepage.workspace = true
 repository.workspace = true
+
+[dependencies]
+signet-bundle.workspace = true
+signet-tx-cache.workspace = true
+signet-types.workspace = true
+
+futures-util.workspace = true
