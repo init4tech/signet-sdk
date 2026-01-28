@@ -24,7 +24,7 @@ impl OrderSource for TxCache {
                 Ok(response) => {
                     let (inner, next_cursor) = response.into_parts();
                     let orders = stream::iter(inner.orders).map(Ok);
-                    Some((Either::Left(orders), Some(next_cursor)))
+                    Some((Either::Left(orders), next_cursor.map(Some)))
                 }
                 Err(error) => Some((Either::Right(stream::once(async { Err(error) })), None)),
             }
