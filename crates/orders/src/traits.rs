@@ -9,7 +9,7 @@ use signet_types::SignedOrder;
 /// or other order submission endpoint.
 pub trait OrderSubmitter {
     /// The error type returned by submission operations.
-    type Error: std::error::Error + Send + Sync + 'static;
+    type Error: core::error::Error + Send + Sync + 'static;
 
     /// Submit a signed order to the backend.
     fn submit_order(

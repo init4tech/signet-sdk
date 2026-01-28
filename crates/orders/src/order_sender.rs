@@ -13,7 +13,7 @@ pub enum OrderSenderError {
     Signing(#[from] SigningError),
     /// Order submission failed.
     #[error("order submission error: {0}")]
-    Submission(#[source] Box<dyn std::error::Error + Send + Sync>),
+    Submission(#[source] Box<dyn core::error::Error + Send + Sync>),
 }
 
 /// Sends signed orders to a backend.
