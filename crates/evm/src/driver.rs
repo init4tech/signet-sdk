@@ -16,6 +16,8 @@ use signet_types::{
     primitives::{BlockBody, RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
     AggregateFills, MarketError,
 };
+#[cfg(doc)]
+use signet_zenith::Transactor;
 use std::collections::VecDeque;
 use tracing::{debug, debug_span, info_span, warn};
 use trevm::{

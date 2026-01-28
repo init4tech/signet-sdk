@@ -1,3 +1,5 @@
+#[cfg(doc)]
+use crate::SignetEthBundle;
 use alloy::eips::eip2718::Eip2718Error;
 use signet_types::{MarketError, SignedPermitError};
 use trevm::{

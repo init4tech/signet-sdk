@@ -1,5 +1,4 @@
-/// Error type for [`crate::config`] module. Captures errors related to loading
-/// configuration from the environment or other sources.
+/// Captures errors related to loading configuration from the environment or other sources.
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     /// Missing `signetConstants` genesis field.

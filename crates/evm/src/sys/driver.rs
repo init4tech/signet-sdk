@@ -7,6 +7,8 @@ use crate::{
 };
 use alloy::primitives::{map::HashSet, U256};
 use signet_extract::Extractable;
+#[cfg(doc)]
+use signet_zenith::Transactor;
 use signet_zenith::MINTER_ADDRESS;
 use tracing::{debug, debug_span};
 use trevm::{
@@ -46,22 +48,18 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// This will do the following:
     /// - Run the system action, allowing direct EVM state changes.
-    /// - Produce the transaction using [`SysOutput::produce_transaction`].
-    /// - Produce the syslog for the receipt using [`SysOutput::produce_log`].
+    /// - Produce the transaction using [`SysBase::produce_transaction`].
+    /// - Produce the syslog for the receipt using [`SysBase::produce_log`].
     /// - Produce a receipt containing the gas used and logs.
     /// - Push the resulting transaction to the block.
     /// - Push the resulting receipt to the output.
     ///
     /// [`SysAction`]s have the following properties:
     /// - DO NOT pay for gas.
-    /// - DO update the nonce of the [`SysOutput::sender`] sender.
+    /// - DO update the nonce of the [`SysBase::evm_sender`] sender.
     /// - DO NOT run the EVM.
     ///
     /// See the [`SysAction`] trait documentation for more details.
-    ///
-    /// [`SysOutput::sender`]: crate::sys::SysOutput::sender
-    /// [`SysOutput::produce_log`]: crate::sys::SysOutput::produce_log
-    /// [`SysOutput::produce_transaction`]: crate::sys::SysOutput::produce_transaction
     pub(crate) fn apply_sys_action_single<Db, Insp, S>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
@@ -202,10 +200,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// [`UnmeteredSysTx`]s have the following properties:
     /// - DO NOT pay for gas.
-    /// - DO update the nonce of the [`SysOutput::sender`].
+    /// - DO update the nonce of the [`SysBase::evm_sender`].
     /// - DO run the EVM.
-    ///
-    /// [`SysOutput::sender`]: crate::sys::SysOutput::sender
     pub(crate) fn apply_unmetered_sys_transaction_single<Db, Insp, S>(
         &mut self,
         trevm: EvmNeedsTx<Db, Insp>,
@@ -233,10 +229,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     ///     /// [`UnmeteredSysTx`]s have the following properties:
     /// - DO NOT pay for gas.
-    /// - DO update the nonce of the [`SysOutput::sender`].
+    /// - DO update the nonce of the [`SysBase::evm_sender`].
     /// - DO run the EVM.
-    ///
-    /// [`SysOutput::sender`]: crate::sys::SysOutput::sender
     pub(crate) fn apply_unmetered_sys_transactions<Db, Insp, S>(
         &mut self,
         trevm: EvmNeedsTx<Db, Insp>,
@@ -260,20 +254,16 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     /// - Run the system transaction in the EVM.
     /// - Double-check that the sender has enough balance to pay for the unused
     ///   gas.
-    /// - Produce the transaction using [`SysOutput::produce_transaction`].
-    /// - Produce a syslog using [`SysOutput::produce_log`].
+    /// - Produce the transaction using [`SysBase::produce_transaction`].
+    /// - Produce a syslog using [`SysBase::produce_log`].
     /// - Push the syslog to the outcome.
     /// - Invoke [`Self::check_fills_and_accept`] to check the fills and
     ///   accept the transaction and receipt.
     ///
     /// [`MeteredSysTx`]s have the following properties:
     /// - DO pay for gas, INCLUDING unused gas.
-    /// - DO update the nonce of the [`SysOutput::sender`].
+    /// - DO update the nonce of the [`SysBase::evm_sender`].
     /// - DO run the EVM.
-    ///
-    /// [`SysOutput::produce_transaction`]: crate::sys::SysOutput::produce_transaction
-    /// [`SysOutput::sender`]: crate::sys::SysOutput::sender
-    /// [`SysOutput::produce_log`]: crate::sys::SysOutput::produce_log
     pub(crate) fn apply_metered_sys_transaction_single<Db, Insp, S>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,
@@ -362,10 +352,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     ///
     /// [`MeteredSysTx`]s have the following properties:
     /// - DO pay for gas, INCLUDING unused gas.
-    /// - DO update the nonce of the [`SysOutput::sender`].
+    /// - DO update the nonce of the [`SysBase::evm_sender`].
     /// - DO run the EVM.
-    ///
-    /// [`SysOutput::sender`]: crate::sys::SysOutput::sender
     fn apply_metered_sys_transactions<Db, Insp, S>(
         &mut self,
         mut trevm: EvmNeedsTx<Db, Insp>,

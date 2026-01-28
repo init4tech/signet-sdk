@@ -14,6 +14,8 @@ pub use token::MintToken;
 mod transact;
 pub use transact::TransactSysTx;
 
+#[cfg(doc)]
+use crate::SignetDriver;
 use alloy::{
     consensus::ReceiptEnvelope,
     primitives::{Address, Bytes, Log, TxKind, U256},

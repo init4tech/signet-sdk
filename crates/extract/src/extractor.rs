@@ -1,4 +1,6 @@
 use crate::{r#trait::Extractable, ExtractStep, Extracts};
+#[cfg(doc)]
+use crate::{Events, ExtractedEvent};
 use alloy::consensus::BlockHeader;
 use signet_types::constants::SignetSystemConstants;
 

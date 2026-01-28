@@ -27,7 +27,7 @@
 //! primary transaction simulation via [`SignetEthBundleDriver`] is performed
 //! locally using [`trevm`]. However, the [`SignedFill`] must be checked
 //! against the host chain. This is done by calling the
-//! [`SignetEthBundle::alloy_validate_fills_onchain`] method. This MUST be
+//! [`SignetEthBundle::decode_and_validate_txs`] method. This MUST be
 //! called BEFORE simulating.
 //!
 //! Builders running in an exex may choose to simulate using the local host
@@ -54,3 +54,6 @@ pub use send::{
     BundleInspector, BundleRecoverError, RecoverError, RecoveredBundle, SignetEthBundle,
     SignetEthBundleDriver, SignetEthBundleError, SignetEthBundleInsp, TxRequirement,
 };
+
+#[cfg(doc)]
+use signet_types::SignedFill;

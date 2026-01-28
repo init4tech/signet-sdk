@@ -1,3 +1,6 @@
+#[cfg(doc)]
+use signet_zenith::RollupOrders::Permit2Batch;
+
 /// An error that can occur when validating a signed order or fill.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SignedPermitError {
