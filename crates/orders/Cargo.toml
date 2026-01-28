@@ -15,7 +15,11 @@ repository.workspace = true
 
 [dependencies]
 signet-bundle.workspace = true
+signet-constants.workspace = true
 signet-tx-cache.workspace = true
 signet-types.workspace = true
+signet-zenith.workspace = true
 
+alloy.workspace = true
 futures-util.workspace = true
+thiserror.workspace = true
