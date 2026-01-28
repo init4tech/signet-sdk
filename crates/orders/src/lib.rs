@@ -16,5 +16,8 @@
 
 mod impls;
 
+mod order_sender;
+pub use order_sender::{OrderSender, OrderSenderError};
+
 mod traits;
 pub use traits::{BundleSubmitter, OrderSource, OrderSubmitter};
