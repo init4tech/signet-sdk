@@ -1,9 +1,8 @@
+use crate::OrderSubmitter;
 use alloy::signers::Signer;
 use signet_constants::SignetSystemConstants;
 use signet_types::{SignedOrder, SigningError, UnsignedOrder};
 use signet_zenith::RollupOrders::Order;
-
-use crate::OrderSubmitter;
 
 /// Errors returned by [`OrderSender`].
 #[derive(Debug, thiserror::Error)]
