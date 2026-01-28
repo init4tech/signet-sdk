@@ -10,7 +10,7 @@
 //! which containing the relevant [`ExtractedEvent`]s and a [`AggregateFills`]
 //! for a specific host block.
 //!
-//! [`SignetSystemConstants`]: signet_types::config::SignetSystemConstants
+//! [`SignetSystemConstants`]: signet_types::constants::SignetSystemConstants
 //! [`AggregateFills`]: signet_types::AggregateFills
 
 #![warn(
@@ -26,7 +26,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod block;
-pub use block::Extracts;
+pub use block::{Extracts, HostEvents};
 
 mod events;
 pub use events::Events;

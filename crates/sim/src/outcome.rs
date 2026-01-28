@@ -1,3 +1,5 @@
+#[cfg(doc)]
+use crate::SimCache;
 use crate::SimItem;
 use alloy::primitives::U256;
 use signet_types::{AggregateFills, AggregateOrders};

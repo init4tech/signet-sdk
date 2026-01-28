@@ -1,4 +1,6 @@
 use super::{sign_tx_with_key_pair, simple_send};
+#[cfg(doc)]
+use crate::specs::HostBlockSpec;
 use alloy::{
     consensus::{BlobTransactionSidecar, SidecarBuilder, SimpleCoder, TxEnvelope},
     eips::eip2718::Encodable2718,
@@ -20,8 +22,6 @@ use std::str::FromStr;
 /// 3. Optionally set the gas limit with [`Self::with_gas_limit`].
 /// 4. Optionally set the reward address with [`Self::with_reward_address`].
 /// 5. Add to a [`HostBlockSpec`] via `HostBlockSpec::add_ru_block`.
-///
-/// [`HostBlockSpec`]: crate::test_utils::HostBlockSpec
 #[derive(Debug, Clone)]
 pub struct RuBlockSpec {
     /// The system constants for the block.
