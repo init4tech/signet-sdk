@@ -11,7 +11,7 @@ use signet_test_utils::{
 };
 use signet_types::UnsignedOrder;
 use signet_zenith::{HostOrders::fillCall, RollupOrders::initiateCall};
-use std::time::{Duration, Instant};
+use tokio::time::{Duration, Instant};
 use trevm::revm::DatabaseRef;
 
 #[tokio::test]

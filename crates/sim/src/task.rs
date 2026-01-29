@@ -1,6 +1,6 @@
 use crate::{env::SimEnv, BuiltBlock, HostEnv, RollupEnv, SharedSimEnv, SimCache, SimDb};
 use std::time::Duration;
-use tokio::{select, time::Instant};
+use tokio::select;
 use tracing::{debug, trace};
 use trevm::{
     helpers::Ctx,
@@ -20,7 +20,7 @@ pub struct BlockBuild<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspe
     block: BuiltBlock,
 
     /// The deadline to produce a block by.
-    finish_by: std::time::Instant,
+    finish_by: tokio::time::Instant,
 
     /// The maximum amount of gas to use in the built block
     max_gas: u64,
@@ -41,7 +41,7 @@ where
     pub fn new(
         rollup: RollupEnv<RuDb, RuInsp>,
         host: HostEnv<HostDb, HostInsp>,
-        finish_by: std::time::Instant,
+        finish_by: tokio::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
         max_gas: u64,
@@ -143,9 +143,9 @@ where
         let mut i = 1;
         // Run until the deadline is reached.
         loop {
-            let finish_by = self.finish_by.into();
+            let finish_by = self.finish_by;
 
-            let next_round_time = Instant::now() + Duration::from_millis(SIM_SLEEP_MS);
+            let next_round_time = tokio::time::Instant::now() + Duration::from_millis(SIM_SLEEP_MS);
 
             // If the next round time is past the deadline, we stop the simulation loop.
             // This will stop the simulation even if there are items, but that is an acceptable tradeoff

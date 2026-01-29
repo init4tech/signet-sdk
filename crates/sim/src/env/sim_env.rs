@@ -29,7 +29,7 @@ pub struct SimEnv<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspector
     sim_items: SimCache,
 
     /// The instant by which the simulation should finish.
-    finish_by: std::time::Instant,
+    finish_by: tokio::time::Instant,
 
     /// The maximum number of concurrent simulations to run.
     concurrency_limit: usize,
@@ -49,7 +49,7 @@ impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     pub const fn new(
         rollup: RollupEnv<RuDb, RuInsp>,
         host: HostEnv<HostDb, HostInsp>,
-        finish_by: std::time::Instant,
+        finish_by: tokio::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
     ) -> Self {
@@ -87,12 +87,12 @@ impl<RuDb, HostDb, RuInsp, HostInsp> SimEnv<RuDb, HostDb, RuInsp, HostInsp> {
     }
 
     /// Get the exectuion timeout.
-    pub const fn finish_by(&self) -> std::time::Instant {
+    pub const fn finish_by(&self) -> tokio::time::Instant {
         self.finish_by
     }
 
     /// Set the execution timeout.
-    pub const fn set_finish_by(&mut self, timeout: std::time::Instant) {
+    pub const fn set_finish_by(&mut self, timeout: tokio::time::Instant) {
         self.finish_by = timeout;
     }
 
@@ -119,7 +119,7 @@ where
         cache_rank: u128,
         transaction: &TxEnvelope,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>> {
-        let trevm = self.rollup.create_evm(self.finish_by);
+        let trevm = self.rollup.create_evm(self.finish_by.into());
 
         // Get the initial beneficiary balance
         let beneficiary = trevm.beneficiary();
@@ -197,12 +197,12 @@ where
     where
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
     {
-        let trevm = self.rollup.create_evm(self.finish_by);
+        let trevm = self.rollup.create_evm(self.finish_by.into());
 
         let mut driver = SignetEthBundleDriver::new_with_fill_state(
             bundle,
-            self.host.create_evm(self.finish_by),
-            self.finish_by,
+            self.host.create_evm(self.finish_by.into()),
+            self.finish_by.into(),
             Cow::Borrowed(self.rollup.fill_state()),
         );
 
