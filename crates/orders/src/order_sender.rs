@@ -20,8 +20,7 @@ pub enum OrderSenderError {
 ///
 /// `OrderSender` is generic over:
 /// - `Sign`: A [`Signer`] for signing orders
-/// - `Submit
-///`: An [`OrderSubmitter`] for submitting signed orders to a backend
+/// - `Submit`: An [`OrderSubmitter`] for submitting signed orders to a backend
 #[derive(Debug, Clone)]
 pub struct OrderSender<Sign, Submit> {
     signer: Sign,
