@@ -19,32 +19,29 @@ pub enum OrderSenderError {
 /// Sends signed orders to a backend.
 ///
 /// `OrderSender` is generic over:
-/// - `SignerT`: A [`Signer`] for signing orders
-/// - `SubmitterT`: An [`OrderSubmitter`] for submitting signed orders to a backend
+/// - `Sign`: A [`Signer`] for signing orders
+/// - `Submit
+///`: An [`OrderSubmitter`] for submitting signed orders to a backend
 #[derive(Debug, Clone)]
-pub struct OrderSender<SignerT, SubmitterT> {
-    signer: SignerT,
-    submitter: SubmitterT,
+pub struct OrderSender<Sign, Submit> {
+    signer: Sign,
+    submitter: Submit,
     constants: SignetSystemConstants,
 }
 
-impl<SignerT, SubmitterT> OrderSender<SignerT, SubmitterT> {
+impl<Sign, Submit> OrderSender<Sign, Submit> {
     /// Create a new order sender instance.
-    pub const fn new(
-        signer: SignerT,
-        submitter: SubmitterT,
-        constants: SignetSystemConstants,
-    ) -> Self {
+    pub const fn new(signer: Sign, submitter: Submit, constants: SignetSystemConstants) -> Self {
         Self { signer, submitter, constants }
     }
 
     /// Get a reference to the signer.
-    pub const fn signer(&self) -> &SignerT {
+    pub const fn signer(&self) -> &Sign {
         &self.signer
     }
 
     /// Get a reference to the submitter.
-    pub const fn submitter(&self) -> &SubmitterT {
+    pub const fn submitter(&self) -> &Submit {
         &self.submitter
     }
 
@@ -54,14 +51,14 @@ impl<SignerT, SubmitterT> OrderSender<SignerT, SubmitterT> {
     }
 }
 
-impl<SignerT, SubmitterT> OrderSender<SignerT, SubmitterT>
+impl<Sign, Submit> OrderSender<Sign, Submit>
 where
-    SignerT: Signer,
+    Sign: Signer,
 {
     /// Sign an [`Order`] and return a [`SignedOrder`].
     pub async fn sign_order(&self, order: &Order) -> Result<SignedOrder, OrderSenderError>
     where
-        SubmitterT: OrderSubmitter,
+        Submit: OrderSubmitter,
     {
         self.sign_unsigned_order(UnsignedOrder::from(order)).await
     }
@@ -72,15 +69,15 @@ where
         order: UnsignedOrder<'_>,
     ) -> Result<SignedOrder, OrderSenderError>
     where
-        SubmitterT: OrderSubmitter,
+        Submit: OrderSubmitter,
     {
         order.with_chain(&self.constants).sign(&self.signer).await.map_err(Into::into)
     }
 }
 
-impl<SignerT, SubmitterT> OrderSender<SignerT, SubmitterT>
+impl<Sign, Submit> OrderSender<Sign, Submit>
 where
-    SubmitterT: OrderSubmitter + Send + Sync,
+    Submit: OrderSubmitter + Send + Sync,
 {
     /// Submit a signed order to the backend.
     pub async fn send_order(&self, order: SignedOrder) -> Result<(), OrderSenderError> {
@@ -91,10 +88,10 @@ where
     }
 }
 
-impl<SignerT, SubmitterT> OrderSender<SignerT, SubmitterT>
+impl<Sign, Submit> OrderSender<Sign, Submit>
 where
-    SignerT: Signer + Send + Sync,
-    SubmitterT: OrderSubmitter + Send + Sync,
+    Sign: Signer + Send + Sync,
+    Submit: OrderSubmitter + Send + Sync,
 {
     /// Sign and submit an order to the backend, returning the signed order.
     pub async fn sign_and_send_order(&self, order: Order) -> Result<SignedOrder, OrderSenderError> {
