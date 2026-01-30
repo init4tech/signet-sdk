@@ -1,3 +1,5 @@
+#[cfg(doc)]
+use crate::Filler;
 use crate::OrdersAndFills;
 use alloy::{
     network::{Ethereum, Network},
@@ -68,10 +70,8 @@ pub trait TxBuilder<N: Network = Ethereum>: Provider<N> + Send + Sync {
 
 /// A trait for submitting signed fills to a backend.
 ///
-/// Implementors handle transaction construction, gas pricing, and target block
-/// determination. This decouples the [`Filler`] from provider and fee concerns.
-///
-/// [`Filler`]: crate::Filler
+/// Implementors handle transaction construction, gas pricing, and target block determination.
+/// This decouples the [`Filler`] from provider and fee concerns.
 pub trait FillSubmitter {
     /// The response type returned on successful submission.
     type Response;

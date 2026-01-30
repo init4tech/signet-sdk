@@ -39,7 +39,7 @@ pub enum FeePolicyError {
 /// a [`SignetEthBundle`], and submits via the wrapped submitter.
 ///
 /// The providers must be configured with appropriate fillers for gas, nonce, chain ID, and wallet
-/// signing (e.g., via `ProviderBuilder::wallet()`).
+/// signing (e.g., via `ProviderBuilder::with_gas_estimation()` and `ProviderBuilder::wallet()`).
 #[derive(Debug, Clone)]
 pub struct FeePolicySubmitter<RuP, HostP, B> {
     ru_provider: RuP,
