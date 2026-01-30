@@ -9,10 +9,10 @@ use signet_zenith::RollupOrders::Order;
 #[non_exhaustive]
 pub enum OrderSenderError {
     /// Order signing failed.
-    #[error("order signing error: {0}")]
+    #[error("failed to sign order: {0}")]
     Signing(#[from] SigningError),
     /// Order submission failed.
-    #[error("order submission error: {0}")]
+    #[error("failed to submit order: {0}")]
     Submission(#[source] Box<dyn core::error::Error + Send + Sync>),
 }
 

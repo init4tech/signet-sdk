@@ -16,8 +16,14 @@
 
 mod impls;
 
+mod fee_policy;
+pub use fee_policy::{FeePolicyError, FeePolicySubmitter};
+
+mod filler;
+pub use filler::{Filler, FillerError, FillerOptions, OrdersAndFills};
+
 mod order_sender;
 pub use order_sender::{OrderSender, OrderSenderError};
 
 mod traits;
-pub use traits::{BundleSubmitter, OrderSource, OrderSubmitter};
+pub use traits::{BundleSubmitter, FillSubmitter, OrderSource, OrderSubmitter, TxBuilder};
