@@ -16,7 +16,7 @@ use signet_test_utils::{
     test_constants::*,
     users::{TEST_SIGNERS, TEST_USERS},
 };
-use std::time::{Duration, Instant};
+use tokio::time::{Duration, Instant};
 
 /// Tests the case where multiple transactions from the same
 /// sender with successive nonces are included in the same
@@ -62,9 +62,10 @@ pub async fn successive_nonces() {
 /// This test simulates a transaction from each of the test signers,
 /// with escalating priority fees, and asserts that the simulation
 /// orders them correctly by priority fee.
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 pub async fn complex_simulation() {
-    let builder = test_sim_env(Instant::now() + Duration::from_millis(200));
+    let timeout = Duration::from_millis(200);
+    let builder = test_sim_env(Instant::now() + timeout);
 
     // Set up 10 simple sends with escalating priority fee
     for (i, sender) in TEST_SIGNERS.iter().enumerate() {
@@ -79,12 +80,34 @@ pub async fn complex_simulation() {
         builder.sim_items().add_tx(tx, 0);
     }
 
-    // Run the simulator
-    let built = builder.build().await;
+    let cache = builder.sim_items().clone();
+    // Run the simulator in a separate task
+    let build_task = tokio::spawn(async move { builder.build().await });
 
-    // Should be 10 if all sim rounds  ran, however on CI this can be flaky
-    // (due to lower resources?), so we assert at least 5 succeeded.
-    assert!(built.transactions().len() >= 5);
+    // Wait until all 10 items have been simulated (cache becomes empty)
+    let wait_for_empty_cache = async {
+        loop {
+            tokio::task::yield_now().await;
+            if cache.is_empty() {
+                break;
+            }
+            // We shouldn't need to manually advance time since the sleeps in
+            // `BlockBuild::run_build` cause the paused time to auto-advance when there is no work
+            // to be done. However, in case some unforeseen task causes this to not happen, we'll
+            // manually advance a little, so that `tokio::time::timeout` will eventually time out.
+            tokio::time::advance(Duration::from_micros(1)).await;
+        }
+    };
+    tokio::time::timeout(timeout, wait_for_empty_cache)
+        .await
+        .expect("timed out waiting for empty cache");
+
+    // Advance time past the deadline to complete the build
+    tokio::time::advance(timeout).await;
+    let built = build_task.await.unwrap();
+
+    // All 10 transactions should be included since we waited for all to process
+    assert_eq!(built.transactions().len(), 10);
 
     // This asserts that the builder has sorted the transactions by priority
     // fee.

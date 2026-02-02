@@ -113,7 +113,9 @@ pub fn host_sim_env() -> HostEnv<Arc<InMemoryDB>, NoOpInspector> {
 }
 
 /// Create a [`BlockBuild`] simulator environment for testing.
-pub fn test_sim_env(deadline: std::time::Instant) -> BlockBuild<Arc<InMemoryDB>, Arc<InMemoryDB>> {
+pub fn test_sim_env(
+    deadline: tokio::time::Instant,
+) -> BlockBuild<Arc<InMemoryDB>, Arc<InMemoryDB>> {
     let (ru_evm, host_evm) = (rollup_sim_env(), host_sim_env());
     BlockBuild::new(ru_evm, host_evm, deadline, 10, Default::default(), 50_000_000, 50_000_000)
 }

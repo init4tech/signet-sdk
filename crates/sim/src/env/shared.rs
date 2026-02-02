@@ -56,7 +56,7 @@ where
     pub fn new(
         rollup: RollupEnv<RuDb, RuInsp>,
         host: HostEnv<HostDb, HostInsp>,
-        finish_by: std::time::Instant,
+        finish_by: tokio::time::Instant,
         concurrency_limit: usize,
         sim_items: SimCache,
     ) -> Self {
@@ -104,7 +104,7 @@ where
 
         // Either simulation is done, or we time out
         select! {
-            _ = tokio::time::sleep_until(self.finish_by().into()) => {
+            _ = tokio::time::sleep_until(self.finish_by()) => {
                 span.in_scope(|| trace!("Sim round timed out"));
             },
             _ = sim_task => {
