@@ -38,3 +38,7 @@ pub use signing::{
 
 mod utils;
 pub use utils::{alias_address, unalias_address};
+
+// Suppress unused_crate_dependencies warning for proptest (used only in tests)
+#[cfg(feature = "proptest")]
+use proptest as _;
