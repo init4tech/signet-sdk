@@ -184,31 +184,4 @@ where
             .await
             .map_err(|error| FillerError::Submission(Box::new(error)))
     }
-
-    /// Fill orders individually, returning a response per submission.
-    ///
-    /// Returns an error if `orders` is empty, or if signing or submission fails.
-    #[instrument(skip_all, fields(order_count = orders.len()))]
-    pub async fn fill_individually(
-        &self,
-        orders: Vec<SignedOrder>,
-    ) -> Result<Vec<Submit::Response>, FillerError> {
-        if orders.is_empty() {
-            return Err(FillerError::NoOrders);
-        }
-
-        let mut responses = Vec::with_capacity(orders.len());
-
-        for order in orders {
-            let orders_and_fills = self.sign_fills(vec![order]).await?;
-            let response = self
-                .submitter
-                .submit_fills(orders_and_fills)
-                .await
-                .map_err(|error| FillerError::Submission(Box::new(error)))?;
-            responses.push(response);
-        }
-
-        Ok(responses)
-    }
 }

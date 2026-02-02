@@ -8,6 +8,7 @@ use alloy::{
     rpc::types::mev::EthSendBundle,
     transports::{RpcError, TransportErrorKind},
 };
+use futures_util::{stream, StreamExt, TryStreamExt};
 use signet_bundle::SignetEthBundle;
 use signet_constants::SignetSystemConstants;
 use tracing::{error, instrument};
@@ -112,17 +113,17 @@ where
         }
 
         // Build rollup transaction requests: fill (if present, must come first) then initiates
-        let mut rollup_txs = Vec::with_capacity(orders.len() + 1);
-        if let Some(fill) = fills.get(&self.constants.ru_chain_id()) {
-            let tx_request = fill.to_fill_tx(self.constants.ru_orders());
-            rollup_txs
-                .push(sign_and_encode_tx(&self.ru_provider, tx_request, signer_address).await?);
-        }
-        for order in &orders {
-            let tx_request = order.to_initiate_tx(signer_address, self.constants.ru_orders());
-            rollup_txs
-                .push(sign_and_encode_tx(&self.ru_provider, tx_request, signer_address).await?);
-        }
+        let fill_iter = fills
+            .get(&self.constants.ru_chain_id())
+            .map(|fill| fill.to_fill_tx(self.constants.ru_orders()))
+            .into_iter();
+        let order_iter = orders
+            .iter()
+            .map(|order| order.to_initiate_tx(signer_address, self.constants.ru_orders()));
+        let rollup_txs: Vec<Bytes> = stream::iter(fill_iter.chain(order_iter))
+            .then(|tx_request| sign_and_encode_tx(&self.ru_provider, tx_request, signer_address))
+            .try_collect()
+            .await?;
 
         // Build host transaction request: fill only (if present)
         let host_txs = match fills.get(&self.constants.host_chain_id()) {
@@ -133,6 +134,8 @@ where
             None => vec![],
         };
 
+        // NOTE: We could retrieve a header up front, then use number+1. We could also check that
+        // the timestamp in the orders are valid for current.timestamp + calculator.slot_duration.
         let target_block =
             self.ru_provider.get_block_number().await.map_err(FeePolicyError::Rpc)? + 1;
 
