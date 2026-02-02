@@ -15,12 +15,11 @@ use alloy::{
     uint,
 };
 use signet_bundle::{
-    BundleInspector, SignetBundleDriver, SignetCallBundle, SignetEthBundle,
-    SignetEthBundleDriver, SignetEthBundleError,
+    BundleInspector, SignetBundleDriver, SignetCallBundle, SignetEthBundle, SignetEthBundleDriver,
+    SignetEthBundleError,
 };
-use trevm::BundleError;
-use signet_constants::SignetSystemConstants;
 use signet_constants::test_utils::{HOST_CHAIN_ID, HOST_WBTC, HOST_WETH, RU_CHAIN_ID};
+use signet_constants::SignetSystemConstants;
 use signet_evm::{EvmNeedsTx, SignetDriver};
 use signet_extract::{Extractable, ExtractedEvent, Extracts};
 use signet_test_utils::{
@@ -39,6 +38,7 @@ use std::{
     sync::LazyLock,
     time::{Duration, Instant},
 };
+use trevm::BundleError;
 use trevm::{
     inspectors::{Layered, TimeLimit},
     revm::{database::InMemoryDB, inspector::NoOpInspector},
@@ -142,7 +142,6 @@ fn aggregate_from_filled(filled: &Filled) -> AggregateFills {
     agg
 }
 
-
 // =============================================================================
 // Transaction & Bundle Fixtures
 // =============================================================================
@@ -236,10 +235,7 @@ mod call_bundle {
         let response = driver.into_response();
 
         // Call bundle should have detected the order outputs
-        assert!(
-            !response.orders.outputs.is_empty(),
-            "call bundle should detect order outputs"
-        );
+        assert!(!response.orders.outputs.is_empty(), "call bundle should detect order outputs");
 
         // The fills in the response come from RU-side fill events, not host fills
         // Since we're not executing host transactions, fills will be empty
@@ -258,7 +254,8 @@ mod call_bundle {
         let mut driver = SignetBundleDriver::new(&call_bundle);
 
         // Run the bundle - should succeed (no fill validation)
-        let _trevm = driver.run_bundle(trevm).expect("call bundle should succeed with partial fills");
+        let _trevm =
+            driver.run_bundle(trevm).expect("call bundle should succeed with partial fills");
 
         let response = driver.into_response();
 
@@ -281,7 +278,8 @@ mod call_bundle {
         let mut driver = SignetBundleDriver::new(&call_bundle);
 
         // Run the bundle - should succeed (no fill validation)
-        let _trevm = driver.run_bundle(trevm).expect("call bundle should succeed with missing fills");
+        let _trevm =
+            driver.run_bundle(trevm).expect("call bundle should succeed with missing fills");
 
         let response = driver.into_response();
 
@@ -292,11 +290,7 @@ mod call_bundle {
         );
 
         // All three transactions should have been executed
-        assert_eq!(
-            response.results.len(),
-            3,
-            "all transactions should execute in call bundle"
-        );
+        assert_eq!(response.results.len(), 3, "all transactions should execute in call bundle");
     }
 }
 
@@ -361,7 +355,8 @@ mod send_bundle {
         );
 
         // Should error due to insufficient fills
-        let (err, trevm) = driver.run_bundle(trevm).expect_err("should error on partial fills").take_err();
+        let (err, trevm) =
+            driver.run_bundle(trevm).expect_err("should error on partial fills").take_err();
         assert!(
             matches!(err, SignetEthBundleError::Bundle(BundleError::BundleReverted)),
             "expected BundleReverted error, got {:?}",
@@ -384,11 +379,15 @@ mod send_bundle {
         let bundle = order_bundle(vec![]);
         let bundle = bundle.try_to_recovered().unwrap();
 
-        let mut driver =
-            SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
+        let mut driver = SignetEthBundleDriver::new(
+            &bundle,
+            host_evm(),
+            Instant::now() + Duration::from_secs(5),
+        );
 
         // Should error due to missing fills
-        let (err, trevm) = driver.run_bundle(trevm).expect_err("should error on missing fills").take_err();
+        let (err, trevm) =
+            driver.run_bundle(trevm).expect_err("should error on missing fills").take_err();
         assert!(
             matches!(err, SignetEthBundleError::Bundle(BundleError::BundleReverted)),
             "expected BundleReverted error, got {:?}",
@@ -414,8 +413,11 @@ mod send_bundle {
         bundle.bundle.reverting_tx_hashes.push(hash);
 
         let bundle = bundle.try_to_recovered().unwrap();
-        let mut driver =
-            SignetEthBundleDriver::new(&bundle, host_evm(), Instant::now() + Duration::from_secs(5));
+        let mut driver = SignetEthBundleDriver::new(
+            &bundle,
+            host_evm(),
+            Instant::now() + Duration::from_secs(5),
+        );
 
         // Should succeed - order tx dropped but bundle continues
         let trevm = driver.run_bundle(trevm).expect("should succeed when revertible tx dropped");
@@ -446,9 +448,7 @@ mod block_driver {
 
     impl BlockDriverEnv {
         fn new() -> Self {
-            let wallets = (1..=10)
-                .map(|i| signet_test_utils::specs::make_wallet(i))
-                .collect::<Vec<_>>();
+            let wallets = (1..=10).map(signet_test_utils::specs::make_wallet).collect::<Vec<_>>();
             Self { wallets, nonces: [0; 10], sequence: 1 }
         }
 
