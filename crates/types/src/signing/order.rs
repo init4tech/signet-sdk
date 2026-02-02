@@ -280,7 +280,7 @@ impl<'a> UnsignedOrder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::{b256, Signature, U256};
+    use alloy::primitives::{address, b256, Signature, U256};
     use signet_zenith::HostOrders::{PermitBatchTransferFrom, TokenPermissions};
 
     use super::*;
@@ -315,6 +315,409 @@ mod tests {
         assert_eq!(
             hash,
             &b256!("0xba359dd4f891bed0a2cf87c306e59fb6ee099e02b5b0fa86584cdcc44bf6c272")
+        );
+    }
+
+    /// Test vector struct for TypeScript SDK verification.
+    #[derive(Debug, serde::Serialize)]
+    struct TestVector {
+        name: &'static str,
+        signed_order: SignedOrder,
+        expected_order_hash: B256,
+        expected_order_hash_pre_image: String,
+    }
+
+    /// Deterministic test signature for vector generation.
+    /// Uses fixed r, s, v values that produce consistent results.
+    fn deterministic_signature() -> Bytes {
+        // Fixed signature: r=1, s=2, v=27 (normalized)
+        let mut sig = [0u8; 65];
+        sig[31] = 1; // r = 1 (32 bytes, big-endian)
+        sig[63] = 2; // s = 2 (32 bytes, big-endian)
+        sig[64] = 27; // v = 27
+        sig.to_vec().into()
+    }
+
+    /// Build test vectors for TypeScript SDK verification.
+    /// These vectors establish deterministic expected values that
+    /// the TypeScript implementation must match.
+    fn build_test_vectors() -> Vec<TestVector> {
+        vec![
+            // 1. Minimal order - single input/output with zero values
+            {
+                let order = SignedOrder::new(
+                    Permit2Batch {
+                        permit: PermitBatchTransferFrom {
+                            permitted: vec![TokenPermissions {
+                                token: Address::ZERO,
+                                amount: U256::ZERO,
+                            }],
+                            nonce: U256::ZERO,
+                            deadline: U256::ZERO,
+                        },
+                        owner: Address::ZERO,
+                        signature: deterministic_signature(),
+                    },
+                    vec![Output {
+                        token: Address::ZERO,
+                        amount: U256::ZERO,
+                        recipient: Address::ZERO,
+                        chainId: 0,
+                    }],
+                );
+                let hash = *order.order_hash();
+                let pre_image = order.order_hash_pre_image().to_string();
+                TestVector {
+                    name: "minimal_order",
+                    signed_order: order,
+                    expected_order_hash: hash,
+                    expected_order_hash_pre_image: pre_image,
+                }
+            },
+            // 2. Multi-input order - 3 different token inputs
+            {
+                let token_a = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"); // USDC
+                let token_b = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7"); // USDT
+                let token_c = address!("0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"); // WBTC
+                let recipient = address!("0x1234567890123456789012345678901234567890");
+
+                let order = SignedOrder::new(
+                    Permit2Batch {
+                        permit: PermitBatchTransferFrom {
+                            permitted: vec![
+                                TokenPermissions {
+                                    token: token_a,
+                                    amount: U256::from(1_000_000u64), // 1 USDC
+                                },
+                                TokenPermissions {
+                                    token: token_b,
+                                    amount: U256::from(2_000_000u64), // 2 USDT
+                                },
+                                TokenPermissions {
+                                    token: token_c,
+                                    amount: U256::from(100_000_000u64), // 1 WBTC
+                                },
+                            ],
+                            nonce: U256::from(12345u64),
+                            deadline: U256::from(1700000000u64),
+                        },
+                        owner: recipient,
+                        signature: deterministic_signature(),
+                    },
+                    vec![Output {
+                        token: Address::ZERO,
+                        amount: U256::from(1_000_000_000_000_000_000u64), // 1 ETH worth
+                        recipient,
+                        chainId: 1,
+                    }],
+                );
+                let hash = *order.order_hash();
+                let pre_image = order.order_hash_pre_image().to_string();
+                TestVector {
+                    name: "multi_input",
+                    signed_order: order,
+                    expected_order_hash: hash,
+                    expected_order_hash_pre_image: pre_image,
+                }
+            },
+            // 3. Multi-output order - outputs to 3 recipients on same chain
+            {
+                let token = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+                let owner = address!("0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF");
+                let recipient_a = address!("0x1111111111111111111111111111111111111111");
+                let recipient_b = address!("0x2222222222222222222222222222222222222222");
+                let recipient_c = address!("0x3333333333333333333333333333333333333333");
+
+                let order = SignedOrder::new(
+                    Permit2Batch {
+                        permit: PermitBatchTransferFrom {
+                            permitted: vec![TokenPermissions {
+                                token,
+                                amount: U256::from(10_000_000u64),
+                            }],
+                            nonce: U256::from(99999u64),
+                            deadline: U256::from(1800000000u64),
+                        },
+                        owner,
+                        signature: deterministic_signature(),
+                    },
+                    vec![
+                        Output {
+                            token,
+                            amount: U256::from(3_000_000u64),
+                            recipient: recipient_a,
+                            chainId: 1,
+                        },
+                        Output {
+                            token,
+                            amount: U256::from(3_000_000u64),
+                            recipient: recipient_b,
+                            chainId: 1,
+                        },
+                        Output {
+                            token,
+                            amount: U256::from(4_000_000u64),
+                            recipient: recipient_c,
+                            chainId: 1,
+                        },
+                    ],
+                );
+                let hash = *order.order_hash();
+                let pre_image = order.order_hash_pre_image().to_string();
+                TestVector {
+                    name: "multi_output",
+                    signed_order: order,
+                    expected_order_hash: hash,
+                    expected_order_hash_pre_image: pre_image,
+                }
+            },
+            // 4. Cross-chain order - outputs to both host (1) and rollup (421614)
+            {
+                let token = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+                let owner = address!("0xCafeBabeCafeBabeCafeBabeCafeBabeCafeBabe");
+                let recipient = address!("0x4444444444444444444444444444444444444444");
+
+                let order = SignedOrder::new(
+                    Permit2Batch {
+                        permit: PermitBatchTransferFrom {
+                            permitted: vec![TokenPermissions {
+                                token,
+                                amount: U256::from(5_000_000u64),
+                            }],
+                            nonce: U256::from(777u64),
+                            deadline: U256::from(1750000000u64),
+                        },
+                        owner,
+                        signature: deterministic_signature(),
+                    },
+                    vec![
+                        Output {
+                            token,
+                            amount: U256::from(2_500_000u64),
+                            recipient,
+                            chainId: 1, // Mainnet host
+                        },
+                        Output {
+                            token,
+                            amount: U256::from(2_500_000u64),
+                            recipient,
+                            chainId: 421614, // Arbitrum Sepolia (example rollup)
+                        },
+                    ],
+                );
+                let hash = *order.order_hash();
+                let pre_image = order.order_hash_pre_image().to_string();
+                TestVector {
+                    name: "cross_chain",
+                    signed_order: order,
+                    expected_order_hash: hash,
+                    expected_order_hash_pre_image: pre_image,
+                }
+            },
+            // 5. Large amounts - U256 values exceeding JS safe integer (>2^53)
+            {
+                let token = address!("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"); // WETH
+                let owner = address!("0x5555555555555555555555555555555555555555");
+                let recipient = address!("0x6666666666666666666666666666666666666666");
+
+                // Amount larger than JS Number.MAX_SAFE_INTEGER (2^53 - 1 = 9007199254740991)
+                let large_amount = U256::from(10_000_000_000_000_000_000_000u128); // 10,000 ETH
+
+                let order = SignedOrder::new(
+                    Permit2Batch {
+                        permit: PermitBatchTransferFrom {
+                            permitted: vec![TokenPermissions { token, amount: large_amount }],
+                            nonce: U256::from(u64::MAX), // Max u64 nonce
+                            deadline: U256::from(u64::MAX), // Max u64 deadline
+                        },
+                        owner,
+                        signature: deterministic_signature(),
+                    },
+                    vec![Output { token, amount: large_amount, recipient, chainId: 1 }],
+                );
+                let hash = *order.order_hash();
+                let pre_image = order.order_hash_pre_image().to_string();
+                TestVector {
+                    name: "large_amounts",
+                    signed_order: order,
+                    expected_order_hash: hash,
+                    expected_order_hash_pre_image: pre_image,
+                }
+            },
+            // 6. Mainnet config - real mainnet addresses and chain IDs
+            {
+                // Real mainnet contract addresses from signet-constants
+                let usdc = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+                let host_orders = address!("0x96f44ddc3Bc8892371305531F1a6d8ca2331fE6C");
+                let owner = address!("0x7777777777777777777777777777777777777777");
+                let recipient = address!("0x8888888888888888888888888888888888888888");
+
+                let order = SignedOrder::new(
+                    Permit2Batch {
+                        permit: PermitBatchTransferFrom {
+                            permitted: vec![TokenPermissions {
+                                token: usdc,
+                                amount: U256::from(100_000_000u64), // 100 USDC
+                            }],
+                            nonce: U256::from(1000000u64),
+                            deadline: U256::from(1704067200u64), // Jan 1, 2024
+                        },
+                        owner,
+                        signature: deterministic_signature(),
+                    },
+                    vec![
+                        Output {
+                            token: host_orders, // Using orders contract as token (test)
+                            amount: U256::from(50_000_000u64),
+                            recipient,
+                            chainId: 1, // Mainnet host
+                        },
+                        Output {
+                            token: host_orders,
+                            amount: U256::from(50_000_000u64),
+                            recipient,
+                            chainId: 519, // Signet mainnet rollup
+                        },
+                    ],
+                );
+                let hash = *order.order_hash();
+                let pre_image = order.order_hash_pre_image().to_string();
+                TestVector {
+                    name: "mainnet_config",
+                    signed_order: order,
+                    expected_order_hash: hash,
+                    expected_order_hash_pre_image: pre_image,
+                }
+            },
+        ]
+    }
+
+    /// Test that generates and verifies all serialization vectors.
+    /// Run with `cargo t -p signet-types serialization_vectors -- --nocapture --ignored`
+    /// to see JSON output for TypeScript import.
+    #[test]
+    #[ignore = "vector generation for external SDK - run manually when needed"]
+    fn serialization_vectors() {
+        let vectors = build_test_vectors();
+
+        println!("\n=== SIGNET ORDER SERIALIZATION TEST VECTORS ===\n");
+        println!("// Generated for TypeScript SDK verification");
+        println!("// Copy this JSON array to tests/vectors.json\n");
+
+        let mut json_vectors = Vec::new();
+
+        for v in &vectors {
+            // Verify order hash computation
+            assert_eq!(
+                v.signed_order.order_hash(),
+                &v.expected_order_hash,
+                "Order hash mismatch for {}",
+                v.name
+            );
+
+            // Build JSON representation
+            let json = serde_json::json!({
+                "name": v.name,
+                "signedOrder": v.signed_order,
+                "expectedOrderHash": format!("{:#x}", v.expected_order_hash),
+                "expectedOrderHashPreImage": v.expected_order_hash_pre_image,
+            });
+            json_vectors.push(json);
+        }
+
+        let output = serde_json::to_string_pretty(&json_vectors).unwrap();
+        println!("{}", output);
+        println!("\n=== END TEST VECTORS ===\n");
+    }
+
+    /// Test that verifies the minimal order matches expected hash.
+    #[test]
+    fn minimal_order_hash() {
+        let order = SignedOrder::new(
+            Permit2Batch {
+                permit: PermitBatchTransferFrom {
+                    permitted: vec![TokenPermissions { token: Address::ZERO, amount: U256::ZERO }],
+                    nonce: U256::ZERO,
+                    deadline: U256::ZERO,
+                },
+                owner: Address::ZERO,
+                signature: deterministic_signature(),
+            },
+            vec![Output {
+                token: Address::ZERO,
+                amount: U256::ZERO,
+                recipient: Address::ZERO,
+                chainId: 0,
+            }],
+        );
+
+        // This hash should remain stable - TypeScript must produce the same value
+        assert_eq!(
+            order.order_hash(),
+            &b256!("0x33ed1473731924de70307a7b458dab12b27c9354ca49d18d84511f6b84e5c956")
+        );
+    }
+
+    /// Test multi-input vector hash stability.
+    #[test]
+    fn multi_input_hash() {
+        let token_a = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        let token_b = address!("0xdAC17F958D2ee523a2206206994597C13D831ec7");
+        let token_c = address!("0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599");
+        let recipient = address!("0x1234567890123456789012345678901234567890");
+
+        let order = SignedOrder::new(
+            Permit2Batch {
+                permit: PermitBatchTransferFrom {
+                    permitted: vec![
+                        TokenPermissions { token: token_a, amount: U256::from(1_000_000u64) },
+                        TokenPermissions { token: token_b, amount: U256::from(2_000_000u64) },
+                        TokenPermissions { token: token_c, amount: U256::from(100_000_000u64) },
+                    ],
+                    nonce: U256::from(12345u64),
+                    deadline: U256::from(1700000000u64),
+                },
+                owner: recipient,
+                signature: deterministic_signature(),
+            },
+            vec![Output {
+                token: Address::ZERO,
+                amount: U256::from(1_000_000_000_000_000_000u64),
+                recipient,
+                chainId: 1,
+            }],
+        );
+
+        assert_eq!(
+            order.order_hash(),
+            &b256!("0x40fb849b8e0fa7ccca85f4d69660eddd83363f575bc218f0edf81b0358658702")
+        );
+    }
+
+    /// Test large amounts vector hash stability (values > JS safe integer).
+    #[test]
+    fn large_amounts_hash() {
+        let token = address!("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        let owner = address!("0x5555555555555555555555555555555555555555");
+        let recipient = address!("0x6666666666666666666666666666666666666666");
+        let large_amount = U256::from(10_000_000_000_000_000_000_000u128);
+
+        let order = SignedOrder::new(
+            Permit2Batch {
+                permit: PermitBatchTransferFrom {
+                    permitted: vec![TokenPermissions { token, amount: large_amount }],
+                    nonce: U256::from(u64::MAX),
+                    deadline: U256::from(u64::MAX),
+                },
+                owner,
+                signature: deterministic_signature(),
+            },
+            vec![Output { token, amount: large_amount, recipient, chainId: 1 }],
+        );
+
+        assert_eq!(
+            order.order_hash(),
+            &b256!("0x7401ff93a0f4d16b66cc5a51109808f6bb29560cce8d0d3e1fce44edc8474e27")
         );
     }
 }
