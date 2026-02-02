@@ -2,7 +2,7 @@ use crate::TxBuilder;
 use alloy::{
     network::Network,
     providers::{
-        fillers::{FillProvider, TxFiller},
+        fillers::{FillProvider, FillerControlFlow, TxFiller},
         Provider, SendableTx,
     },
     transports::TransportResult,
@@ -16,5 +16,9 @@ where
 {
     async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
         FillProvider::fill(self, tx).await
+    }
+
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
+        self.filler().status(tx)
     }
 }

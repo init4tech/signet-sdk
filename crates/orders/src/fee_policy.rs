@@ -4,13 +4,13 @@ use alloy::{
     eips::eip2718::Encodable2718,
     network::{Ethereum, Network, TransactionBuilder},
     primitives::Bytes,
-    providers::SendableTx,
+    providers::{fillers::FillerControlFlow, SendableTx},
     rpc::types::mev::EthSendBundle,
     transports::{RpcError, TransportErrorKind},
 };
 use signet_bundle::SignetEthBundle;
 use signet_constants::SignetSystemConstants;
-use tracing::instrument;
+use tracing::{error, instrument};
 
 /// Errors returned by [`FeePolicySubmitter`].
 #[derive(Debug, thiserror::Error)]
@@ -19,18 +19,27 @@ pub enum FeePolicyError {
     /// No fills provided for submission.
     #[error("no fills provided for submission")]
     NoFills,
-    /// Failed to get block number from provider.
-    #[error("failed to get block number: {0}")]
-    BlockNumber(#[source] RpcError<TransportErrorKind>),
-    /// Failed to fill transaction.
-    #[error("failed to fill transaction: {0}")]
-    FillTransaction(#[source] RpcError<TransportErrorKind>),
-    /// Transaction fill returned builder instead of envelope.
-    #[error("transaction fill did not return signed envelope")]
-    NotEnvelope,
+    /// RPC call failed.
+    #[error("RPC error: {0}")]
+    Rpc(#[source] RpcError<TransportErrorKind>),
+    /// Transaction is incomplete (missing required properties).
+    #[error("transaction missing required properties: {0:?}")]
+    IncompleteTransaction(Vec<(&'static str, Vec<&'static str>)>),
     /// Bundle submission failed.
     #[error("failed to submit bundle: {0}")]
     Submission(#[source] Box<dyn core::error::Error + Send + Sync>),
+}
+
+impl From<FillerControlFlow> for FeePolicyError {
+    fn from(filler_control_flow: FillerControlFlow) -> Self {
+        match filler_control_flow {
+            FillerControlFlow::Missing(missing) => Self::IncompleteTransaction(missing),
+            FillerControlFlow::Finished | FillerControlFlow::Ready => {
+                error!("fill returned Builder but status is {filler_control_flow:?}");
+                Self::IncompleteTransaction(Vec::new())
+            }
+        }
+    }
 }
 
 /// A [`FillSubmitter`] that wraps a [`BundleSubmitter`] and handles fee policy.
@@ -40,6 +49,10 @@ pub enum FeePolicyError {
 ///
 /// The providers must be configured with appropriate fillers for gas, nonce, chain ID, and wallet
 /// signing (e.g., via `ProviderBuilder::with_gas_estimation()` and `ProviderBuilder::wallet()`).
+/// Note that the provider's nonce filler must correctly increment nonces across all transactions
+/// built within a single [`submit_fills`] call.
+///
+/// [`submit_fills`]: FillSubmitter::submit_fills
 #[derive(Debug, Clone)]
 pub struct FeePolicySubmitter<RuP, HostP, B> {
     ru_provider: RuP,
@@ -121,7 +134,7 @@ where
         };
 
         let target_block =
-            self.ru_provider.get_block_number().await.map_err(FeePolicyError::BlockNumber)? + 1;
+            self.ru_provider.get_block_number().await.map_err(FeePolicyError::Rpc)? + 1;
 
         let bundle = SignetEthBundle::new(
             EthSendBundle { txs: rollup_txs, block_number: target_block, ..Default::default() },
@@ -148,10 +161,13 @@ where
     N::TxEnvelope: Encodable2718,
 {
     tx_request = tx_request.with_from(signer_address);
-    let sendable = provider.fill(tx_request).await.map_err(FeePolicyError::FillTransaction)?;
+    let sendable = provider.fill(tx_request).await.map_err(FeePolicyError::Rpc)?;
 
-    let SendableTx::Envelope(envelope) = sendable else {
-        return Err(FeePolicyError::NotEnvelope);
+    let envelope = match sendable {
+        SendableTx::Envelope(envelope) => envelope,
+        SendableTx::Builder(tx) => {
+            return Err(FeePolicyError::from(provider.status(&tx)));
+        }
     };
 
     Ok(Bytes::from(envelope.encoded_2718()))

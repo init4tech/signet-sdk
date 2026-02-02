@@ -3,7 +3,7 @@ use crate::Filler;
 use crate::OrdersAndFills;
 use alloy::{
     network::{Ethereum, Network},
-    providers::{Provider, SendableTx},
+    providers::{fillers::FillerControlFlow, Provider, SendableTx},
     transports::TransportResult,
 };
 use core::future::Future;
@@ -66,6 +66,9 @@ pub trait TxBuilder<N: Network = Ethereum>: Provider<N> + Send + Sync {
         &self,
         tx: N::TransactionRequest,
     ) -> impl Future<Output = TransportResult<SendableTx<N>>> + Send;
+
+    /// Return the filler's status for the given transaction request.
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 }
 
 /// A trait for submitting signed fills to a backend.
