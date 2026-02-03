@@ -40,7 +40,7 @@ impl AggregateOrders {
     }
 
     /// Ingest raw output values into the aggregate orders.
-    pub fn ingest_raw_output(
+    pub(crate) fn ingest_raw_output(
         &mut self,
         chain_id: u64,
         token: Address,
@@ -58,7 +58,7 @@ impl AggregateOrders {
     }
 
     /// Ingest raw input values into the aggregate orders.
-    pub fn ingest_raw_input(&mut self, token: Address, amount: U256) {
+    pub(crate) fn ingest_raw_input(&mut self, token: Address, amount: U256) {
         let entry = self.inputs.entry(token).or_default();
         *entry = entry.saturating_add(amount);
     }
