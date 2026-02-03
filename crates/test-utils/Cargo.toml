@@ -10,17 +10,19 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-signet-constants = { workspace = true, features = ["test-utils"] }
-signet-types.workspace = true
-signet-evm.workspace = true
-signet-zenith.workspace = true
-signet-extract.workspace = true
 signet-bundle.workspace = true
+signet-constants = { workspace = true, features = ["test-utils"] }
+signet-evm.workspace = true
+signet-extract.workspace = true
+signet-orders.workspace = true
 signet-sim.workspace = true
+signet-types.workspace = true
+signet-zenith.workspace = true
 
 trevm = { workspace = true, features = ["test-utils"] }
 
 alloy.workspace = true
+futures-util.workspace = true
 
 tokio = { workspace = true, features = ["test-util", "time"] }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

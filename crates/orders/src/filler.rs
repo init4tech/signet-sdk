@@ -55,11 +55,28 @@ impl FillerOptions {
 
 /// A small struct to ensure the relevant orders remain paired with the fills generated from them
 /// and with the signer's address.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OrdersAndFills {
     pub(crate) orders: Vec<SignedOrder>,
     pub(crate) fills: HashMap<u64, SignedFill>,
     pub(crate) signer_address: Address,
+}
+
+impl OrdersAndFills {
+    /// Get the orders.
+    pub fn orders(&self) -> &[SignedOrder] {
+        &self.orders
+    }
+
+    /// Get the fills.
+    pub const fn fills(&self) -> &HashMap<u64, SignedFill> {
+        &self.fills
+    }
+
+    /// Get the signer address.
+    pub const fn signer_address(&self) -> Address {
+        self.signer_address
+    }
 }
 
 /// Fills orders by fetching from a source, signing fills, and submitting them.

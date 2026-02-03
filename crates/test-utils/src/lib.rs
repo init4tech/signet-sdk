@@ -1,6 +1,7 @@
 pub mod chain;
 pub mod contracts;
 pub mod evm;
+pub mod orders;
 pub mod specs;
 pub mod users;
 
