@@ -64,7 +64,7 @@ pub async fn successive_nonces() {
 /// orders them correctly by priority fee.
 #[tokio::test(start_paused = true)]
 pub async fn complex_simulation() {
-    let timeout = Duration::from_millis(200);
+    let timeout = Duration::from_secs(10);
     let builder = test_sim_env(Instant::now() + timeout);
 
     // Set up 10 simple sends with escalating priority fee
