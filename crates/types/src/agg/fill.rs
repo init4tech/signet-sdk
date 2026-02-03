@@ -192,7 +192,12 @@ impl AggregateFills {
                         amount: *amount,
                     },
                 )?;
-                *filled = filled.saturating_sub(*amount);
+                *filled = filled.checked_sub(*amount).ok_or(MarketError::InsufficientBalance {
+                    chain_id: output_asset.0,
+                    asset: output_asset.1,
+                    recipient: *recipient,
+                    amount: *amount,
+                })?;
             }
         }
 
