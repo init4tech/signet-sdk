@@ -450,4 +450,422 @@ mod tests {
             b256!("0x866a5aba21966af95d6c7ab78eb2b2fc913915c28be3b9aa07cc04ff903e3f28")
         );
     }
+
+    /// Build fill-specific EIP-712 test vectors.
+    ///
+    /// Fill vectors represent filler authorization - the filler authorizes transfer
+    /// of tokens they provide to satisfy order outputs. The permitted tokens exactly
+    /// match the output tokens/amounts (fillers transfer what users expect to receive).
+    fn build_fill_test_vectors() -> Vec<Eip712TestVector> {
+        vec![
+            // 1. Minimal fill - all zeros, single token
+            {
+                let permitted = vec![TokenPermissions { token: Address::ZERO, amount: U256::ZERO }];
+                let outputs = vec![Output {
+                    token: Address::ZERO,
+                    amount: U256::ZERO,
+                    recipient: Address::ZERO,
+                    chainId: 1,
+                }];
+                let chain_id = 1u64;
+                let order_contract = Address::ZERO;
+                let nonce = 0u64;
+                let deadline = 0u64;
+
+                let permit_batch = PermitBatchWitnessTransferFrom {
+                    permitted: permitted.clone(),
+                    spender: order_contract,
+                    nonce: U256::from(nonce),
+                    deadline: U256::from(deadline),
+                    outputs: outputs.clone(),
+                };
+
+                let domain = Eip712Domain {
+                    chain_id: Some(U256::from(chain_id)),
+                    name: Some(PERMIT2_CONTRACT_NAME.into()),
+                    verifying_contract: Some(PERMIT2_ADDRESS),
+                    version: None,
+                    salt: None,
+                };
+
+                let domain_separator = domain.hash_struct();
+                let struct_hash = permit_batch.eip712_hash_struct();
+                let signing_hash = permit_batch.eip712_signing_hash(&domain);
+
+                Eip712TestVector {
+                    name: "minimal_fill",
+                    chain_id,
+                    order_contract: format!("{:#x}", order_contract),
+                    permitted: permitted
+                        .iter()
+                        .map(|p| PermittedJson {
+                            token: format!("{:#x}", p.token),
+                            amount: format!("{:#x}", p.amount),
+                        })
+                        .collect(),
+                    nonce: format!("{:#x}", U256::from(nonce)),
+                    deadline: format!("{:#x}", U256::from(deadline)),
+                    outputs: outputs
+                        .iter()
+                        .map(|o| OutputJson {
+                            token: format!("{:#x}", o.token),
+                            amount: format!("{:#x}", o.amount),
+                            recipient: format!("{:#x}", o.recipient),
+                            chain_id: o.chainId,
+                        })
+                        .collect(),
+                    expected_domain_separator: format!("{:#x}", domain_separator),
+                    expected_struct_hash: format!("{:#x}", struct_hash),
+                    expected_signing_hash: format!("{:#x}", signing_hash),
+                }
+            },
+            // 2. Mainnet ETH fill - filler provides ETH on mainnet
+            {
+                let weth = address!("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+                let recipient = address!("0xABCDABCDABCDABCDABCDABCDABCDABCDABCDABCD");
+                let order_contract = address!("0x96f44ddc3Bc8892371305531F1a6d8ca2331fE6C");
+
+                let fill_amount = U256::from(1_000_000_000_000_000_000u64); // 1 ETH
+                let permitted = vec![TokenPermissions { token: weth, amount: fill_amount }];
+                let outputs =
+                    vec![Output { token: weth, amount: fill_amount, recipient, chainId: 1 }];
+                let chain_id = 1u64;
+                let nonce = 1000u64;
+                let deadline = 1700000000u64;
+
+                let permit_batch = PermitBatchWitnessTransferFrom {
+                    permitted: permitted.clone(),
+                    spender: order_contract,
+                    nonce: U256::from(nonce),
+                    deadline: U256::from(deadline),
+                    outputs: outputs.clone(),
+                };
+
+                let domain = Eip712Domain {
+                    chain_id: Some(U256::from(chain_id)),
+                    name: Some(PERMIT2_CONTRACT_NAME.into()),
+                    verifying_contract: Some(PERMIT2_ADDRESS),
+                    version: None,
+                    salt: None,
+                };
+
+                let domain_separator = domain.hash_struct();
+                let struct_hash = permit_batch.eip712_hash_struct();
+                let signing_hash = permit_batch.eip712_signing_hash(&domain);
+
+                Eip712TestVector {
+                    name: "mainnet_eth_fill",
+                    chain_id,
+                    order_contract: format!("{:#x}", order_contract),
+                    permitted: permitted
+                        .iter()
+                        .map(|p| PermittedJson {
+                            token: format!("{:#x}", p.token),
+                            amount: format!("{:#x}", p.amount),
+                        })
+                        .collect(),
+                    nonce: format!("{:#x}", U256::from(nonce)),
+                    deadline: format!("{:#x}", U256::from(deadline)),
+                    outputs: outputs
+                        .iter()
+                        .map(|o| OutputJson {
+                            token: format!("{:#x}", o.token),
+                            amount: format!("{:#x}", o.amount),
+                            recipient: format!("{:#x}", o.recipient),
+                            chain_id: o.chainId,
+                        })
+                        .collect(),
+                    expected_domain_separator: format!("{:#x}", domain_separator),
+                    expected_struct_hash: format!("{:#x}", struct_hash),
+                    expected_signing_hash: format!("{:#x}", signing_hash),
+                }
+            },
+            // 3. Multi-token fill - filler provides WETH and USDC
+            {
+                let weth = address!("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+                let usdc = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+                let recipient = address!("0x7777777777777777777777777777777777777777");
+                let order_contract = address!("0x96f44ddc3Bc8892371305531F1a6d8ca2331fE6C");
+
+                let weth_amount = U256::from(500_000_000_000_000_000u64); // 0.5 ETH
+                let usdc_amount = U256::from(1_000_000_000u64); // 1000 USDC
+
+                let permitted = vec![
+                    TokenPermissions { token: weth, amount: weth_amount },
+                    TokenPermissions { token: usdc, amount: usdc_amount },
+                ];
+                let outputs = vec![
+                    Output { token: weth, amount: weth_amount, recipient, chainId: 1 },
+                    Output { token: usdc, amount: usdc_amount, recipient, chainId: 1 },
+                ];
+                let chain_id = 1u64;
+                let nonce = 42u64;
+                let deadline = 1750000000u64;
+
+                let permit_batch = PermitBatchWitnessTransferFrom {
+                    permitted: permitted.clone(),
+                    spender: order_contract,
+                    nonce: U256::from(nonce),
+                    deadline: U256::from(deadline),
+                    outputs: outputs.clone(),
+                };
+
+                let domain = Eip712Domain {
+                    chain_id: Some(U256::from(chain_id)),
+                    name: Some(PERMIT2_CONTRACT_NAME.into()),
+                    verifying_contract: Some(PERMIT2_ADDRESS),
+                    version: None,
+                    salt: None,
+                };
+
+                let domain_separator = domain.hash_struct();
+                let struct_hash = permit_batch.eip712_hash_struct();
+                let signing_hash = permit_batch.eip712_signing_hash(&domain);
+
+                Eip712TestVector {
+                    name: "multi_token_fill",
+                    chain_id,
+                    order_contract: format!("{:#x}", order_contract),
+                    permitted: permitted
+                        .iter()
+                        .map(|p| PermittedJson {
+                            token: format!("{:#x}", p.token),
+                            amount: format!("{:#x}", p.amount),
+                        })
+                        .collect(),
+                    nonce: format!("{:#x}", U256::from(nonce)),
+                    deadline: format!("{:#x}", U256::from(deadline)),
+                    outputs: outputs
+                        .iter()
+                        .map(|o| OutputJson {
+                            token: format!("{:#x}", o.token),
+                            amount: format!("{:#x}", o.amount),
+                            recipient: format!("{:#x}", o.recipient),
+                            chain_id: o.chainId,
+                        })
+                        .collect(),
+                    expected_domain_separator: format!("{:#x}", domain_separator),
+                    expected_struct_hash: format!("{:#x}", struct_hash),
+                    expected_signing_hash: format!("{:#x}", signing_hash),
+                }
+            },
+            // 4. Cross-chain fill - fill with outputs to mainnet and rollup
+            {
+                let usdc = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+                let recipient_mainnet = address!("0x3333333333333333333333333333333333333333");
+                let recipient_rollup = address!("0x4444444444444444444444444444444444444444");
+                let order_contract = address!("0x96f44ddc3Bc8892371305531F1a6d8ca2331fE6C");
+
+                let mainnet_amount = U256::from(500_000_000u64); // 500 USDC
+                let rollup_amount = U256::from(500_000_000u64); // 500 USDC
+                let total_amount = mainnet_amount + rollup_amount;
+
+                let permitted = vec![TokenPermissions { token: usdc, amount: total_amount }];
+                let outputs = vec![
+                    Output {
+                        token: usdc,
+                        amount: mainnet_amount,
+                        recipient: recipient_mainnet,
+                        chainId: 1,
+                    },
+                    Output {
+                        token: usdc,
+                        amount: rollup_amount,
+                        recipient: recipient_rollup,
+                        chainId: 519,
+                    },
+                ];
+                let chain_id = 1u64; // Fill signed on mainnet
+                let nonce = 88888u64;
+                let deadline = 1800000000u64;
+
+                let permit_batch = PermitBatchWitnessTransferFrom {
+                    permitted: permitted.clone(),
+                    spender: order_contract,
+                    nonce: U256::from(nonce),
+                    deadline: U256::from(deadline),
+                    outputs: outputs.clone(),
+                };
+
+                let domain = Eip712Domain {
+                    chain_id: Some(U256::from(chain_id)),
+                    name: Some(PERMIT2_CONTRACT_NAME.into()),
+                    verifying_contract: Some(PERMIT2_ADDRESS),
+                    version: None,
+                    salt: None,
+                };
+
+                let domain_separator = domain.hash_struct();
+                let struct_hash = permit_batch.eip712_hash_struct();
+                let signing_hash = permit_batch.eip712_signing_hash(&domain);
+
+                Eip712TestVector {
+                    name: "cross_chain_fill",
+                    chain_id,
+                    order_contract: format!("{:#x}", order_contract),
+                    permitted: permitted
+                        .iter()
+                        .map(|p| PermittedJson {
+                            token: format!("{:#x}", p.token),
+                            amount: format!("{:#x}", p.amount),
+                        })
+                        .collect(),
+                    nonce: format!("{:#x}", U256::from(nonce)),
+                    deadline: format!("{:#x}", U256::from(deadline)),
+                    outputs: outputs
+                        .iter()
+                        .map(|o| OutputJson {
+                            token: format!("{:#x}", o.token),
+                            amount: format!("{:#x}", o.amount),
+                            recipient: format!("{:#x}", o.recipient),
+                            chain_id: o.chainId,
+                        })
+                        .collect(),
+                    expected_domain_separator: format!("{:#x}", domain_separator),
+                    expected_struct_hash: format!("{:#x}", struct_hash),
+                    expected_signing_hash: format!("{:#x}", signing_hash),
+                }
+            },
+            // 5. Large amount fill - exceeds JS safe integer
+            {
+                let weth = address!("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+                let recipient = address!("0x9999999999999999999999999999999999999999");
+                let order_contract = address!("0x000000000000007369676E65742D6f7264657273");
+
+                let large_amount = U256::from(50_000_000_000_000_000_000_000u128); // 50,000 ETH
+
+                let permitted = vec![TokenPermissions { token: weth, amount: large_amount }];
+                let outputs =
+                    vec![Output { token: weth, amount: large_amount, recipient, chainId: 1 }];
+                let chain_id = 519u64; // Signet rollup
+                let nonce = u64::MAX;
+                let deadline = u64::MAX;
+
+                let permit_batch = PermitBatchWitnessTransferFrom {
+                    permitted: permitted.clone(),
+                    spender: order_contract,
+                    nonce: U256::from(nonce),
+                    deadline: U256::from(deadline),
+                    outputs: outputs.clone(),
+                };
+
+                let domain = Eip712Domain {
+                    chain_id: Some(U256::from(chain_id)),
+                    name: Some(PERMIT2_CONTRACT_NAME.into()),
+                    verifying_contract: Some(PERMIT2_ADDRESS),
+                    version: None,
+                    salt: None,
+                };
+
+                let domain_separator = domain.hash_struct();
+                let struct_hash = permit_batch.eip712_hash_struct();
+                let signing_hash = permit_batch.eip712_signing_hash(&domain);
+
+                Eip712TestVector {
+                    name: "large_amount_fill",
+                    chain_id,
+                    order_contract: format!("{:#x}", order_contract),
+                    permitted: permitted
+                        .iter()
+                        .map(|p| PermittedJson {
+                            token: format!("{:#x}", p.token),
+                            amount: format!("{:#x}", p.amount),
+                        })
+                        .collect(),
+                    nonce: format!("{:#x}", U256::from(nonce)),
+                    deadline: format!("{:#x}", U256::from(deadline)),
+                    outputs: outputs
+                        .iter()
+                        .map(|o| OutputJson {
+                            token: format!("{:#x}", o.token),
+                            amount: format!("{:#x}", o.amount),
+                            recipient: format!("{:#x}", o.recipient),
+                            chain_id: o.chainId,
+                        })
+                        .collect(),
+                    expected_domain_separator: format!("{:#x}", domain_separator),
+                    expected_struct_hash: format!("{:#x}", struct_hash),
+                    expected_signing_hash: format!("{:#x}", signing_hash),
+                }
+            },
+            // 6. Signet rollup fill - fill on the Signet rollup chain
+            {
+                let usdc = address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+                let recipient = address!("0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF");
+                let order_contract = address!("0x000000000000007369676E65742D6f7264657273");
+
+                let fill_amount = U256::from(10_000_000_000u64); // 10,000 USDC
+
+                let permitted = vec![TokenPermissions { token: usdc, amount: fill_amount }];
+                let outputs =
+                    vec![Output { token: usdc, amount: fill_amount, recipient, chainId: 519 }];
+                let chain_id = 519u64; // Signet rollup
+                let nonce = 123456789u64;
+                let deadline = 1850000000u64;
+
+                let permit_batch = PermitBatchWitnessTransferFrom {
+                    permitted: permitted.clone(),
+                    spender: order_contract,
+                    nonce: U256::from(nonce),
+                    deadline: U256::from(deadline),
+                    outputs: outputs.clone(),
+                };
+
+                let domain = Eip712Domain {
+                    chain_id: Some(U256::from(chain_id)),
+                    name: Some(PERMIT2_CONTRACT_NAME.into()),
+                    verifying_contract: Some(PERMIT2_ADDRESS),
+                    version: None,
+                    salt: None,
+                };
+
+                let domain_separator = domain.hash_struct();
+                let struct_hash = permit_batch.eip712_hash_struct();
+                let signing_hash = permit_batch.eip712_signing_hash(&domain);
+
+                Eip712TestVector {
+                    name: "signet_rollup_fill",
+                    chain_id,
+                    order_contract: format!("{:#x}", order_contract),
+                    permitted: permitted
+                        .iter()
+                        .map(|p| PermittedJson {
+                            token: format!("{:#x}", p.token),
+                            amount: format!("{:#x}", p.amount),
+                        })
+                        .collect(),
+                    nonce: format!("{:#x}", U256::from(nonce)),
+                    deadline: format!("{:#x}", U256::from(deadline)),
+                    outputs: outputs
+                        .iter()
+                        .map(|o| OutputJson {
+                            token: format!("{:#x}", o.token),
+                            amount: format!("{:#x}", o.amount),
+                            recipient: format!("{:#x}", o.recipient),
+                            chain_id: o.chainId,
+                        })
+                        .collect(),
+                    expected_domain_separator: format!("{:#x}", domain_separator),
+                    expected_struct_hash: format!("{:#x}", struct_hash),
+                    expected_signing_hash: format!("{:#x}", signing_hash),
+                }
+            },
+        ]
+    }
+
+    /// Test that generates fill-specific EIP-712 vectors for TypeScript verification.
+    /// Run with `cargo t -p signet-types fill_signing_vectors -- --nocapture --ignored`
+    #[test]
+    #[ignore = "vector generation for external SDK - run manually when needed"]
+    fn fill_signing_vectors() {
+        let vectors = build_fill_test_vectors();
+
+        println!("\n=== FILL EIP-712 SIGNING HASH TEST VECTORS ===\n");
+        println!("// Generated for TypeScript SDK verification");
+        println!("// Copy this JSON array to tests/fill-vectors.json\n");
+
+        let output = serde_json::to_string_pretty(&vectors).unwrap();
+        println!("{}", output);
+        println!("\n=== END TEST VECTORS ===\n");
+    }
 }
