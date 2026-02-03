@@ -178,7 +178,7 @@ fn simple_order(nonce: u64) -> TypedTransaction {
 /// - tx_0: Simple ETH send to TX_0_RECIPIENT
 /// - tx_1: Order transaction requiring fills
 /// - tx_2: Simple ETH send to TX_2_RECIPIENT
-fn order_bundle(host_txs: Vec<TxEnvelope>) -> SignetEthBundle {
+fn order_bundle() -> SignetEthBundle {
     let tx_0 = simple_send(TX_0_RECIPIENT, U256::ONE, 0, RU_CHAIN_ID);
     let tx_1 = simple_order(0);
     let tx_2 = simple_send(TX_2_RECIPIENT, U256::ONE, 1, RU_CHAIN_ID);
@@ -187,7 +187,7 @@ fn order_bundle(host_txs: Vec<TxEnvelope>) -> SignetEthBundle {
     let tx_1 = sign_tx_with_key_pair(&ORDERER_WALLET, tx_1);
     let tx_2 = sign_tx_with_key_pair(&SENDER_WALLET, tx_2);
 
-    simple_bundle(vec![tx_0, tx_1, tx_2], host_txs, 0)
+    simple_bundle(vec![tx_0, tx_1, tx_2], vec![], 0)
 }
 
 /// Create a SignetCallBundle from a SignetEthBundle for call bundle tests
@@ -218,13 +218,15 @@ fn to_call_bundle(bundle: &SignetEthBundle) -> SignetCallBundle {
 mod call_bundle {
     use super::*;
 
-    /// Test that call bundle outputs fills when orders have valid fills available.
-    /// The response should contain both the detected orders AND the detected fills.
+    /// Test that call bundle executes all transactions and reports detected orders.
+    ///
+    /// Call bundle (SignetBundleDriver) performs NO fill validation - it simply
+    /// reports detected orders in the response. This test verifies that behavior.
     #[test]
-    fn outputs_fills_when_valid() {
+    fn reports_orders_without_validation() {
         let trevm = call_bundle_evm();
 
-        let bundle = order_bundle(vec![]);
+        let bundle = order_bundle();
         let call_bundle = to_call_bundle(&bundle);
 
         let mut driver = SignetBundleDriver::new(&call_bundle);
@@ -236,58 +238,6 @@ mod call_bundle {
 
         // Call bundle should have detected the order outputs
         assert!(!response.orders.outputs.is_empty(), "call bundle should detect order outputs");
-
-        // The fills in the response come from RU-side fill events, not host fills
-        // Since we're not executing host transactions, fills will be empty
-        // This is expected behavior - call bundle just reports what it sees
-    }
-
-    /// Test that call bundle succeeds even with partial fills.
-    /// No validation occurs - it just reports what was detected.
-    #[test]
-    fn outputs_fills_when_partial() {
-        let trevm = call_bundle_evm();
-
-        let bundle = order_bundle(vec![]);
-        let call_bundle = to_call_bundle(&bundle);
-
-        let mut driver = SignetBundleDriver::new(&call_bundle);
-
-        // Run the bundle - should succeed (no fill validation)
-        let _trevm =
-            driver.run_bundle(trevm).expect("call bundle should succeed with partial fills");
-
-        let response = driver.into_response();
-
-        // Order outputs should still be detected
-        assert!(
-            !response.orders.outputs.is_empty(),
-            "call bundle should detect order outputs even with partial fills"
-        );
-    }
-
-    /// Test that call bundle succeeds even with NO fills.
-    /// No validation occurs - it reports orders that need fills.
-    #[test]
-    fn outputs_fills_when_missing() {
-        let trevm = call_bundle_evm();
-
-        let bundle = order_bundle(vec![]);
-        let call_bundle = to_call_bundle(&bundle);
-
-        let mut driver = SignetBundleDriver::new(&call_bundle);
-
-        // Run the bundle - should succeed (no fill validation)
-        let _trevm =
-            driver.run_bundle(trevm).expect("call bundle should succeed with missing fills");
-
-        let response = driver.into_response();
-
-        // Order outputs should be detected - these represent what needs to be filled
-        assert!(
-            !response.orders.outputs.is_empty(),
-            "call bundle should detect order outputs when fills are missing"
-        );
 
         // All three transactions should have been executed
         assert_eq!(response.results.len(), 3, "all transactions should execute in call bundle");
@@ -314,7 +264,7 @@ mod send_bundle {
         let filled = full_fills();
         let agg_fills = aggregate_from_filled(&filled);
 
-        let bundle = order_bundle(vec![]);
+        let bundle = order_bundle();
         let bundle = bundle.try_to_recovered().unwrap();
 
         let mut driver = SignetEthBundleDriver::new_with_fill_state(
@@ -344,7 +294,7 @@ mod send_bundle {
         let filled = partial_fills();
         let agg_fills = aggregate_from_filled(&filled);
 
-        let bundle = order_bundle(vec![]);
+        let bundle = order_bundle();
         let bundle = bundle.try_to_recovered().unwrap();
 
         let mut driver = SignetEthBundleDriver::new_with_fill_state(
@@ -376,7 +326,7 @@ mod send_bundle {
         let initial_balance = trevm.read_balance_ref(*ORDERER);
 
         // No fills provided
-        let bundle = order_bundle(vec![]);
+        let bundle = order_bundle();
         let bundle = bundle.try_to_recovered().unwrap();
 
         let mut driver = SignetEthBundleDriver::new(
@@ -406,7 +356,7 @@ mod send_bundle {
         let trevm = bundle_evm();
         let initial_balance = trevm.read_balance_ref(*ORDERER);
 
-        let mut bundle = order_bundle(vec![]);
+        let mut bundle = order_bundle();
 
         // Mark the order transaction (tx_1) as revertible
         let hash = keccak256(&bundle.txs()[1]);
