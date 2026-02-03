@@ -26,4 +26,4 @@ serde_json.workspace = true
 tokio = { version = "1.37.0", features = ["macros"] }
 
 [features]
-proptest = ["dep:proptest"]
+proptest = ["dep:proptest", "alloy/arbitrary"]
