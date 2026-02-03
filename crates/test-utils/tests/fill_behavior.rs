@@ -33,11 +33,8 @@ use signet_types::{
     AggregateFills,
 };
 use signet_zenith::HostOrders::{initiateCall, Filled, Input, Output};
-use std::{
-    borrow::Cow,
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::{borrow::Cow, sync::LazyLock, time::Duration};
+use tokio::time::Instant;
 use trevm::BundleError;
 use trevm::{
     inspectors::{Layered, TimeLimit},
