@@ -40,7 +40,7 @@ impl AggregateOrders {
     }
 
     /// Ingest raw output values into the aggregate orders.
-    fn ingest_raw_output(
+    pub(crate) fn ingest_raw_output(
         &mut self,
         chain_id: u64,
         token: Address,
@@ -58,7 +58,7 @@ impl AggregateOrders {
     }
 
     /// Ingest raw input values into the aggregate orders.
-    fn ingest_raw_input(&mut self, token: Address, amount: U256) {
+    pub(crate) fn ingest_raw_input(&mut self, token: Address, amount: U256) {
         let entry = self.inputs.entry(token).or_default();
         *entry = entry.saturating_add(amount);
     }
@@ -105,9 +105,14 @@ impl AggregateOrders {
     }
 
     /// Get the aggregated Outputs for a given target chain id.
-    /// # Warning ⚠️
+    ///
+    /// # Warning
+    ///
     /// All Orders in the AggregateOrders MUST have originated on the same rollup.
     /// Otherwise, the aggregated Outputs will be incorrectly credited.
+    ///
+    /// This function truncates `ru_chain_id` to u32. Chain IDs exceeding
+    /// `u32::MAX` will be silently truncated.
     pub fn outputs_for(&self, target_chain_id: u64, ru_chain_id: u64) -> Vec<RollupOrders::Output> {
         let mut o = Vec::new();
         for ((chain_id, token), recipient_map) in &self.outputs {
@@ -287,5 +292,58 @@ mod test {
             Some(Some(&U256::from(500))),
             "ASSET_C USER_C output"
         );
+    }
+
+    // === Chain ID Truncation Tests ===
+
+    #[test]
+    fn chain_id_truncation_at_u32_max() {
+        let mut orders = AggregateOrders::new();
+        orders.ingest_raw_output(u64::from(u32::MAX), ASSET_A, USER_A, U256::from(100));
+
+        let outputs = orders.outputs_for(u64::from(u32::MAX), u64::from(u32::MAX));
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].chainId, u32::MAX);
+    }
+
+    #[test]
+    fn chain_id_truncation_exceeds_u32() {
+        let mut orders = AggregateOrders::new();
+        let large_chain_id: u64 = u64::from(u32::MAX) + 1000;
+
+        orders.ingest_raw_output(large_chain_id, ASSET_A, USER_A, U256::from(100));
+
+        let outputs = orders.outputs_for(large_chain_id, large_chain_id);
+        assert_eq!(outputs.len(), 1);
+        // Documents truncation behavior - chainId wraps
+        assert_eq!(outputs[0].chainId, 999); // (u32::MAX + 1000) as u32 = 999
+    }
+
+    // === Multi-Chain Tests ===
+
+    #[test]
+    fn target_chain_ids_multiple_chains() {
+        let mut orders = AggregateOrders::new();
+        orders.ingest_raw_output(1, ASSET_A, USER_A, U256::from(100));
+        orders.ingest_raw_output(10, ASSET_A, USER_A, U256::from(200));
+        orders.ingest_raw_output(42161, ASSET_A, USER_A, U256::from(300));
+
+        let ids = orders.target_chain_ids();
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains(&1));
+        assert!(ids.contains(&10));
+        assert!(ids.contains(&42161));
+    }
+
+    // === Clone/Equality Tests ===
+
+    #[test]
+    fn clone_equality() {
+        let mut orders = AggregateOrders::new();
+        orders.ingest_raw_output(1, ASSET_A, USER_A, U256::from(100));
+        orders.ingest_raw_input(ASSET_B, U256::from(200));
+
+        let cloned = orders.clone();
+        assert_eq!(orders, cloned);
     }
 }

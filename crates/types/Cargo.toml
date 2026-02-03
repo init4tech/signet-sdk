@@ -19,6 +19,11 @@ serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 chrono.workspace = true
 
+proptest = { version = "1.6", optional = true }
+
 [dev-dependencies]
 serde_json.workspace = true
 tokio = { version = "1.37.0", features = ["macros"] }
+
+[features]
+proptest = ["dep:proptest", "alloy/arbitrary"]

@@ -184,8 +184,20 @@ impl AggregateFills {
                 })?;
 
             for (recipient, amount) in recipients {
-                let filled = context_recipients.get_mut(recipient).unwrap();
-                *filled = filled.saturating_sub(*amount);
+                let filled = context_recipients.get_mut(recipient).ok_or(
+                    MarketError::InsufficientBalance {
+                        chain_id: output_asset.0,
+                        asset: output_asset.1,
+                        recipient: *recipient,
+                        amount: *amount,
+                    },
+                )?;
+                *filled = filled.checked_sub(*amount).ok_or(MarketError::InsufficientBalance {
+                    chain_id: output_asset.0,
+                    asset: output_asset.1,
+                    recipient: *recipient,
+                    amount: *amount,
+                })?;
             }
         }
 
@@ -302,7 +314,9 @@ struct CombinedContext<'a, 'b> {
 impl CombinedContext<'_, '_> {
     /// Get the combined balance of the context and the extra context.
     fn balance(&self, output_asset: &(u64, Address), recipient: Address) -> U256 {
-        self.context.filled(output_asset, recipient) + self.extra.filled(output_asset, recipient)
+        self.context
+            .filled(output_asset, recipient)
+            .saturating_add(self.extra.filled(output_asset, recipient))
     }
 
     /// Check if the combined context has enough filled for the asset,
@@ -416,5 +430,236 @@ mod test {
         assert_eq!(context_a.filled(&(1, asset), user), U256::from(300));
         context_a.unchecked_unabsorb(&context_b).unwrap();
         assert_eq!(context_a, pre_absorb);
+    }
+
+    // === CombinedContext Overflow Tests ===
+
+    #[test]
+    fn combined_context_saturates_on_overflow() {
+        // Verifies saturating addition prevents overflow
+        let mut context = AggregateFills::default();
+        let mut extra = AggregateFills::default();
+
+        let user = Address::with_last_byte(1);
+        let asset = Address::with_last_byte(2);
+
+        // Context has near-max, extra has enough that would overflow with wrapping add
+        context.add_raw_fill(1, asset, user, U256::MAX - U256::from(100));
+        extra.add_raw_fill(1, asset, user, U256::from(200));
+
+        let mut orders = AggregateOrders::new();
+        orders.ingest_raw_output(1, asset, user, U256::from(150));
+
+        // With saturating_add, balance saturates to U256::MAX, which is >= 150
+        context.check_ru_tx_events(&extra, &orders).unwrap();
+    }
+
+    #[test]
+    fn combined_context_near_max_no_overflow() {
+        let mut context = AggregateFills::default();
+        let mut extra = AggregateFills::default();
+
+        let user = Address::with_last_byte(1);
+        let asset = Address::with_last_byte(2);
+
+        let half_max = U256::MAX / U256::from(2);
+        context.add_raw_fill(1, asset, user, half_max);
+        extra.add_raw_fill(1, asset, user, U256::from(100));
+
+        let mut orders = AggregateOrders::new();
+        orders.ingest_raw_output(1, asset, user, half_max + U256::from(50));
+
+        context.check_ru_tx_events(&extra, &orders).unwrap();
+    }
+
+    // === Boundary Tests ===
+
+    #[test]
+    fn fill_saturates_at_max() {
+        let mut context = AggregateFills::default();
+        context.add_raw_fill(1, Address::ZERO, Address::ZERO, U256::MAX);
+        context.add_raw_fill(1, Address::ZERO, Address::ZERO, U256::from(1));
+        assert_eq!(context.filled(&(1, Address::ZERO), Address::ZERO), U256::MAX);
+    }
+
+    #[test]
+    fn remove_max_from_max() {
+        let mut context = AggregateFills::default();
+        context.add_raw_fill(1, Address::ZERO, Address::ZERO, U256::MAX);
+
+        let mut aggregate = AggregateOrders::new();
+        aggregate.ingest_raw_output(1, Address::ZERO, Address::ZERO, U256::MAX);
+
+        context.checked_remove_aggregate(&aggregate).unwrap();
+        assert_eq!(context.filled(&(1, Address::ZERO), Address::ZERO), U256::ZERO);
+    }
+
+    #[test]
+    fn absorb_saturates_at_max() {
+        let mut a = AggregateFills::default();
+        let mut b = AggregateFills::default();
+
+        a.add_raw_fill(1, Address::ZERO, Address::ZERO, U256::MAX);
+        b.add_raw_fill(1, Address::ZERO, Address::ZERO, U256::from(1000));
+
+        a.absorb(&b);
+        assert_eq!(a.filled(&(1, Address::ZERO), Address::ZERO), U256::MAX);
+    }
+
+    // === Panic/Error Path Tests ===
+
+    #[test]
+    fn unchecked_remove_aggregate_errors_on_missing_recipient() {
+        let mut context = AggregateFills::default();
+        let asset = Address::with_last_byte(1);
+
+        // Add fill for asset but different recipient
+        context.add_raw_fill(1, asset, Address::with_last_byte(99), U256::from(100));
+
+        let mut aggregate = AggregateOrders::new();
+        aggregate.ingest_raw_output(1, asset, Address::with_last_byte(2), U256::from(50));
+
+        let result = context.unchecked_remove_aggregate(&aggregate);
+        assert!(matches!(result, Err(MarketError::InsufficientBalance { .. })));
+    }
+
+    #[test]
+    fn checked_remove_handles_missing_recipient() {
+        let mut context = AggregateFills::default();
+        let asset = Address::with_last_byte(1);
+
+        context.add_raw_fill(1, asset, Address::with_last_byte(99), U256::from(100));
+
+        let mut aggregate = AggregateOrders::new();
+        aggregate.ingest_raw_output(1, asset, Address::with_last_byte(2), U256::from(50));
+
+        let result = context.checked_remove_aggregate(&aggregate);
+        assert!(matches!(result, Err(MarketError::InsufficientBalance { .. })));
+    }
+
+    #[test]
+    fn insufficient_balance_error_fields() {
+        let context = AggregateFills::default();
+        let result = context.check_filled(
+            &(42, Address::with_last_byte(1)),
+            Address::with_last_byte(2),
+            U256::from(100),
+        );
+
+        let err = result.unwrap_err();
+        assert!(matches!(err, MarketError::InsufficientBalance { chain_id: 42, .. }));
+    }
+
+    #[test]
+    fn missing_asset_error_fields() {
+        let context = AggregateFills::default();
+        let mut aggregate = AggregateOrders::new();
+        aggregate.ingest_raw_output(42, Address::with_last_byte(1), Address::ZERO, U256::from(100));
+
+        let result = context.check_aggregate(&aggregate);
+        assert!(matches!(result, Err(MarketError::MissingAsset { chain_id: 42, .. })));
+    }
+
+    // === Multi-Chain Tests ===
+
+    #[test]
+    fn fills_across_multiple_chains() {
+        let mut context = AggregateFills::default();
+        let user = Address::with_last_byte(1);
+        let asset = Address::with_last_byte(2);
+
+        context.add_raw_fill(1, asset, user, U256::from(100));
+        context.add_raw_fill(10, asset, user, U256::from(200));
+        context.add_raw_fill(42161, asset, user, U256::from(300));
+
+        assert_eq!(context.filled(&(1, asset), user), U256::from(100));
+        assert_eq!(context.filled(&(10, asset), user), U256::from(200));
+        assert_eq!(context.filled(&(42161, asset), user), U256::from(300));
+    }
+
+    #[test]
+    fn remove_from_wrong_chain_fails() {
+        let mut context = AggregateFills::default();
+        let user = Address::with_last_byte(1);
+        let asset = Address::with_last_byte(2);
+
+        context.add_raw_fill(1, asset, user, U256::from(100));
+
+        let mut aggregate = AggregateOrders::new();
+        aggregate.ingest_raw_output(10, asset, user, U256::from(50));
+
+        let result = context.checked_remove_aggregate(&aggregate);
+        assert!(matches!(result, Err(MarketError::MissingAsset { chain_id: 10, .. })));
+    }
+
+    // === Clone/Equality Tests ===
+
+    #[test]
+    fn clone_equality() {
+        let mut context = AggregateFills::default();
+        context.add_raw_fill(
+            1,
+            Address::with_last_byte(1),
+            Address::with_last_byte(2),
+            U256::from(12345),
+        );
+        context.add_raw_fill(10, Address::with_last_byte(3), Address::with_last_byte(2), U256::MAX);
+
+        let cloned = context.clone();
+        assert_eq!(context, cloned);
+    }
+}
+
+#[cfg(all(test, feature = "proptest"))]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn nonzero_u256() -> impl Strategy<Value = U256> {
+        any::<U256>().prop_map(|x| if x == U256::ZERO { U256::from(1) } else { x })
+    }
+
+    proptest! {
+        #[test]
+        fn add_then_remove_returns_to_zero(
+            chain_id in 0u64..100,
+            asset_byte in 0u8..=255,
+            recipient_byte in 0u8..=255,
+            amount in nonzero_u256(),
+        ) {
+            let mut context = AggregateFills::default();
+            let asset = Address::with_last_byte(asset_byte);
+            let recipient = Address::with_last_byte(recipient_byte);
+
+            context.add_raw_fill(chain_id, asset, recipient, amount);
+
+            let mut aggregate = AggregateOrders::new();
+            aggregate.ingest_raw_output(chain_id, asset, recipient, amount);
+
+            context.checked_remove_aggregate(&aggregate).unwrap();
+            prop_assert_eq!(context.filled(&(chain_id, asset), recipient), U256::ZERO);
+        }
+
+        #[test]
+        fn fill_addition_is_commutative(
+            chain_id in 0u64..100,
+            asset_byte in 0u8..=255,
+            recipient_byte in 0u8..=255,
+            amount_a in any::<U256>(),
+            amount_b in any::<U256>(),
+        ) {
+            let asset = Address::with_last_byte(asset_byte);
+            let recipient = Address::with_last_byte(recipient_byte);
+
+            let mut ab = AggregateFills::default();
+            ab.add_raw_fill(chain_id, asset, recipient, amount_a);
+            ab.add_raw_fill(chain_id, asset, recipient, amount_b);
+
+            let mut ba = AggregateFills::default();
+            ba.add_raw_fill(chain_id, asset, recipient, amount_b);
+            ba.add_raw_fill(chain_id, asset, recipient, amount_a);
+
+            prop_assert_eq!(ab, ba);
+        }
     }
 }
