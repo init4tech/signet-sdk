@@ -283,4 +283,105 @@ mod test {
 
         assert!(deserialized.host_txs.is_empty());
     }
+
+    /// Generate test vectors for TypeScript SDK.
+    ///
+    /// Run with: `cargo t -p signet-bundle -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn generate_eth_bundle_vectors() {
+        use alloy::primitives::Address;
+
+        let vectors = vec![
+            (
+                "minimal",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8test_tx_1".into()],
+                        block_number: 12345678,
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+            (
+                "with_timestamps",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8test_tx_1".into()],
+                        block_number: 12345678,
+                        min_timestamp: Some(1700000000),
+                        max_timestamp: Some(1700003600),
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+            (
+                "with_reverting_hashes",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8test_tx_1".into(), b"\x02\xf8test_tx_2".into()],
+                        block_number: 12345678,
+                        reverting_tx_hashes: vec![B256::repeat_byte(0xab), B256::repeat_byte(0xcd)],
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+            (
+                "with_host_txs",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8rollup_tx".into()],
+                        block_number: 12345678,
+                        ..Default::default()
+                    },
+                    vec![b"\x02\xf8host_tx_1".into(), b"\x02\xf8host_tx_2".into()],
+                ),
+            ),
+            (
+                "full_bundle",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8tx_1".into(), b"\x02\xf8tx_2".into()],
+                        block_number: 12345678,
+                        min_timestamp: Some(1700000000),
+                        max_timestamp: Some(1700003600),
+                        reverting_tx_hashes: vec![B256::repeat_byte(0xef)],
+                        dropping_tx_hashes: vec![B256::repeat_byte(0x11)],
+                        refund_percent: Some(90),
+                        refund_recipient: Some(Address::repeat_byte(0x22)),
+                        refund_tx_hashes: vec![B256::repeat_byte(0x33)],
+                        ..Default::default()
+                    },
+                    vec![b"\x02\xf8host_tx".into()],
+                ),
+            ),
+            (
+                "replacement_bundle",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8replacement_tx".into()],
+                        block_number: 12345678,
+                        replacement_uuid: Some("550e8400-e29b-41d4-a716-446655440000".to_owned()),
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+        ];
+
+        let output: Vec<_> = vectors
+            .into_iter()
+            .map(|(name, bundle)| {
+                serde_json::json!({
+                    "name": name,
+                    "bundle": bundle,
+                })
+            })
+            .collect();
+
+        println!("// SignetEthBundle vectors\n{}", serde_json::to_string_pretty(&output).unwrap());
+    }
 }

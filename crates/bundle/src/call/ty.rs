@@ -350,4 +350,131 @@ mod test {
 
         assert_eq!(resp, deserialized);
     }
+
+    /// Generate test vectors for TypeScript SDK.
+    ///
+    /// Run with: `cargo t -p signet-bundle -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn generate_call_bundle_vectors() {
+        let vectors = vec![
+            (
+                "minimal",
+                SignetCallBundle {
+                    bundle: EthCallBundle {
+                        txs: vec![b"\x02\xf8test_tx_1".into()],
+                        block_number: 12345678,
+                        state_block_number: BlockNumberOrTag::Number(12345677),
+                        ..Default::default()
+                    },
+                },
+            ),
+            (
+                "with_overrides",
+                SignetCallBundle {
+                    bundle: EthCallBundle {
+                        txs: vec![b"\x02\xf8test_tx_1".into()],
+                        block_number: 12345678,
+                        state_block_number: BlockNumberOrTag::Number(12345677),
+                        timestamp: Some(1700000000),
+                        gas_limit: Some(30000000),
+                        base_fee: Some(1000000000),
+                        ..Default::default()
+                    },
+                },
+            ),
+            (
+                "with_coinbase",
+                SignetCallBundle {
+                    bundle: EthCallBundle {
+                        txs: vec![b"\x02\xf8test_tx_1".into()],
+                        block_number: 12345678,
+                        state_block_number: BlockNumberOrTag::Latest,
+                        coinbase: Some(Address::repeat_byte(0x42)),
+                        timeout: Some(5),
+                        ..Default::default()
+                    },
+                },
+            ),
+        ];
+
+        let output: Vec<_> = vectors
+            .into_iter()
+            .map(|(name, bundle)| {
+                serde_json::json!({
+                    "name": name,
+                    "bundle": bundle,
+                })
+            })
+            .collect();
+
+        println!("// SignetCallBundle vectors\n{}", serde_json::to_string_pretty(&output).unwrap());
+
+        // Also generate response vectors
+        let response_vectors = vec![
+            (
+                "minimal_response",
+                SignetCallBundleResponse::from(EthCallBundleResponse {
+                    bundle_hash: B256::repeat_byte(0xaa),
+                    bundle_gas_price: U256::from(1000000000u64),
+                    coinbase_diff: U256::from(100000000000000u64),
+                    eth_sent_to_coinbase: U256::from(50000000000000u64),
+                    gas_fees: U256::from(50000000000000u64),
+                    results: vec![EthCallBundleTransactionResult {
+                        coinbase_diff: U256::from(100000000000000u64),
+                        eth_sent_to_coinbase: U256::from(50000000000000u64),
+                        from_address: Address::repeat_byte(0x11),
+                        gas_fees: U256::from(50000000000000u64),
+                        gas_price: U256::from(1000000000u64),
+                        gas_used: 21000,
+                        to_address: Some(Address::repeat_byte(0x22)),
+                        tx_hash: B256::repeat_byte(0xbb),
+                        value: Some(Bytes::from(b"result_data")),
+                        revert: None,
+                    }],
+                    state_block_number: 12345677,
+                    total_gas_used: 21000,
+                }),
+            ),
+            (
+                "reverted_response",
+                SignetCallBundleResponse::from(EthCallBundleResponse {
+                    bundle_hash: B256::repeat_byte(0xcc),
+                    bundle_gas_price: U256::from(1000000000u64),
+                    coinbase_diff: U256::from(0u64),
+                    eth_sent_to_coinbase: U256::from(0u64),
+                    gas_fees: U256::from(21000000000000u64),
+                    results: vec![EthCallBundleTransactionResult {
+                        coinbase_diff: U256::from(0u64),
+                        eth_sent_to_coinbase: U256::from(0u64),
+                        from_address: Address::repeat_byte(0x33),
+                        gas_fees: U256::from(21000000000000u64),
+                        gas_price: U256::from(1000000000u64),
+                        gas_used: 21000,
+                        to_address: Some(Address::repeat_byte(0x44)),
+                        tx_hash: B256::repeat_byte(0xdd),
+                        value: None,
+                        revert: Some(Bytes::from(b"execution reverted")),
+                    }],
+                    state_block_number: 12345677,
+                    total_gas_used: 21000,
+                }),
+            ),
+        ];
+
+        let response_output: Vec<_> = response_vectors
+            .into_iter()
+            .map(|(name, resp)| {
+                serde_json::json!({
+                    "name": name,
+                    "response": resp,
+                })
+            })
+            .collect();
+
+        println!(
+            "\n// SignetCallBundleResponse vectors\n{}",
+            serde_json::to_string_pretty(&response_output).unwrap()
+        );
+    }
 }
