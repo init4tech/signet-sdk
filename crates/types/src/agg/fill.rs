@@ -615,18 +615,21 @@ mod proptests {
     use super::*;
     use proptest::prelude::*;
 
+    fn nonzero_u256() -> impl Strategy<Value = U256> {
+        any::<U256>().prop_map(|x| if x == U256::ZERO { U256::from(1) } else { x })
+    }
+
     proptest! {
         #[test]
         fn add_then_remove_returns_to_zero(
             chain_id in 0u64..100,
             asset_byte in 0u8..=255,
             recipient_byte in 0u8..=255,
-            amount in 1u64..u64::MAX,
+            amount in nonzero_u256(),
         ) {
             let mut context = AggregateFills::default();
             let asset = Address::with_last_byte(asset_byte);
             let recipient = Address::with_last_byte(recipient_byte);
-            let amount = U256::from(amount);
 
             context.add_raw_fill(chain_id, asset, recipient, amount);
 
@@ -642,19 +645,19 @@ mod proptests {
             chain_id in 0u64..100,
             asset_byte in 0u8..=255,
             recipient_byte in 0u8..=255,
-            amount_a in 1u64..u64::MAX/2,
-            amount_b in 1u64..u64::MAX/2,
+            amount_a in any::<U256>(),
+            amount_b in any::<U256>(),
         ) {
             let asset = Address::with_last_byte(asset_byte);
             let recipient = Address::with_last_byte(recipient_byte);
 
             let mut ab = AggregateFills::default();
-            ab.add_raw_fill(chain_id, asset, recipient, U256::from(amount_a));
-            ab.add_raw_fill(chain_id, asset, recipient, U256::from(amount_b));
+            ab.add_raw_fill(chain_id, asset, recipient, amount_a);
+            ab.add_raw_fill(chain_id, asset, recipient, amount_b);
 
             let mut ba = AggregateFills::default();
-            ba.add_raw_fill(chain_id, asset, recipient, U256::from(amount_b));
-            ba.add_raw_fill(chain_id, asset, recipient, U256::from(amount_a));
+            ba.add_raw_fill(chain_id, asset, recipient, amount_b);
+            ba.add_raw_fill(chain_id, asset, recipient, amount_a);
 
             prop_assert_eq!(ab, ba);
         }
