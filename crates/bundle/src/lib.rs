@@ -25,14 +25,7 @@
 //! The [`SignetEthBundle`] type contains actions that must be performed on
 //! both chains. As such, its simulation must be performed on both chains. The
 //! primary transaction simulation via [`SignetEthBundleDriver`] is performed
-//! locally using [`trevm`]. However, the [`SignedFill`] must be checked
-//! against the host chain. This is done by calling the
-//! [`SignetEthBundle::decode_and_validate_txs`] method. This MUST be
-//! called BEFORE simulating.
-//!
-//! Builders running in an exex may choose to simulate using the local host
-//! chain DB copy. This is not yet implemented in this library, but may be in
-//! the future.
+//! locally using [`trevm`].
 
 #![warn(
     missing_copy_implementations,
@@ -54,6 +47,3 @@ pub use send::{
     BundleInspector, BundleRecoverError, RecoverError, RecoveredBundle, SignetEthBundle,
     SignetEthBundleDriver, SignetEthBundleError, SignetEthBundleInsp, TxRequirement,
 };
-
-#[cfg(doc)]
-use signet_types::SignedFill;
