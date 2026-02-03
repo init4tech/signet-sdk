@@ -462,6 +462,7 @@ mod block_driver {
     #[test]
     fn accepts_with_valid_fills() {
         let mut ctx = BlockDriverEnv::new();
+        let orderer = ctx.wallets[1].address();
 
         // Create transactions: send, order, send
         let tx_0 = ctx.signed_simple_send(0, TX_0_RECIPIENT, U256::from(100));
@@ -516,12 +517,15 @@ mod block_driver {
         // Verify balances
         assert_eq!(trevm.read_balance(TX_0_RECIPIENT), U256::from(100));
         assert_eq!(trevm.read_balance(TX_2_RECIPIENT), U256::from(100));
+        // Orderer's balance should have decreased (spent INPUT_AMOUNT + gas)
+        assert!(trevm.read_balance(orderer) < U256::from(ETH_TO_WEI * 1000) - INPUT_AMOUNT);
     }
 
     /// Test that block driver drops order tx on partial fills but processes others.
     #[test]
     fn drops_tx_on_partial_fills() {
         let mut ctx = BlockDriverEnv::new();
+        let orderer = ctx.wallets[1].address();
 
         // Create transactions: send, order, send
         let tx_0 = ctx.signed_simple_send(0, TX_0_RECIPIENT, U256::from(100));
@@ -575,6 +579,8 @@ mod block_driver {
         // tx_0 and tx_2 should have executed
         assert_eq!(trevm.read_balance(TX_0_RECIPIENT), U256::from(100));
         assert_eq!(trevm.read_balance(TX_2_RECIPIENT), U256::from(100));
+        // Orderer's balance should be unchanged (order tx was dropped)
+        assert_eq!(trevm.read_balance(orderer), U256::from(ETH_TO_WEI * 1000));
     }
 
     /// Test that block driver drops order tx when no fills are provided.
