@@ -1,7 +1,8 @@
 use crate::{InnerDb, SimDb, TimeLimited};
 use signet_evm::{signet_precompiles, EvmNeedsTx, OrderDetector, SignetLayered};
 use signet_types::constants::SignetSystemConstants;
-use std::{marker::PhantomData, sync::Arc, time::Instant};
+use std::{marker::PhantomData, sync::Arc};
+use tokio::time::Instant;
 use trevm::{
     db::TryCachingDb,
     helpers::Ctx,

@@ -119,7 +119,7 @@ where
         cache_rank: u128,
         transaction: &TxEnvelope,
     ) -> Result<SimOutcomeWithCache, SignetEthBundleError<SimDb<RuDb>>> {
-        let trevm = self.rollup.create_evm(self.finish_by.into());
+        let trevm = self.rollup.create_evm(self.finish_by);
 
         // Get the initial beneficiary balance
         let beneficiary = trevm.beneficiary();
@@ -197,12 +197,12 @@ where
     where
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync,
     {
-        let trevm = self.rollup.create_evm(self.finish_by.into());
+        let trevm = self.rollup.create_evm(self.finish_by);
 
         let mut driver = SignetEthBundleDriver::new_with_fill_state(
             bundle,
-            self.host.create_evm(self.finish_by.into()),
-            self.finish_by.into(),
+            self.host.create_evm(self.finish_by),
+            self.finish_by,
             Cow::Borrowed(self.rollup.fill_state()),
         );
 

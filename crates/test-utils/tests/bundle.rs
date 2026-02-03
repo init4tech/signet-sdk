@@ -26,11 +26,8 @@ use signet_test_utils::{
 };
 use signet_types::AggregateFills;
 use signet_zenith::HostOrders::{initiateCall, Filled, Input, Output};
-use std::{
-    borrow::Cow,
-    sync::LazyLock,
-    time::{Duration, Instant},
-};
+use std::{borrow::Cow, sync::LazyLock, time::Duration};
+use tokio::time::Instant;
 use trevm::{
     inspectors::{Layered, TimeLimit},
     revm::{database::InMemoryDB, inspector::NoOpInspector},

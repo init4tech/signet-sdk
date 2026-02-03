@@ -86,7 +86,7 @@ where
 
     /// Execution deadline for this bundle. This limits the total WALLCLOCK
     /// time spent simulating the bundle.
-    deadline: std::time::Instant,
+    deadline: tokio::time::Instant,
 
     // -- Accumulated outputs below here--
     output: DriverOutput<Db, Insp>,
@@ -102,7 +102,7 @@ where
     pub fn new(
         bundle: &'a RecoveredBundle,
         host_evm: signet_evm::EvmNeedsTx<Db, Insp>,
-        deadline: std::time::Instant,
+        deadline: tokio::time::Instant,
     ) -> Self {
         Self::new_with_fill_state(bundle, host_evm, deadline, Default::default())
     }
@@ -114,7 +114,7 @@ where
     pub fn new_with_fill_state(
         bundle: &'a RecoveredBundle,
         host_evm: signet_evm::EvmNeedsTx<Db, Insp>,
-        deadline: std::time::Instant,
+        deadline: tokio::time::Instant,
         fill_state: Cow<'b, AggregateFills>,
     ) -> Self {
         Self {
@@ -138,7 +138,7 @@ where
     }
 
     /// Get the deadline for this driver.
-    pub const fn deadline(&self) -> std::time::Instant {
+    pub const fn deadline(&self) -> tokio::time::Instant {
         self.deadline
     }
 
@@ -267,7 +267,7 @@ where
 
             // Update the inner deadline.
             let limit = trevm.inner_mut_unchecked().ctx_inspector().1.outer_mut().outer_mut();
-            *limit = TimeLimit::new(self.deadline - std::time::Instant::now());
+            *limit = TimeLimit::new(self.deadline - tokio::time::Instant::now());
 
             let tx_hash = tx.hash();
 
