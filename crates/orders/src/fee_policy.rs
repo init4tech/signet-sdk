@@ -11,6 +11,8 @@ use alloy::{
 use futures_util::{stream, StreamExt, TryStreamExt};
 use signet_bundle::SignetEthBundle;
 use signet_constants::SignetSystemConstants;
+#[cfg(doc)]
+use signet_types::SignedFill;
 use tracing::{error, instrument};
 
 /// Errors returned by [`FeePolicySubmitter`].
@@ -51,9 +53,7 @@ impl From<FillerControlFlow> for FeePolicyError {
 /// The providers must be configured with appropriate fillers for gas, nonce, chain ID, and wallet
 /// signing (e.g., via `ProviderBuilder::with_gas_estimation()` and `ProviderBuilder::wallet()`).
 /// Note that the provider's nonce filler must correctly increment nonces across all transactions
-/// built within a single [`submit_fills`] call.
-///
-/// [`submit_fills`]: FillSubmitter::submit_fills
+/// built within a single [`FillSubmitter::submit_fills`] call.
 #[derive(Debug, Clone)]
 pub struct FeePolicySubmitter<RuP, HostP, B> {
     ru_provider: RuP,

@@ -1,6 +1,8 @@
 #[cfg(doc)]
 use crate::Filler;
 use crate::OrdersAndFills;
+#[cfg(doc)]
+use alloy::providers::fillers::FillProvider;
 use alloy::{
     network::{Ethereum, Network},
     providers::{fillers::FillerControlFlow, Provider, SendableTx},
@@ -9,6 +11,8 @@ use alloy::{
 use core::future::Future;
 use futures_util::Stream;
 use signet_bundle::SignetEthBundle;
+#[cfg(doc)]
+use signet_types::SignedFill;
 use signet_types::SignedOrder;
 
 /// A trait for submitting signed orders to a backend.
