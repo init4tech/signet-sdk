@@ -3,7 +3,8 @@ use signet_evm::EvmNeedsTx;
 use signet_types::{
     constants::SignetSystemConstants, AggregateFills, AggregateOrders, MarketError,
 };
-use std::{marker::PhantomData, sync::Arc, time::Instant};
+use std::{marker::PhantomData, sync::Arc};
+use tokio::time::Instant;
 use trevm::{
     db::{cow::CacheOnWrite, TryCachingDb},
     helpers::Ctx,
