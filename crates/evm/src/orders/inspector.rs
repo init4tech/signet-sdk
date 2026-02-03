@@ -118,6 +118,21 @@ impl OrderDetector {
     pub const fn filleds(&self) -> &FramedFilleds {
         &self.filleds
     }
+
+    fn enter_frame(&mut self) {
+        self.orders.enter_frame();
+        self.filleds.enter_frame();
+    }
+
+    fn exit_frame(&mut self) {
+        self.orders.exit_frame();
+        self.filleds.exit_frame();
+    }
+
+    fn revert_frame(&mut self) {
+        self.orders.revert_frame();
+        self.filleds.revert_frame();
+    }
 }
 
 impl<Db, Int> Inspector<Ctx<Db>, Int> for OrderDetector
@@ -152,7 +167,7 @@ where
     }
 
     fn call(&mut self, _context: &mut Ctx<Db>, _inputs: &mut CallInputs) -> Option<CallOutcome> {
-        self.orders.enter_frame();
+        self.enter_frame();
         None
     }
 
@@ -163,9 +178,9 @@ where
         outcome: &mut CallOutcome,
     ) {
         if outcome.result.is_ok() {
-            self.orders.exit_frame();
+            self.exit_frame();
         } else {
-            self.orders.revert_frame();
+            self.revert_frame();
         }
     }
 
@@ -174,7 +189,7 @@ where
         _context: &mut Ctx<Db>,
         _inputs: &mut CreateInputs,
     ) -> Option<CreateOutcome> {
-        self.orders.enter_frame();
+        self.enter_frame();
         None
     }
 
@@ -185,13 +200,209 @@ where
         outcome: &mut CreateOutcome,
     ) {
         if outcome.result.is_ok() {
-            self.orders.exit_frame();
+            self.exit_frame();
         } else {
-            self.orders.revert_frame();
+            self.revert_frame();
         }
     }
 
     fn selfdestruct(&mut self, _contract: Address, _target: Address, _value: U256) {
-        self.orders.exit_frame();
+        self.exit_frame();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use alloy::primitives::Bytes;
+    use trevm::{
+        helpers::Ctx,
+        revm::{
+            database::EmptyDB,
+            interpreter::{
+                interpreter::EthInterpreter, CallInput, CallOutcome, CallScheme, CallValue,
+                CreateOutcome, Gas, InstructionResult, InterpreterResult,
+            },
+            primitives::hardfork::SpecId,
+            Context, Inspector,
+        },
+    };
+
+    type TestCtx = Ctx<EmptyDB>;
+    type TestInt = EthInterpreter;
+
+    fn test_ctx() -> TestCtx {
+        Context::new(EmptyDB::new(), SpecId::CANCUN)
+    }
+
+    fn test_call_inputs() -> CallInputs {
+        CallInputs {
+            input: CallInput::default(),
+            return_memory_offset: 0..0,
+            gas_limit: 1_000_000,
+            bytecode_address: Address::ZERO,
+            known_bytecode: None,
+            target_address: Address::ZERO,
+            caller: Address::ZERO,
+            value: CallValue::Transfer(U256::ZERO),
+            scheme: CallScheme::Call,
+            is_static: false,
+        }
+    }
+
+    fn success_outcome() -> CallOutcome {
+        CallOutcome::new(
+            InterpreterResult::new(InstructionResult::Return, Bytes::new(), Gas::new(1_000_000)),
+            0..0,
+        )
+    }
+
+    fn revert_outcome() -> CallOutcome {
+        CallOutcome::new(
+            InterpreterResult::new(InstructionResult::Revert, Bytes::new(), Gas::new(1_000_000)),
+            0..0,
+        )
+    }
+
+    fn success_create_outcome() -> CreateOutcome {
+        CreateOutcome::new(
+            InterpreterResult::new(InstructionResult::Return, Bytes::new(), Gas::new(1_000_000)),
+            Some(Address::ZERO),
+        )
+    }
+
+    fn revert_create_outcome() -> CreateOutcome {
+        CreateOutcome::new(
+            InterpreterResult::new(InstructionResult::Revert, Bytes::new(), Gas::new(1_000_000)),
+            None,
+        )
+    }
+
+    fn dummy_order() -> RollupOrders::Order {
+        RollupOrders::Order {
+            deadline: Default::default(),
+            inputs: Default::default(),
+            outputs: Default::default(),
+        }
+    }
+
+    fn dummy_filled() -> RollupOrders::Filled {
+        RollupOrders::Filled { outputs: Default::default() }
+    }
+
+    /// `orders` and `filleds` must be reverted when a call frame reverts.
+    #[test]
+    fn call_revert_discards_orders_and_filleds() {
+        let contract = Address::repeat_byte(0x42);
+        let mut detector = OrderDetector::new(std::iter::once(contract).collect(), 1, false);
+        let mut ctx = test_ctx();
+        let mut inputs = test_call_inputs();
+
+        <OrderDetector as Inspector<TestCtx, TestInt>>::call(&mut detector, &mut ctx, &mut inputs);
+
+        detector.orders.add(dummy_order());
+        detector.filleds.add(dummy_filled());
+        assert_eq!(detector.orders.len(), 1);
+        assert_eq!(detector.filleds.len(), 1);
+
+        let mut outcome = revert_outcome();
+        <OrderDetector as Inspector<TestCtx, TestInt>>::call_end(
+            &mut detector,
+            &mut ctx,
+            &inputs,
+            &mut outcome,
+        );
+
+        assert!(detector.orders.is_empty(), "orders should be empty after call revert");
+        assert!(detector.filleds.is_empty(), "filleds should be empty after call revert");
+    }
+
+    /// `orders` and `filleds` must be reverted when a create frame reverts.
+    #[test]
+    fn create_revert_discards_orders_and_filleds() {
+        let contract = Address::repeat_byte(0x42);
+        let mut detector = OrderDetector::new(std::iter::once(contract).collect(), 1, false);
+        let mut ctx = test_ctx();
+        let mut inputs = CreateInputs::default();
+
+        <OrderDetector as Inspector<TestCtx, TestInt>>::create(
+            &mut detector,
+            &mut ctx,
+            &mut inputs,
+        );
+
+        detector.orders.add(dummy_order());
+        detector.filleds.add(dummy_filled());
+        assert_eq!(detector.orders.len(), 1);
+        assert_eq!(detector.filleds.len(), 1);
+
+        let mut outcome = revert_create_outcome();
+        <OrderDetector as Inspector<TestCtx, TestInt>>::create_end(
+            &mut detector,
+            &mut ctx,
+            &inputs,
+            &mut outcome,
+        );
+
+        assert!(detector.orders.is_empty(), "orders should be empty after create revert");
+        assert!(detector.filleds.is_empty(), "filleds should be empty after create revert");
+    }
+
+    /// `orders` and `filleds` must be retained on successful call.
+    #[test]
+    fn call_success_retains_orders_and_filleds() {
+        let contract = Address::repeat_byte(0x42);
+        let mut detector = OrderDetector::new(std::iter::once(contract).collect(), 1, false);
+        let mut ctx = test_ctx();
+        let mut inputs = test_call_inputs();
+
+        <OrderDetector as Inspector<TestCtx, TestInt>>::call(&mut detector, &mut ctx, &mut inputs);
+
+        detector.orders.add(dummy_order());
+        detector.filleds.add(dummy_filled());
+        assert_eq!(detector.orders.len(), 1);
+        assert_eq!(detector.filleds.len(), 1);
+
+        let mut outcome = success_outcome();
+        <OrderDetector as Inspector<TestCtx, TestInt>>::call_end(
+            &mut detector,
+            &mut ctx,
+            &inputs,
+            &mut outcome,
+        );
+
+        assert_eq!(detector.orders.len(), 1, "orders should be retained after successful call");
+        assert_eq!(detector.filleds.len(), 1, "filleds should be retained after successful call");
+    }
+
+    /// `orders` and `filleds` must be retained on successful create.
+    #[test]
+    fn create_success_retains_orders_and_filleds() {
+        let contract = Address::repeat_byte(0x42);
+        let mut detector = OrderDetector::new(std::iter::once(contract).collect(), 1, false);
+        let mut ctx = test_ctx();
+        let mut inputs = CreateInputs::default();
+
+        <OrderDetector as Inspector<TestCtx, TestInt>>::create(
+            &mut detector,
+            &mut ctx,
+            &mut inputs,
+        );
+
+        detector.orders.add(dummy_order());
+        detector.filleds.add(dummy_filled());
+        assert_eq!(detector.orders.len(), 1);
+        assert_eq!(detector.filleds.len(), 1);
+
+        let mut outcome = success_create_outcome();
+        <OrderDetector as Inspector<TestCtx, TestInt>>::create_end(
+            &mut detector,
+            &mut ctx,
+            &inputs,
+            &mut outcome,
+        );
+
+        assert_eq!(detector.orders.len(), 1, "orders should be retained after successful create");
+        assert_eq!(detector.filleds.len(), 1, "filleds should be retained after successful create");
     }
 }
