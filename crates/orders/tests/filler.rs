@@ -1,4 +1,3 @@
-#![recursion_limit = "256"]
 //! Integration tests for [`Filler`].
 use alloy::{
     consensus::{Transaction, TxEnvelope},
