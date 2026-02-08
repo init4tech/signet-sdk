@@ -2,4 +2,5 @@
 .DS_Store
 Cargo.lock
 .idea/
-.claude/
+.claude/*.local.*
+CLAUDE.local.md
