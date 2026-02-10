@@ -1,4 +1,4 @@
-//! Integration tests for [`Filler`].
+//! Integration tests for [`signet_orders::Filler`].
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::eip2718::Decodable2718,
