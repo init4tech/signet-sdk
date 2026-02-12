@@ -200,3 +200,166 @@ impl<'a, C: Extractable> core::ops::DerefMut for Extracts<'a, C> {
         &mut self.events
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::consensus::{Header, ReceiptWithBloom};
+    use signet_types::primitives::{BlockBody, SealedBlock, SealedHeader};
+
+    // Mock Extractable implementation for testing
+    #[derive(Debug, Clone)]
+    struct MockExtractable {
+        blocks: Vec<SealedBlock>,
+        receipts: Vec<Vec<ReceiptWithBloom>>,
+    }
+
+    impl crate::Extractable for MockExtractable {
+        type Block = SealedBlock;
+        type Receipt = ReceiptWithBloom;
+
+        fn blocks_and_receipts(&self) -> impl Iterator<Item = (&Self::Block, &Vec<Self::Receipt>)> {
+            self.blocks.iter().zip(self.receipts.iter())
+        }
+    }
+
+    fn make_mock_block() -> SealedBlock {
+        let header = Header { number: 100, timestamp: 1234567890, ..Default::default() };
+        let sealed_header = SealedHeader::new(header);
+        SealedBlock::new_unchecked(sealed_header, BlockBody::default())
+    }
+
+    // Test HostEvents Default impl
+    #[test]
+    fn host_events_default() {
+        let events: HostEvents<'_, MockExtractable> = Default::default();
+        assert!(events.submitted.is_none());
+        assert!(events.enters.is_empty());
+        assert!(events.transacts.is_empty());
+        assert!(events.enter_tokens.is_empty());
+    }
+
+    // Test Extracts::new
+    #[test]
+    fn extracts_new() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+
+        assert_eq!(extracts.host_chain_id, 1);
+        assert_eq!(extracts.chain_id, 519);
+        assert_eq!(extracts.ru_height, 50);
+        assert!(!extracts.contains_block());
+    }
+
+    // Test Extracts::empty
+    #[test]
+    fn extracts_empty() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::empty(&block);
+
+        assert_eq!(extracts.host_chain_id, 0);
+        assert_eq!(extracts.chain_id, 0);
+        assert_eq!(extracts.ru_height, 0);
+        assert!(!extracts.contains_block());
+    }
+
+    // Test Extracts::contains_block
+    #[test]
+    fn extracts_contains_block_false_when_no_submitted() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert!(!extracts.contains_block());
+    }
+
+    // Test Extracts accessor methods
+    #[test]
+    fn extracts_host_block_number() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert_eq!(extracts.host_block_number(), 100);
+    }
+
+    #[test]
+    fn extracts_host_block_timestamp() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert_eq!(extracts.host_block_timestamp(), 1234567890);
+    }
+
+    // Test iterator methods return empty when no events
+    #[test]
+    fn extracts_transacts_empty() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert_eq!(extracts.transacts().count(), 0);
+    }
+
+    #[test]
+    fn extracts_enters_empty() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert_eq!(extracts.enters().count(), 0);
+    }
+
+    #[test]
+    fn extracts_enter_tokens_empty() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert_eq!(extracts.enter_tokens().count(), 0);
+    }
+
+    // Test aggregate_fills returns default context
+    #[test]
+    fn extracts_aggregate_fills_default() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        let fills = extracts.aggregate_fills();
+        // AggregateFills is created via Default, so it's in its initial state
+        let default_fills = AggregateFills::default();
+        assert_eq!(format!("{:?}", fills), format!("{:?}", default_fills));
+    }
+
+    // Test ru_header returns None when no block submitted
+    #[test]
+    fn extracts_ru_header_none() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        assert!(extracts.ru_header().is_none());
+    }
+
+    // Test Deref
+    #[test]
+    fn extracts_deref() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        // Test that we can access HostEvents fields through Deref
+        assert!(extracts.submitted.is_none());
+    }
+
+    // Test Clone
+    #[test]
+    fn extracts_clone() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        let cloned = extracts.clone();
+        assert_eq!(cloned.host_chain_id, extracts.host_chain_id);
+        assert_eq!(cloned.chain_id, extracts.chain_id);
+        assert_eq!(cloned.ru_height, extracts.ru_height);
+    }
+
+    // Test Debug
+    #[test]
+    fn extracts_debug() {
+        let block = make_mock_block();
+        let extracts: Extracts<'_, MockExtractable> = Extracts::new(1, &block, 519, 50);
+        let debug_str = format!("{:?}", extracts);
+        assert!(debug_str.contains("Extracts"));
+    }
+
+    #[test]
+    fn host_events_debug() {
+        let events: HostEvents<'_, MockExtractable> = Default::default();
+        let debug_str = format!("{:?}", events);
+        assert!(debug_str.contains("HostEvents"));
+    }
+}

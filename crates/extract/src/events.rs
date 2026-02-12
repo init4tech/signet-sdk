@@ -176,3 +176,201 @@ impl Events {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::primitives::{address, Address, U256};
+
+    fn make_enter_event() -> Passage::Enter {
+        Passage::Enter {
+            rollupChainId: U256::from(519u64),
+            rollupRecipient: Address::ZERO,
+            amount: U256::from(1000u64),
+        }
+    }
+
+    fn make_enter_token_event() -> Passage::EnterToken {
+        Passage::EnterToken {
+            rollupChainId: U256::from(519u64),
+            rollupRecipient: Address::ZERO,
+            token: address!("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+            amount: U256::from(1000u64),
+        }
+    }
+
+    fn make_block_submitted_event() -> Zenith::BlockSubmitted {
+        Zenith::BlockSubmitted {
+            sequencer: Address::ZERO,
+            rollupChainId: U256::from(519u64),
+            gasLimit: U256::from(30_000_000u64),
+            rewardAddress: Address::ZERO,
+            blockDataHash: [0u8; 32].into(),
+        }
+    }
+
+    fn make_transact_event() -> Transactor::Transact {
+        Transactor::Transact {
+            rollupChainId: U256::from(519u64),
+            sender: Address::ZERO,
+            to: Address::ZERO,
+            data: Default::default(),
+            value: U256::ZERO,
+            gas: U256::from(21000u64),
+            maxFeePerGas: U256::from(1_000_000_000u64),
+        }
+    }
+
+    fn make_filled_event() -> RollupOrders::Filled {
+        RollupOrders::Filled { outputs: vec![] }
+    }
+
+    // Test From implementations
+    #[test]
+    fn from_enter_token() {
+        let e = make_enter_token_event();
+        let events: Events = e.into();
+        assert!(events.is_enter_token());
+        assert!(events.as_enter_token().is_some());
+    }
+
+    #[test]
+    fn from_enter() {
+        let e = make_enter_event();
+        let events: Events = e.into();
+        assert!(events.is_enter());
+        assert!(events.as_enter().is_some());
+    }
+
+    #[test]
+    fn from_block_submitted() {
+        let e = make_block_submitted_event();
+        let events: Events = e.into();
+        assert!(events.is_block_submitted());
+        assert!(events.as_block_submitted().is_some());
+    }
+
+    #[test]
+    fn from_filled() {
+        let e = make_filled_event();
+        let events: Events = e.clone().into();
+        assert!(events.is_filled());
+        assert!(events.as_filled().is_some());
+    }
+
+    #[test]
+    fn from_transact() {
+        let e = make_transact_event();
+        let events: Events = e.clone().into();
+        assert!(events.is_transact());
+        assert!(events.as_transact().is_some());
+    }
+
+    // Test is_* methods return false for other variants
+    #[test]
+    fn enter_is_not_other_types() {
+        let events: Events = make_enter_event().into();
+        assert!(!events.is_enter_token());
+        assert!(!events.is_block_submitted());
+        assert!(!events.is_transact());
+        assert!(!events.is_filled());
+    }
+
+    #[test]
+    fn enter_token_is_not_other_types() {
+        let events: Events = make_enter_token_event().into();
+        assert!(!events.is_enter());
+        assert!(!events.is_block_submitted());
+        assert!(!events.is_transact());
+        assert!(!events.is_filled());
+    }
+
+    #[test]
+    fn block_submitted_is_not_other_types() {
+        let events: Events = make_block_submitted_event().into();
+        assert!(!events.is_enter());
+        assert!(!events.is_enter_token());
+        assert!(!events.is_transact());
+        assert!(!events.is_filled());
+    }
+
+    #[test]
+    fn transact_is_not_other_types() {
+        let events: Events = make_transact_event().into();
+        assert!(!events.is_enter());
+        assert!(!events.is_enter_token());
+        assert!(!events.is_block_submitted());
+        assert!(!events.is_filled());
+    }
+
+    #[test]
+    fn filled_is_not_other_types() {
+        let events: Events = make_filled_event().into();
+        assert!(!events.is_enter());
+        assert!(!events.is_enter_token());
+        assert!(!events.is_block_submitted());
+        assert!(!events.is_transact());
+    }
+
+    // Test as_* returns None for wrong variants
+    #[test]
+    fn as_enter_returns_none_for_other() {
+        let events: Events = make_enter_token_event().into();
+        assert!(events.as_enter().is_none());
+    }
+
+    #[test]
+    fn as_enter_token_returns_none_for_other() {
+        let events: Events = make_enter_event().into();
+        assert!(events.as_enter_token().is_none());
+    }
+
+    #[test]
+    fn as_block_submitted_returns_none_for_other() {
+        let events: Events = make_enter_event().into();
+        assert!(events.as_block_submitted().is_none());
+    }
+
+    #[test]
+    fn as_transact_returns_none_for_other() {
+        let events: Events = make_enter_event().into();
+        assert!(events.as_transact().is_none());
+    }
+
+    #[test]
+    fn as_filled_returns_none_for_other() {
+        let events: Events = make_enter_event().into();
+        assert!(events.as_filled().is_none());
+    }
+
+    // Test equality
+    #[test]
+    fn events_equality() {
+        let e1: Events = make_enter_event().into();
+        let e2: Events = make_enter_event().into();
+        assert_eq!(e1, e2);
+    }
+
+    #[test]
+    fn events_inequality() {
+        let e1: Events = make_enter_event().into();
+        let e2: Events = make_enter_token_event().into();
+        assert_ne!(e1, e2);
+    }
+
+    // Test Debug trait
+    #[test]
+    fn events_debug() {
+        let events: Events = make_enter_event().into();
+        let debug_str = format!("{:?}", events);
+        assert!(debug_str.contains("Enter"));
+    }
+
+    // Test Clone trait
+    #[test]
+    fn events_clone() {
+        let e1: Events = make_enter_event().into();
+        let e2 = e1.clone();
+        assert_eq!(e1, e2);
+    }
+}

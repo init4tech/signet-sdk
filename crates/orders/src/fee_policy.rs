@@ -175,3 +175,51 @@ where
 
     Ok(Bytes::from(envelope.encoded_2718()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fee_policy_error_display_no_fills() {
+        let err = FeePolicyError::NoFills;
+        assert_eq!(err.to_string(), "no fills provided for submission");
+    }
+
+    #[test]
+    fn fee_policy_error_display_incomplete_transaction() {
+        let err = FeePolicyError::IncompleteTransaction(vec![("gas", vec!["gas_limit"])]);
+        assert!(err.to_string().contains("missing required properties"));
+    }
+
+    #[test]
+    fn fee_policy_error_from_filler_control_flow_missing() {
+        let missing = vec![("nonce", vec!["nonce"])];
+        let control_flow = FillerControlFlow::Missing(missing.clone());
+        let err = FeePolicyError::from(control_flow);
+        match err {
+            FeePolicyError::IncompleteTransaction(m) => assert_eq!(m, missing),
+            _ => panic!("expected IncompleteTransaction"),
+        }
+    }
+
+    #[test]
+    fn fee_policy_error_from_filler_control_flow_finished() {
+        let control_flow = FillerControlFlow::Finished;
+        let err = FeePolicyError::from(control_flow);
+        match err {
+            FeePolicyError::IncompleteTransaction(m) => assert!(m.is_empty()),
+            _ => panic!("expected IncompleteTransaction"),
+        }
+    }
+
+    #[test]
+    fn fee_policy_error_from_filler_control_flow_ready() {
+        let control_flow = FillerControlFlow::Ready;
+        let err = FeePolicyError::from(control_flow);
+        match err {
+            FeePolicyError::IncompleteTransaction(m) => assert!(m.is_empty()),
+            _ => panic!("expected IncompleteTransaction"),
+        }
+    }
+}

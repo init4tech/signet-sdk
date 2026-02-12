@@ -202,3 +202,65 @@ where
             .map_err(|error| FillerError::Submission(Box::new(error)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn filler_options_default() {
+        let opts = FillerOptions::default();
+        assert!(opts.deadline_offset.is_none());
+        assert!(opts.nonce.is_none());
+    }
+
+    #[test]
+    fn filler_options_new() {
+        let opts = FillerOptions::new();
+        assert!(opts.deadline_offset.is_none());
+        assert!(opts.nonce.is_none());
+    }
+
+    #[test]
+    fn filler_options_with_deadline_offset() {
+        let opts = FillerOptions::new().with_deadline_offset(60);
+        assert_eq!(opts.deadline_offset, Some(60));
+        assert!(opts.nonce.is_none());
+    }
+
+    #[test]
+    fn filler_options_with_nonce() {
+        let opts = FillerOptions::new().with_nonce(12345);
+        assert!(opts.deadline_offset.is_none());
+        assert_eq!(opts.nonce, Some(12345));
+    }
+
+    #[test]
+    fn filler_options_chained() {
+        let opts = FillerOptions::new().with_deadline_offset(30).with_nonce(999);
+        assert_eq!(opts.deadline_offset, Some(30));
+        assert_eq!(opts.nonce, Some(999));
+    }
+
+    #[test]
+    fn filler_error_display_no_orders() {
+        let err = FillerError::NoOrders;
+        assert_eq!(err.to_string(), "no orders to fill");
+    }
+
+    #[test]
+    fn orders_and_fills_accessors() {
+        use alloy::primitives::Address;
+        use std::collections::HashMap;
+
+        let orders = vec![];
+        let fills = HashMap::new();
+        let signer_address = Address::repeat_byte(0x42);
+
+        let oaf = OrdersAndFills { orders, fills, signer_address };
+
+        assert!(oaf.orders().is_empty());
+        assert!(oaf.fills().is_empty());
+        assert_eq!(oaf.signer_address(), Address::repeat_byte(0x42));
+    }
+}
