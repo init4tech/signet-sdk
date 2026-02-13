@@ -440,31 +440,31 @@ pub struct OrderKey {
 // Deprecated type aliases for backwards compatibility
 // ============================================================================
 
-#[deprecated(since = "0.2.0", note = "renamed to `CachedBundle`")]
+#[deprecated(since = "0.16.0", note = "renamed to `CachedBundle`")]
 /// Deprecated alias for [`CachedBundle`].
 pub type TxCacheBundle = CachedBundle;
 
-#[deprecated(since = "0.2.0", note = "renamed to `BundleList`")]
+#[deprecated(since = "0.16.0", note = "renamed to `BundleList`")]
 /// Deprecated alias for [`BundleList`].
 pub type TxCacheBundlesResponse = BundleList;
 
-#[deprecated(since = "0.2.0", note = "renamed to `BundleReceipt`")]
+#[deprecated(since = "0.16.0", note = "renamed to `BundleReceipt`")]
 /// Deprecated alias for [`BundleReceipt`].
 pub type TxCacheSendBundleResponse = BundleReceipt;
 
-#[deprecated(since = "0.2.0", note = "renamed to `TransactionList`")]
+#[deprecated(since = "0.16.0", note = "renamed to `TransactionList`")]
 /// Deprecated alias for [`TransactionList`].
 pub type TxCacheTransactionsResponse = TransactionList;
 
-#[deprecated(since = "0.2.0", note = "renamed to `TransactionReceipt`")]
+#[deprecated(since = "0.16.0", note = "renamed to `TransactionReceipt`")]
 /// Deprecated alias for [`TransactionReceipt`].
 pub type TxCacheSendTransactionResponse = TransactionReceipt;
 
-#[deprecated(since = "0.2.0", note = "renamed to `OrderList`")]
+#[deprecated(since = "0.16.0", note = "renamed to `OrderList`")]
 /// Deprecated alias for [`OrderList`].
 pub type TxCacheOrdersResponse = OrderList;
 
-#[deprecated(since = "0.2.0", note = "renamed to `OrderReceipt`")]
+#[deprecated(since = "0.16.0", note = "renamed to `OrderReceipt`")]
 /// Deprecated alias for [`OrderReceipt`].
 pub type TxCacheSendOrderResponse = OrderReceipt;
 
