@@ -2,7 +2,7 @@ use crate::{BundleSubmitter, OrderSource, OrderSubmitter};
 use futures_util::future::Either;
 use futures_util::stream::{self, Stream, StreamExt};
 use signet_bundle::SignetEthBundle;
-use signet_tx_cache::{types::TxCacheSendBundleResponse, TxCache, TxCacheError};
+use signet_tx_cache::{types::BundleReceipt, TxCache, TxCacheError};
 use signet_types::SignedOrder;
 
 impl OrderSubmitter for TxCache {
@@ -34,7 +34,7 @@ impl OrderSource for TxCache {
 }
 
 impl BundleSubmitter for TxCache {
-    type Response = TxCacheSendBundleResponse;
+    type Response = BundleReceipt;
     type Error = TxCacheError;
 
     async fn submit_bundle(&self, bundle: SignetEthBundle) -> Result<Self::Response, Self::Error> {
