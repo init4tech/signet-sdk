@@ -31,6 +31,66 @@ This allows users and builders to simulate and validated the effects of
 - A [trevm] driver capable of simulating `SignetCallBundle` and producing a
   `SignetCallBundleResponse`.
 
+## Refund Fields
+
+Signet bundles support refund parameters equivalent to [Flashbots refund semantics].
+These fields allow builders to return a portion of the bundle's profit to the
+searcher based on execution outcomes.
+
+### Refund Parameters
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `refundPercent` | `u8` (0-100) | Percentage of bundle profit to refund. Default: 90% |
+| `refundRecipient` | `Address` | Address to receive the refund. Default: first tx signer |
+| `refundTxHashes` | `Vec<TxHash>` | Specific txs to use for refund calculation. Default: all txs |
+
+### How Refunds Work
+
+1. **Profit Calculation**: The builder calculates the bundle's profit based on
+   the difference between coinbase payments and gas costs.
+
+2. **Refund Percentage**: The `refundPercent` (0-100) specifies what portion of
+   this profit should be returned to the searcher. If not specified, builders
+   typically default to 90%.
+
+3. **Recipient**: The `refundRecipient` specifies where the refund is sent. If
+   not specified, it defaults to the signer of the first transaction in the
+   bundle.
+
+4. **Transaction Selection**: The `refundTxHashes` field allows searchers to
+   specify which transactions should be used when calculating the refund
+   amount. If empty, all bundle transactions are considered.
+
+### Example JSON
+
+```json
+{
+  "txs": ["0x02f8...signed_tx_1", "0x02f8...signed_tx_2"],
+  "blockNumber": "0xbc614e",
+  "refundPercent": 90,
+  "refundRecipient": "0x742d35Cc6634C0532925a3b844Bc9e7595f8aB12",
+  "refundTxHashes": ["0xabc123...tx_hash"]
+}
+```
+
+### Validation
+
+The SDK provides validation methods for refund fields:
+
+- `is_valid_refund_percent()` - Ensures percent is 0-100
+- `is_valid_refund_tx_hashes()` - Ensures referenced tx hashes exist in bundle
+- `is_valid_refunds()` - Validates all refund fields together
+
+### Effective Defaults
+
+The `RecoveredBundle` provides methods to get effective values with Flashbots-compatible
+defaults:
+
+- `effective_refund_percent()` - Returns specified value or default of 90%
+- `effective_refund_recipient()` - Returns specified address or first tx signer
+
 [trevm]: https://docs.rs/trevm/latest/trevm/
 [Flashbots bundles]: https://docs.flashbots.net/flashbots-auction/advanced/understanding-bundles
+[Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
 [conditional transactions]: https://signet.sh/docs/learn-about-signet/cross-chain-transfers/

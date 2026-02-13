@@ -199,17 +199,42 @@ impl RecoveredBundle {
         self.dropping_tx_hashes.as_slice()
     }
 
-    /// Getter for refund_percent, a standard bundle prop.
+    /// Returns the refund percentage for this bundle.
+    ///
+    /// The refund percent specifies what percentage of the bundle's profit
+    /// should be returned to the [`refund_recipient`]. Valid values are 0-100.
+    /// If not specified, the builder may use a default (typically 90%).
+    ///
+    /// This follows the [Flashbots refund semantics].
+    ///
+    /// [`refund_recipient`]: Self::refund_recipient
+    /// [Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
     pub const fn refund_percent(&self) -> Option<u8> {
         self.refund_percent
     }
 
-    /// Getter for refund_recipient, a standard bundle prop.
+    /// Returns the refund recipient address for this bundle.
+    ///
+    /// The refund recipient is the address that receives the refund percentage
+    /// of the bundle's profit. If not specified, the builder typically defaults
+    /// to the first transaction's origin address.
+    ///
+    /// This follows the [Flashbots refund semantics].
+    ///
+    /// [Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
     pub const fn refund_recipient(&self) -> Option<Address> {
         self.refund_recipient
     }
 
-    /// Getter for refund_tx_hashes, a standard bundle prop.
+    /// Returns the refund tx hashes for this bundle.
+    ///
+    /// The refund tx hashes specify which transactions in the bundle should be
+    /// used to calculate the refund amount. If empty, all transactions in the
+    /// bundle are used.
+    ///
+    /// This follows the [Flashbots refund semantics].
+    ///
+    /// [Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
     pub const fn refund_tx_hashes(&self) -> &[TxHash] {
         self.refund_tx_hashes.as_slice()
     }
@@ -217,6 +242,60 @@ impl RecoveredBundle {
     /// Getter for extra_fields, a standard bundle prop.
     pub const fn extra_fields(&self) -> &OtherFields {
         &self.extra_fields
+    }
+
+    /// Validates that the refund percentage is within valid bounds (0-100).
+    ///
+    /// Returns `true` if the refund percent is valid or not specified.
+    /// Returns `false` if the refund percent exceeds 100.
+    pub const fn is_valid_refund_percent(&self) -> bool {
+        match self.refund_percent {
+            Some(percent) => percent <= 100,
+            None => true,
+        }
+    }
+
+    /// Validates that all refund tx hashes exist in the bundle's transactions.
+    ///
+    /// Returns `true` if all refund tx hashes are found in the bundle, or if
+    /// no refund tx hashes are specified.
+    pub fn is_valid_refund_tx_hashes(&self) -> bool {
+        if self.refund_tx_hashes.is_empty() {
+            return true;
+        }
+
+        self.refund_tx_hashes.iter().all(|hash| self.txs.iter().any(|tx| tx.tx_hash() == hash))
+    }
+
+    /// Validates all refund-related fields in the bundle.
+    ///
+    /// Checks:
+    /// - Refund percentage is 0-100 (if specified)
+    /// - All refund tx hashes exist in the bundle (if specified)
+    ///
+    /// Returns `true` if all refund fields are valid.
+    pub fn is_valid_refunds(&self) -> bool {
+        self.is_valid_refund_percent() && self.is_valid_refund_tx_hashes()
+    }
+
+    /// Returns the effective refund recipient for this bundle.
+    ///
+    /// If a refund recipient is specified, returns that address. Otherwise,
+    /// returns the signer of the first transaction in the bundle (the default
+    /// Flashbots behavior). Returns `None` if the bundle has no transactions.
+    pub fn effective_refund_recipient(&self) -> Option<Address> {
+        self.refund_recipient.or_else(|| self.txs.first().map(|tx| tx.signer()))
+    }
+
+    /// Returns the effective refund percentage for this bundle.
+    ///
+    /// If a refund percent is specified, returns that value. Otherwise,
+    /// returns the default of 90% (the Flashbots default).
+    pub const fn effective_refund_percent(&self) -> u8 {
+        match self.refund_percent {
+            Some(percent) => percent,
+            None => 90,
+        }
     }
 
     /// Checks if the bundle is valid at a given timestamp.

@@ -201,6 +201,93 @@ impl SignetEthBundle {
         self.bundle.block_number == block_number
     }
 
+    /// Returns the dropping tx hashes for this bundle.
+    ///
+    /// Dropping tx hashes specify transactions that may be dropped from the
+    /// bundle if they fail, without causing the entire bundle to fail.
+    pub const fn dropping_tx_hashes(&self) -> &[B256] {
+        self.bundle.dropping_tx_hashes.as_slice()
+    }
+
+    /// Returns the refund percentage for this bundle.
+    ///
+    /// The refund percent specifies what percentage of the bundle's profit
+    /// should be returned to the [`refund_recipient`]. Valid values are 0-100.
+    /// If not specified, the builder may use a default (typically 90%).
+    ///
+    /// This follows the [Flashbots refund semantics].
+    ///
+    /// [`refund_recipient`]: Self::refund_recipient
+    /// [Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
+    pub const fn refund_percent(&self) -> Option<u8> {
+        self.bundle.refund_percent
+    }
+
+    /// Returns the refund recipient address for this bundle.
+    ///
+    /// The refund recipient is the address that receives the refund percentage
+    /// of the bundle's profit. If not specified, the builder typically defaults
+    /// to the first transaction's origin address.
+    ///
+    /// This follows the [Flashbots refund semantics].
+    ///
+    /// [Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
+    pub const fn refund_recipient(&self) -> Option<Address> {
+        self.bundle.refund_recipient
+    }
+
+    /// Returns the refund tx hashes for this bundle.
+    ///
+    /// The refund tx hashes specify which transactions in the bundle should be
+    /// used to calculate the refund amount. If empty, all transactions in the
+    /// bundle are used.
+    ///
+    /// This follows the [Flashbots refund semantics].
+    ///
+    /// [Flashbots refund semantics]: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint
+    pub const fn refund_tx_hashes(&self) -> &[B256] {
+        self.bundle.refund_tx_hashes.as_slice()
+    }
+
+    /// Validates that the refund percentage is within valid bounds (0-100).
+    ///
+    /// Returns `true` if the refund percent is valid or not specified.
+    /// Returns `false` if the refund percent exceeds 100.
+    pub const fn is_valid_refund_percent(&self) -> bool {
+        match self.bundle.refund_percent {
+            Some(percent) => percent <= 100,
+            None => true,
+        }
+    }
+
+    /// Validates that all refund tx hashes exist in the bundle's transactions.
+    ///
+    /// This requires decoding transactions, which may be expensive. Returns
+    /// `true` if all refund tx hashes are found in the bundle, or if no refund
+    /// tx hashes are specified.
+    pub fn is_valid_refund_tx_hashes(&self) -> bool {
+        let refund_hashes = self.refund_tx_hashes();
+        if refund_hashes.is_empty() {
+            return true;
+        }
+
+        let bundle_hashes: Vec<_> =
+            self.decode_txs().filter_map(|res| res.ok().map(|tx| *tx.hash())).collect();
+
+        refund_hashes.iter().all(|hash| bundle_hashes.contains(hash))
+    }
+
+    /// Validates all refund-related fields in the bundle.
+    ///
+    /// Checks:
+    /// - Refund percentage is 0-100 (if specified)
+    /// - All refund tx hashes exist in the bundle (if specified)
+    ///
+    /// Returns `true` if all refund fields are valid.
+    pub fn is_valid_refunds(&self) -> bool {
+        self.is_valid_refund_percent() && self.is_valid_refund_tx_hashes()
+    }
+
     /// Decode and validate the transactions in the bundle.
     pub fn decode_and_validate_txs<Db: Database>(
         &self,
@@ -284,6 +371,127 @@ mod test {
         assert!(deserialized.host_txs.is_empty());
     }
 
+    #[test]
+    fn test_refund_percent_validation() {
+        // Valid: no refund percent specified
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
+                txs: vec![b"tx1".into()],
+                block_number: 1,
+                refund_percent: None,
+                ..Default::default()
+            },
+            vec![],
+        );
+        assert!(bundle.is_valid_refund_percent());
+
+        // Valid: 0%
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
+                txs: vec![b"tx1".into()],
+                block_number: 1,
+                refund_percent: Some(0),
+                ..Default::default()
+            },
+            vec![],
+        );
+        assert!(bundle.is_valid_refund_percent());
+
+        // Valid: 100%
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
+                txs: vec![b"tx1".into()],
+                block_number: 1,
+                refund_percent: Some(100),
+                ..Default::default()
+            },
+            vec![],
+        );
+        assert!(bundle.is_valid_refund_percent());
+
+        // Valid: typical 90%
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
+                txs: vec![b"tx1".into()],
+                block_number: 1,
+                refund_percent: Some(90),
+                ..Default::default()
+            },
+            vec![],
+        );
+        assert!(bundle.is_valid_refund_percent());
+    }
+
+    #[test]
+    fn test_refund_fields_accessors() {
+        let recipient = Address::repeat_byte(0x42);
+        let refund_hash = B256::repeat_byte(0xab);
+
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
+                txs: vec![b"tx1".into()],
+                block_number: 1,
+                refund_percent: Some(85),
+                refund_recipient: Some(recipient),
+                refund_tx_hashes: vec![refund_hash],
+                ..Default::default()
+            },
+            vec![],
+        );
+
+        assert_eq!(bundle.refund_percent(), Some(85));
+        assert_eq!(bundle.refund_recipient(), Some(recipient));
+        assert_eq!(bundle.refund_tx_hashes(), &[refund_hash]);
+    }
+
+    #[test]
+    fn test_refund_fields_serialization() {
+        let recipient = Address::repeat_byte(0x22);
+        let refund_hash = B256::repeat_byte(0x33);
+
+        let bundle = SignetEthBundle::new(
+            EthSendBundle {
+                txs: vec![b"tx1".into()],
+                block_number: 12345678,
+                refund_percent: Some(90),
+                refund_recipient: Some(recipient),
+                refund_tx_hashes: vec![refund_hash],
+                ..Default::default()
+            },
+            vec![],
+        );
+
+        let serialized = serde_json::to_string(&bundle).unwrap();
+
+        // Verify refund fields are present in serialized output
+        assert!(serialized.contains("refundPercent"));
+        assert!(serialized.contains("refundRecipient"));
+        assert!(serialized.contains("refundTxHashes"));
+
+        // Verify roundtrip
+        let deserialized: SignetEthBundle = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.refund_percent(), Some(90));
+        assert_eq!(deserialized.refund_recipient(), Some(recipient));
+        assert_eq!(deserialized.refund_tx_hashes(), &[refund_hash]);
+    }
+
+    #[test]
+    fn test_deser_bundle_with_refund_fields() {
+        let json = r#"{
+            "txs": ["0x747831"],
+            "blockNumber": "0xbc614e",
+            "refundPercent": 90,
+            "refundRecipient": "0x2222222222222222222222222222222222222222",
+            "refundTxHashes": ["0x3333333333333333333333333333333333333333333333333333333333333333"]
+        }"#;
+
+        let deserialized: SignetEthBundle = serde_json::from_str(json).unwrap();
+
+        assert_eq!(deserialized.refund_percent(), Some(90));
+        assert_eq!(deserialized.refund_recipient(), Some(Address::repeat_byte(0x22)));
+        assert_eq!(deserialized.refund_tx_hashes(), &[B256::repeat_byte(0x33)]);
+    }
+
     /// Generate test vectors for TypeScript SDK.
     ///
     /// Run with: `cargo t -p signet-bundle -- --ignored --nocapture`
@@ -365,6 +573,46 @@ mod test {
                         txs: vec![b"\x02\xf8replacement_tx".into()],
                         block_number: 12345678,
                         replacement_uuid: Some("550e8400-e29b-41d4-a716-446655440000".to_owned()),
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+            // Refund-specific test vectors
+            (
+                "refund_basic",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8arb_tx".into()],
+                        block_number: 12345678,
+                        refund_percent: Some(90),
+                        refund_recipient: Some(Address::repeat_byte(0x42)),
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+            (
+                "refund_with_tx_hashes",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8tx_1".into(), b"\x02\xf8tx_2".into()],
+                        block_number: 12345678,
+                        refund_percent: Some(50),
+                        refund_recipient: Some(Address::repeat_byte(0xaa)),
+                        refund_tx_hashes: vec![B256::repeat_byte(0xbb)],
+                        ..Default::default()
+                    },
+                    vec![],
+                ),
+            ),
+            (
+                "refund_zero_percent",
+                SignetEthBundle::new(
+                    EthSendBundle {
+                        txs: vec![b"\x02\xf8tx".into()],
+                        block_number: 12345678,
+                        refund_percent: Some(0),
                         ..Default::default()
                     },
                     vec![],
