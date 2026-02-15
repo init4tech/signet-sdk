@@ -12,6 +12,10 @@
 
 //! Signet EVM
 
+mod account;
+pub use account::Account;
+mod hardfork;
+pub use hardfork::{genesis_header, EthereumHardfork};
 #[macro_use]
 mod macros;
 
