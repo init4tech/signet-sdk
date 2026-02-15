@@ -21,6 +21,14 @@ pub use signet_constants::PairedHeights;
 
 mod agg;
 pub use agg::{AggregateFills, AggregateOrders, MarketError};
+mod confirmation;
+pub use confirmation::ConfirmationMeta;
+mod confirmed;
+pub use confirmed::Confirmed;
+mod receipt;
+pub use receipt::Receipt;
+mod tx_location;
+pub use tx_location::TxLocation;
 
 mod magic_sig;
 pub use magic_sig::{MagicSig, MagicSigInfo};
