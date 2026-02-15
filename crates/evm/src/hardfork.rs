@@ -3,7 +3,7 @@
 use alloy::{
     consensus::{constants::EMPTY_WITHDRAWALS, proofs::state_root_ref_unhashed, Header},
     eips::{eip1559::INITIAL_BASE_FEE, eip7685::EMPTY_REQUESTS_HASH},
-    genesis::Genesis,
+    genesis::{ChainConfig, Genesis},
     primitives::B256,
 };
 use bitflags::bitflags;
@@ -117,6 +117,137 @@ impl EthereumHardfork {
             SpecId::FRONTIER
         }
     }
+
+    /// Returns the single [`EthereumHardfork`] bit corresponding to a
+    /// [`SpecId`]. Does not include predecessor forks.
+    ///
+    /// `FRONTIER_THAWING` maps to [`EthereumHardfork::Frontier`] as there is
+    /// no distinct bit for it.
+    ///
+    /// This exhaustive match also serves as a compilation canary: when revm
+    /// adds a new [`SpecId`] variant, this function will fail to compile,
+    /// signaling that [`EthereumHardfork`] and [`spec_id`] need updating.
+    ///
+    /// [`SpecId`]: trevm::revm::primitives::hardfork::SpecId
+    /// [`spec_id`]: EthereumHardfork::spec_id
+    pub const fn bit_for_spec_id(spec: trevm::revm::primitives::hardfork::SpecId) -> Self {
+        use trevm::revm::primitives::hardfork::SpecId;
+        match spec {
+            SpecId::FRONTIER | SpecId::FRONTIER_THAWING => Self::Frontier,
+            SpecId::HOMESTEAD => Self::Homestead,
+            SpecId::DAO_FORK => Self::Dao,
+            SpecId::TANGERINE => Self::Tangerine,
+            SpecId::SPURIOUS_DRAGON => Self::SpuriousDragon,
+            SpecId::BYZANTIUM => Self::Byzantium,
+            SpecId::CONSTANTINOPLE => Self::Constantinople,
+            SpecId::PETERSBURG => Self::Petersburg,
+            SpecId::ISTANBUL => Self::Istanbul,
+            SpecId::MUIR_GLACIER => Self::MuirGlacier,
+            SpecId::BERLIN => Self::Berlin,
+            SpecId::LONDON => Self::London,
+            SpecId::ARROW_GLACIER => Self::ArrowGlacier,
+            SpecId::GRAY_GLACIER => Self::GrayGlacier,
+            SpecId::MERGE => Self::Paris,
+            SpecId::SHANGHAI => Self::Shanghai,
+            SpecId::CANCUN => Self::Cancun,
+            SpecId::PRAGUE => Self::Prague,
+            SpecId::OSAKA => Self::Osaka,
+            SpecId::AMSTERDAM => Self::Amsterdam,
+        }
+    }
+
+    /// Returns all active hardforks at the given block number and timestamp,
+    /// as determined by the given [`ChainConfig`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use signet_evm::EthereumHardfork;
+    /// use alloy::genesis::ChainConfig;
+    ///
+    /// let config = ChainConfig {
+    ///     homestead_block: Some(0),
+    ///     london_block: Some(100),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let forks = EthereumHardfork::active_hardforks(&config, 50, 0);
+    /// assert!(forks.contains(EthereumHardfork::Homestead));
+    /// assert!(!forks.contains(EthereumHardfork::London));
+    /// ```
+    pub fn active_hardforks(config: &ChainConfig, block: u64, timestamp: u64) -> Self {
+        Self::Frontier
+            | fork_active(config.homestead_block, block, Self::Homestead)
+            | fork_active(
+                config.dao_fork_block.filter(|_| config.dao_fork_support),
+                block,
+                Self::Dao,
+            )
+            | fork_active(config.eip150_block, block, Self::Tangerine)
+            | fork_active(config.eip158_block, block, Self::SpuriousDragon)
+            | fork_active(config.byzantium_block, block, Self::Byzantium)
+            | fork_active(config.constantinople_block, block, Self::Constantinople)
+            | fork_active(config.petersburg_block, block, Self::Petersburg)
+            | fork_active(config.istanbul_block, block, Self::Istanbul)
+            | fork_active(config.muir_glacier_block, block, Self::MuirGlacier)
+            | fork_active(config.berlin_block, block, Self::Berlin)
+            | fork_active(config.london_block, block, Self::London)
+            | fork_active(config.arrow_glacier_block, block, Self::ArrowGlacier)
+            | fork_active(config.gray_glacier_block, block, Self::GrayGlacier)
+            | if config.terminal_total_difficulty_passed { Self::Paris } else { Self::empty() }
+            | fork_active(config.shanghai_time, timestamp, Self::Shanghai)
+            | fork_active(config.cancun_time, timestamp, Self::Cancun)
+            | fork_active(config.prague_time, timestamp, Self::Prague)
+            | fork_active(config.osaka_time, timestamp, Self::Osaka)
+            | fork_active(config.bpo1_time, timestamp, Self::Bpo1)
+            | fork_active(config.bpo2_time, timestamp, Self::Bpo2)
+            | fork_active(config.bpo3_time, timestamp, Self::Bpo3)
+            | fork_active(config.bpo4_time, timestamp, Self::Bpo4)
+            | fork_active(config.bpo5_time, timestamp, Self::Bpo5)
+    }
+
+    /// Returns all active hardforks at the given [`Header`]'s block number
+    /// and timestamp, as determined by the given [`ChainConfig`].
+    pub fn active_hardforks_at_header(config: &ChainConfig, header: &Header) -> Self {
+        Self::active_hardforks(config, header.number, header.timestamp)
+    }
+
+    /// Returns the single latest active hardfork at the given block number
+    /// and timestamp, as determined by the given [`ChainConfig`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use signet_evm::EthereumHardfork;
+    /// use alloy::genesis::ChainConfig;
+    ///
+    /// let config = ChainConfig {
+    ///     homestead_block: Some(0),
+    ///     london_block: Some(0),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let latest = EthereumHardfork::latest_hardfork(&config, 100, 0);
+    /// assert_eq!(latest, EthereumHardfork::London);
+    /// ```
+    pub fn latest_hardfork(config: &ChainConfig, block: u64, timestamp: u64) -> Self {
+        let active = Self::active_hardforks(config, block, timestamp);
+        // Frontier is always active, so bits() is always >= 1.
+        Self::from_bits_retain(1 << active.bits().ilog2())
+    }
+}
+
+/// Returns the given `fork` if the activation point has been reached,
+/// or an empty set otherwise.
+const fn fork_active(
+    activation: Option<u64>,
+    current: u64,
+    fork: EthereumHardfork,
+) -> EthereumHardfork {
+    match activation {
+        Some(a) if current >= a => fork,
+        _ => EthereumHardfork::empty(),
+    }
 }
 
 /// Helper method building a [`Header`] given [`Genesis`] and [`EthereumHardfork`].
@@ -165,5 +296,214 @@ pub fn genesis_header(genesis: &Genesis, hardforks: &EthereumHardfork) -> Header
         excess_blob_gas,
         requests_hash,
         ..Default::default()
+    }
+}
+
+/// Compilation canary: exhaustive destructure of [`ChainConfig`]. When alloy
+/// adds a new field, this will fail to compile, signaling that
+/// [`EthereumHardfork::active_hardforks`] needs updating.
+#[allow(dead_code, unused_variables)]
+const fn chain_config_canary(config: &ChainConfig) {
+    let ChainConfig {
+        chain_id,
+        homestead_block,
+        dao_fork_block,
+        dao_fork_support,
+        eip150_block,
+        eip155_block,
+        eip158_block,
+        byzantium_block,
+        constantinople_block,
+        petersburg_block,
+        istanbul_block,
+        muir_glacier_block,
+        berlin_block,
+        london_block,
+        arrow_glacier_block,
+        gray_glacier_block,
+        merge_netsplit_block,
+        shanghai_time,
+        cancun_time,
+        prague_time,
+        osaka_time,
+        bpo1_time,
+        bpo2_time,
+        bpo3_time,
+        bpo4_time,
+        bpo5_time,
+        terminal_total_difficulty,
+        terminal_total_difficulty_passed,
+        ethash,
+        clique,
+        parlia,
+        extra_fields,
+        deposit_contract_address,
+        blob_schedule,
+    } = config;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy::consensus::Header;
+    use trevm::revm::primitives::hardfork::SpecId;
+
+    #[test]
+    fn spec_id_roundtrips_through_bit() {
+        // FRONTIER_THAWING is excluded: it maps to the Frontier bit, which
+        // round-trips back to SpecId::FRONTIER.
+        let all_specs = [
+            SpecId::FRONTIER,
+            SpecId::HOMESTEAD,
+            SpecId::DAO_FORK,
+            SpecId::TANGERINE,
+            SpecId::SPURIOUS_DRAGON,
+            SpecId::BYZANTIUM,
+            SpecId::CONSTANTINOPLE,
+            SpecId::PETERSBURG,
+            SpecId::ISTANBUL,
+            SpecId::MUIR_GLACIER,
+            SpecId::BERLIN,
+            SpecId::LONDON,
+            SpecId::ARROW_GLACIER,
+            SpecId::GRAY_GLACIER,
+            SpecId::MERGE,
+            SpecId::SHANGHAI,
+            SpecId::CANCUN,
+            SpecId::PRAGUE,
+            SpecId::OSAKA,
+            SpecId::AMSTERDAM,
+        ];
+        for spec in all_specs {
+            let bit = EthereumHardfork::bit_for_spec_id(spec);
+            assert_eq!(bit.spec_id(), spec, "roundtrip failed for {spec:?}");
+        }
+    }
+
+    #[test]
+    fn frontier_always_active() {
+        let config = ChainConfig::default();
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 0);
+        assert_eq!(forks, EthereumHardfork::Frontier);
+    }
+
+    #[test]
+    fn block_forks_activate_at_threshold() {
+        let config = ChainConfig {
+            homestead_block: Some(10),
+            byzantium_block: Some(20),
+            ..Default::default()
+        };
+
+        let forks = EthereumHardfork::active_hardforks(&config, 9, 0);
+        assert!(!forks.contains(EthereumHardfork::Homestead));
+
+        let forks = EthereumHardfork::active_hardforks(&config, 10, 0);
+        assert!(forks.contains(EthereumHardfork::Homestead));
+        assert!(!forks.contains(EthereumHardfork::Byzantium));
+
+        let forks = EthereumHardfork::active_hardforks(&config, 20, 0);
+        assert!(forks.contains(EthereumHardfork::Homestead));
+        assert!(forks.contains(EthereumHardfork::Byzantium));
+    }
+
+    #[test]
+    fn timestamp_forks_activate_at_threshold() {
+        let config = ChainConfig {
+            shanghai_time: Some(1000),
+            cancun_time: Some(2000),
+            ..Default::default()
+        };
+
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 999);
+        assert!(!forks.contains(EthereumHardfork::Shanghai));
+
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 1000);
+        assert!(forks.contains(EthereumHardfork::Shanghai));
+        assert!(!forks.contains(EthereumHardfork::Cancun));
+
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 2000);
+        assert!(forks.contains(EthereumHardfork::Shanghai));
+        assert!(forks.contains(EthereumHardfork::Cancun));
+    }
+
+    #[test]
+    fn dao_requires_support_flag() {
+        let config =
+            ChainConfig { dao_fork_block: Some(10), dao_fork_support: false, ..Default::default() };
+        let forks = EthereumHardfork::active_hardforks(&config, 10, 0);
+        assert!(!forks.contains(EthereumHardfork::Dao));
+
+        let config =
+            ChainConfig { dao_fork_block: Some(10), dao_fork_support: true, ..Default::default() };
+        let forks = EthereumHardfork::active_hardforks(&config, 10, 0);
+        assert!(forks.contains(EthereumHardfork::Dao));
+    }
+
+    #[test]
+    fn paris_uses_ttd_passed() {
+        let config = ChainConfig { terminal_total_difficulty_passed: true, ..Default::default() };
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 0);
+        assert!(forks.contains(EthereumHardfork::Paris));
+
+        let config = ChainConfig::default();
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 0);
+        assert!(!forks.contains(EthereumHardfork::Paris));
+    }
+
+    #[test]
+    fn latest_returns_highest_active() {
+        let config = ChainConfig {
+            homestead_block: Some(0),
+            eip150_block: Some(0),
+            eip158_block: Some(0),
+            byzantium_block: Some(0),
+            constantinople_block: Some(0),
+            petersburg_block: Some(0),
+            istanbul_block: Some(0),
+            berlin_block: Some(0),
+            london_block: Some(0),
+            terminal_total_difficulty_passed: true,
+            shanghai_time: Some(0),
+            cancun_time: Some(0),
+            ..Default::default()
+        };
+
+        let latest = EthereumHardfork::latest_hardfork(&config, 100, 100);
+        assert_eq!(latest, EthereumHardfork::Cancun);
+    }
+
+    #[test]
+    fn latest_frontier_when_no_forks() {
+        let config = ChainConfig::default();
+        let latest = EthereumHardfork::latest_hardfork(&config, 0, 0);
+        assert_eq!(latest, EthereumHardfork::Frontier);
+    }
+
+    #[test]
+    fn active_hardforks_at_header_delegates() {
+        let config = ChainConfig {
+            homestead_block: Some(10),
+            shanghai_time: Some(1000),
+            ..Default::default()
+        };
+        let header = Header { number: 10, timestamp: 1000, ..Default::default() };
+        let forks = EthereumHardfork::active_hardforks_at_header(&config, &header);
+        assert!(forks.contains(EthereumHardfork::Homestead));
+        assert!(forks.contains(EthereumHardfork::Shanghai));
+    }
+
+    #[test]
+    fn bpo_forks_activate() {
+        let config =
+            ChainConfig { bpo1_time: Some(100), bpo3_time: Some(300), ..Default::default() };
+
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 200);
+        assert!(forks.contains(EthereumHardfork::Bpo1));
+        assert!(!forks.contains(EthereumHardfork::Bpo3));
+
+        let forks = EthereumHardfork::active_hardforks(&config, 0, 300);
+        assert!(forks.contains(EthereumHardfork::Bpo1));
+        assert!(forks.contains(EthereumHardfork::Bpo3));
     }
 }
