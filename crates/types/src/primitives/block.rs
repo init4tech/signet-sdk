@@ -9,6 +9,33 @@ use alloy::{
 };
 use std::sync::OnceLock;
 
+/// Delegates all required [`BlockHeader`] methods to an inner field.
+macro_rules! delegate_block_header {
+    ($($accessor:ident).+) => {
+        fn parent_hash(&self) -> B256 { self.$($accessor).+.parent_hash() }
+        fn ommers_hash(&self) -> B256 { self.$($accessor).+.ommers_hash() }
+        fn beneficiary(&self) -> Address { self.$($accessor).+.beneficiary() }
+        fn state_root(&self) -> B256 { self.$($accessor).+.state_root() }
+        fn transactions_root(&self) -> B256 { self.$($accessor).+.transactions_root() }
+        fn receipts_root(&self) -> B256 { self.$($accessor).+.receipts_root() }
+        fn withdrawals_root(&self) -> Option<B256> { self.$($accessor).+.withdrawals_root() }
+        fn logs_bloom(&self) -> Bloom { self.$($accessor).+.logs_bloom() }
+        fn difficulty(&self) -> U256 { self.$($accessor).+.difficulty() }
+        fn number(&self) -> BlockNumber { self.$($accessor).+.number() }
+        fn gas_limit(&self) -> u64 { self.$($accessor).+.gas_limit() }
+        fn gas_used(&self) -> u64 { self.$($accessor).+.gas_used() }
+        fn timestamp(&self) -> u64 { self.$($accessor).+.timestamp() }
+        fn mix_hash(&self) -> Option<B256> { self.$($accessor).+.mix_hash() }
+        fn nonce(&self) -> Option<B64> { self.$($accessor).+.nonce() }
+        fn base_fee_per_gas(&self) -> Option<u64> { self.$($accessor).+.base_fee_per_gas() }
+        fn blob_gas_used(&self) -> Option<u64> { self.$($accessor).+.blob_gas_used() }
+        fn excess_blob_gas(&self) -> Option<u64> { self.$($accessor).+.excess_blob_gas() }
+        fn parent_beacon_block_root(&self) -> Option<B256> { self.$($accessor).+.parent_beacon_block_root() }
+        fn requests_hash(&self) -> Option<B256> { self.$($accessor).+.requests_hash() }
+        fn extra_data(&self) -> &Bytes { self.$($accessor).+.extra_data() }
+    };
+}
+
 /// A type alias for the block body used in Ethereum blocks.
 pub type BlockBody<T = TransactionSigned, H = Header> = AlloyBlockBody<T, H>;
 
@@ -47,89 +74,7 @@ impl SealedHeader {
 }
 
 impl<H: BlockHeader> BlockHeader for SealedHeader<H> {
-    fn parent_hash(&self) -> B256 {
-        self.header.parent_hash()
-    }
-
-    fn ommers_hash(&self) -> B256 {
-        self.header.ommers_hash()
-    }
-
-    fn beneficiary(&self) -> Address {
-        self.header.beneficiary()
-    }
-
-    fn state_root(&self) -> B256 {
-        self.header.state_root()
-    }
-
-    fn transactions_root(&self) -> B256 {
-        self.header.transactions_root()
-    }
-
-    fn receipts_root(&self) -> B256 {
-        self.header.receipts_root()
-    }
-
-    fn withdrawals_root(&self) -> Option<B256> {
-        self.header.withdrawals_root()
-    }
-
-    fn logs_bloom(&self) -> Bloom {
-        self.header.logs_bloom()
-    }
-
-    fn difficulty(&self) -> U256 {
-        self.header.difficulty()
-    }
-
-    fn number(&self) -> BlockNumber {
-        self.header.number()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.header.gas_limit()
-    }
-
-    fn gas_used(&self) -> u64 {
-        self.header.gas_used()
-    }
-
-    fn timestamp(&self) -> u64 {
-        self.header.timestamp()
-    }
-
-    fn mix_hash(&self) -> Option<B256> {
-        self.header.mix_hash()
-    }
-
-    fn nonce(&self) -> Option<B64> {
-        self.header.nonce()
-    }
-
-    fn base_fee_per_gas(&self) -> Option<u64> {
-        self.header.base_fee_per_gas()
-    }
-
-    fn blob_gas_used(&self) -> Option<u64> {
-        self.header.blob_gas_used()
-    }
-
-    fn excess_blob_gas(&self) -> Option<u64> {
-        self.header.excess_blob_gas()
-    }
-
-    fn parent_beacon_block_root(&self) -> Option<B256> {
-        self.header.parent_beacon_block_root()
-    }
-
-    fn requests_hash(&self) -> Option<B256> {
-        self.header.requests_hash()
-    }
-
-    fn extra_data(&self) -> &Bytes {
-        self.header.extra_data()
-    }
+    delegate_block_header!(header);
 }
 
 /// Ethereum sealed block type.
@@ -169,89 +114,7 @@ impl<T, H> SealedBlock<T, H> {
 }
 
 impl<T, H: BlockHeader> BlockHeader for SealedBlock<T, H> {
-    fn parent_hash(&self) -> B256 {
-        self.header.parent_hash()
-    }
-
-    fn ommers_hash(&self) -> B256 {
-        self.header.ommers_hash()
-    }
-
-    fn beneficiary(&self) -> Address {
-        self.header.beneficiary()
-    }
-
-    fn state_root(&self) -> B256 {
-        self.header.state_root()
-    }
-
-    fn transactions_root(&self) -> B256 {
-        self.header.transactions_root()
-    }
-
-    fn receipts_root(&self) -> B256 {
-        self.header.receipts_root()
-    }
-
-    fn withdrawals_root(&self) -> Option<B256> {
-        self.header.withdrawals_root()
-    }
-
-    fn logs_bloom(&self) -> Bloom {
-        self.header.logs_bloom()
-    }
-
-    fn difficulty(&self) -> U256 {
-        self.header.difficulty()
-    }
-
-    fn number(&self) -> BlockNumber {
-        self.header.number()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.header.gas_limit()
-    }
-
-    fn gas_used(&self) -> u64 {
-        self.header.gas_used()
-    }
-
-    fn timestamp(&self) -> u64 {
-        self.header.timestamp()
-    }
-
-    fn mix_hash(&self) -> Option<B256> {
-        self.header.mix_hash()
-    }
-
-    fn nonce(&self) -> Option<B64> {
-        self.header.nonce()
-    }
-
-    fn base_fee_per_gas(&self) -> Option<u64> {
-        self.header.base_fee_per_gas()
-    }
-
-    fn blob_gas_used(&self) -> Option<u64> {
-        self.header.blob_gas_used()
-    }
-
-    fn excess_blob_gas(&self) -> Option<u64> {
-        self.header.excess_blob_gas()
-    }
-
-    fn parent_beacon_block_root(&self) -> Option<B256> {
-        self.header.parent_beacon_block_root()
-    }
-
-    fn requests_hash(&self) -> Option<B256> {
-        self.header.requests_hash()
-    }
-
-    fn extra_data(&self) -> &Bytes {
-        self.header.extra_data()
-    }
+    delegate_block_header!(header);
 }
 
 /// A [`SealedBlock`] with the senders of the transactions.
@@ -291,89 +154,7 @@ impl<T, H> RecoveredBlock<T, H> {
 }
 
 impl<T, H: BlockHeader> BlockHeader for RecoveredBlock<T, H> {
-    fn parent_hash(&self) -> B256 {
-        self.block.parent_hash()
-    }
-
-    fn ommers_hash(&self) -> B256 {
-        self.block.ommers_hash()
-    }
-
-    fn beneficiary(&self) -> Address {
-        self.block.beneficiary()
-    }
-
-    fn state_root(&self) -> B256 {
-        self.block.state_root()
-    }
-
-    fn transactions_root(&self) -> B256 {
-        self.block.transactions_root()
-    }
-
-    fn receipts_root(&self) -> B256 {
-        self.block.receipts_root()
-    }
-
-    fn withdrawals_root(&self) -> Option<B256> {
-        self.block.withdrawals_root()
-    }
-
-    fn logs_bloom(&self) -> Bloom {
-        self.block.logs_bloom()
-    }
-
-    fn difficulty(&self) -> U256 {
-        self.block.difficulty()
-    }
-
-    fn number(&self) -> BlockNumber {
-        self.block.number()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.block.gas_limit()
-    }
-
-    fn gas_used(&self) -> u64 {
-        self.block.gas_used()
-    }
-
-    fn timestamp(&self) -> u64 {
-        self.block.timestamp()
-    }
-
-    fn mix_hash(&self) -> Option<B256> {
-        self.block.mix_hash()
-    }
-
-    fn nonce(&self) -> Option<B64> {
-        self.block.nonce()
-    }
-
-    fn base_fee_per_gas(&self) -> Option<u64> {
-        self.block.base_fee_per_gas()
-    }
-
-    fn blob_gas_used(&self) -> Option<u64> {
-        self.block.blob_gas_used()
-    }
-
-    fn excess_blob_gas(&self) -> Option<u64> {
-        self.block.excess_blob_gas()
-    }
-
-    fn parent_beacon_block_root(&self) -> Option<B256> {
-        self.block.parent_beacon_block_root()
-    }
-
-    fn requests_hash(&self) -> Option<B256> {
-        self.block.requests_hash()
-    }
-
-    fn extra_data(&self) -> &Bytes {
-        self.block.extra_data()
-    }
+    delegate_block_header!(block);
 }
 
 /// Typed Transaction type without a signature
