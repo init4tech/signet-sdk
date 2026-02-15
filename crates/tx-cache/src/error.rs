@@ -14,6 +14,9 @@ pub enum TxCacheError {
     /// The request was made during a slot that is not assigned to this builder.
     #[error("Request occurred during a slot that is not assigned to this builder")]
     NotOurSlot,
+    /// A conflict occurred when updating a resource (e.g., version mismatch).
+    #[error("Conflict occurred when updating resource")]
+    Conflict,
 
     /// An error occurred while parsing the URL.
     #[error(transparent)]
@@ -29,6 +32,7 @@ impl From<reqwest::Error> for TxCacheError {
         match err.status() {
             Some(reqwest::StatusCode::NOT_FOUND) => TxCacheError::NotFound,
             Some(reqwest::StatusCode::FORBIDDEN) => TxCacheError::NotOurSlot,
+            Some(reqwest::StatusCode::CONFLICT) => TxCacheError::Conflict,
             _ => TxCacheError::Reqwest(err),
         }
     }

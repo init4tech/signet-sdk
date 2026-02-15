@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::types::{
     CacheObject, CacheResponse, OrderKey, TxCacheOrdersResponse, TxCacheSendBundleResponse,
-    TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
+    TxCacheSendOrderResponse, TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
 use serde::{de::DeserializeOwned, Serialize};
@@ -133,6 +133,28 @@ impl TxCache {
             .map_err(Into::into)
     }
 
+    async fn put_inner<T: Serialize + Send, R: DeserializeOwned>(
+        &self,
+        path: &str,
+        obj: T,
+    ) -> Result<R> {
+        let url = self
+            .url
+            .join(path)
+            .inspect_err(|e| warn!(%e, "Failed to join URL. Not updating resource."))?;
+
+        self.client
+            .put(url)
+            .json(&obj)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<R>()
+            .await
+            .inspect_err(|e| warn!(%e, "Failed to parse response from transaction cache"))
+            .map_err(Into::into)
+    }
+
     /// Forward a raw transaction to the transaction cache.
     ///
     /// This method submits a signed transaction envelope to the cache for
@@ -261,5 +283,106 @@ impl TxCache {
         query: Option<OrderKey>,
     ) -> Result<CacheResponse<TxCacheOrdersResponse>> {
         self.get_inner(ORDERS, query).await
+    }
+
+    /// Update an existing bundle in the transaction cache.
+    ///
+    /// This method sends a PUT request to update a bundle that already exists
+    /// in the cache. The bundle is identified by its UUID and the entire bundle
+    /// content is replaced with the provided data.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle_id` - The UUID of the bundle to update.
+    /// * `bundle` - The updated [`SignetEthBundle`] to store.
+    ///
+    /// # Returns
+    ///
+    /// A [`TxCacheSendBundleResponse`] containing the bundle's UUID on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TxCacheError::NotFound`] if the bundle does not exist.
+    /// Returns [`TxCacheError::Conflict`] if there is a version conflict.
+    /// Returns an error if the request fails or the response cannot be parsed.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use signet_tx_cache::TxCache;
+    /// use signet_bundle::SignetEthBundle;
+    ///
+    /// async fn example() -> Result<(), signet_tx_cache::TxCacheError> {
+    ///     let cache = TxCache::parmigiana();
+    ///     let bundle_id = "550e8400-e29b-41d4-a716-446655440000";
+    ///     // Create bundle from your transaction data
+    ///     let bundle: SignetEthBundle = todo!();
+    ///
+    ///     let response = cache.update_bundle(bundle_id, bundle).await?;
+    ///     println!("Updated bundle: {}", response.id);
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`TxCacheError::NotFound`]: crate::error::TxCacheError::NotFound
+    /// [`TxCacheError::Conflict`]: crate::error::TxCacheError::Conflict
+    #[instrument(skip_all)]
+    pub async fn update_bundle(
+        &self,
+        bundle_id: &str,
+        bundle: SignetEthBundle,
+    ) -> Result<TxCacheSendBundleResponse> {
+        let path = format!("{BUNDLES}/{bundle_id}");
+        self.put_inner(&path, bundle).await
+    }
+
+    /// Update an existing order in the transaction cache.
+    ///
+    /// This method sends a PUT request to update an order that already exists
+    /// in the cache. The order is identified by its ID and the entire order
+    /// content is replaced with the provided data.
+    ///
+    /// # Arguments
+    ///
+    /// * `order_id` - The ID of the order to update (hex-encoded B256).
+    /// * `order` - The updated [`SignedOrder`] to store.
+    ///
+    /// # Returns
+    ///
+    /// A [`TxCacheSendOrderResponse`] containing the order's ID on success.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TxCacheError::NotFound`] if the order does not exist.
+    /// Returns [`TxCacheError::Conflict`] if there is a version conflict.
+    /// Returns an error if the request fails or the response cannot be parsed.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # async fn example() -> Result<(), signet_tx_cache::TxCacheError> {
+    /// use signet_tx_cache::TxCache;
+    /// use signet_types::SignedOrder;
+    ///
+    /// let cache = TxCache::parmigiana();
+    /// let order_id = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    /// # let order: SignedOrder = todo!();
+    ///
+    /// let response = cache.update_order(order_id, order).await?;
+    /// println!("Updated order: {:?}", response.id);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`TxCacheError::NotFound`]: crate::error::TxCacheError::NotFound
+    /// [`TxCacheError::Conflict`]: crate::error::TxCacheError::Conflict
+    #[instrument(skip_all)]
+    pub async fn update_order(
+        &self,
+        order_id: &str,
+        order: SignedOrder,
+    ) -> Result<TxCacheSendOrderResponse> {
+        let path = format!("{ORDERS}/{order_id}");
+        self.put_inner(&path, order).await
     }
 }
