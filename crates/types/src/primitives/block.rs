@@ -1,11 +1,15 @@
-//! Many of these types are re-produced from the `reth-primitives` crate family.
+//! Signet block primitives.
+//!
+//! These types wrap alloy consensus types to provide a simplified block
+//! representation for the signet rollup. Unlike Ethereum blocks, signet
+//! blocks have no ommers or withdrawals.
 
 use alloy::{
     consensus::{
-        Block as AlloyBlock, BlockBody as AlloyBlockBody, BlockHeader, EthereumTxEnvelope,
+        transaction::Recovered, Block as AlloyBlock, BlockHeader, EthereumTxEnvelope,
         EthereumTypedTransaction, Header, TxEip4844,
     },
-    primitives::{Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256},
+    primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256},
 };
 
 /// Delegates all required [`BlockHeader`] methods to an inner field.
@@ -35,120 +39,97 @@ macro_rules! delegate_block_header {
     };
 }
 
-/// A type alias for the block body used in Ethereum blocks.
-pub type BlockBody<T = TransactionSigned, H = Header> = AlloyBlockBody<T, H>;
-
 /// A sealed header with a cached block hash.
 ///
-/// This is a type alias for [`Sealed<H>`], which eagerly computes and
+/// This is a type alias for [`Sealed<Header>`], which eagerly computes and
 /// stores the header hash on construction.
-pub type SealedHeader<H = Header> = Sealed<H>;
+pub type SealedHeader = Sealed<Header>;
 
 /// Ethereum sealed block type.
+///
+/// Parameterized on the transaction type `T`:
+/// - `SealedBlock<TransactionSigned>` — a block with signed transactions
+/// - `SealedBlock<Recovered<TransactionSigned>>` — a block with sender-recovered
+///   transactions (see [`RecoveredBlock`])
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SealedBlock<T = TransactionSigned, H = Header> {
+pub struct SealedBlock<T = TransactionSigned> {
     /// The sealed header of the block.
-    pub header: SealedHeader<H>,
+    pub header: SealedHeader,
     /// The transactions in the block.
-    pub body: AlloyBlockBody<T, H>,
+    pub transactions: Vec<T>,
 }
 
-impl<T: Default, H: Sealable + Default> Default for SealedBlock<T, H> {
-    fn default() -> Self {
-        Self { header: Sealed::new(H::default()), body: AlloyBlockBody::default() }
-    }
-}
-
-impl<T, H> SealedBlock<T, H> {
-    /// Create a new sealed block without checking the header hash.
-    pub const fn new_unchecked(header: SealedHeader<H>, body: AlloyBlockBody<T, H>) -> Self {
-        Self { header, body }
+impl<T> SealedBlock<T> {
+    /// Create a new sealed block.
+    pub const fn new(header: SealedHeader, transactions: Vec<T>) -> Self {
+        Self { header, transactions }
     }
 
     /// Create a new empty sealed block for testing.
     #[doc(hidden)]
-    pub fn blank_for_testing() -> Self
-    where
-        H: Sealable + Default,
-    {
-        Self { header: Sealed::new(H::default()), body: AlloyBlockBody::default() }
+    pub fn blank_for_testing() -> Self {
+        Self { header: Sealed::new(Header::default()), transactions: Vec::new() }
     }
 
     /// Create a new empty sealed block with the given header for testing.
     #[doc(hidden)]
-    pub fn blank_with_header(header: H) -> Self
-    where
-        H: Sealable,
-    {
-        Self { header: Sealed::new(header), body: AlloyBlockBody::default() }
-    }
-
-    /// Get the transactions in the block.
-    fn transactions(&self) -> &[T] {
-        &self.body.transactions
-    }
-}
-
-impl<T, H: BlockHeader> BlockHeader for SealedBlock<T, H> {
-    delegate_block_header!(header);
-}
-
-/// A [`SealedBlock`] with the senders of the transactions.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RecoveredBlock<T = TransactionSigned, H = Header> {
-    /// The block.
-    pub block: SealedBlock<T, H>,
-    /// The senders
-    pub senders: Vec<Address>,
-}
-
-impl<T: Default, H: Sealable + Default> Default for RecoveredBlock<T, H> {
-    fn default() -> Self {
-        Self { block: SealedBlock::default(), senders: Vec::new() }
-    }
-}
-
-impl<T, H> RecoveredBlock<T, H> {
-    /// Create a new recovered block.
-    pub const fn new(block: SealedBlock<T, H>, senders: Vec<Address>) -> Self {
-        Self { block, senders }
-    }
-
-    /// Create a new empty recovered block for testing.
-    #[doc(hidden)]
-    pub fn blank_for_testing() -> Self
-    where
-        H: Sealable + Default,
-    {
-        Self { block: SealedBlock::blank_for_testing(), senders: Vec::new() }
-    }
-
-    /// Create a new empty recovered block with the given header for testing.
-    #[doc(hidden)]
-    pub fn blank_with_header(header: H) -> Self
-    where
-        H: Sealable,
-    {
-        Self { block: SealedBlock::blank_with_header(header), senders: Vec::new() }
+    pub fn blank_with_header(header: Header) -> Self {
+        Self { header: Sealed::new(header), transactions: Vec::new() }
     }
 
     /// Get the transactions in the block.
     pub fn transactions(&self) -> &[T] {
-        self.block.transactions()
+        &self.transactions
     }
 }
 
-impl<T, H: BlockHeader> BlockHeader for RecoveredBlock<T, H> {
-    delegate_block_header!(block);
+impl Default for SealedBlock {
+    fn default() -> Self {
+        Self::blank_for_testing()
+    }
 }
 
-/// Typed Transaction type without a signature
+impl SealedBlock {
+    /// Zip transactions with recovered senders to produce a [`RecoveredBlock`].
+    pub fn recover(self, senders: Vec<Address>) -> RecoveredBlock {
+        let transactions = self
+            .transactions
+            .into_iter()
+            .zip(senders)
+            .map(|(tx, sender)| Recovered::new_unchecked(tx, sender))
+            .collect();
+        SealedBlock { header: self.header, transactions }
+    }
+}
+
+/// A [`SealedBlock`] with sender-recovered transactions.
+///
+/// Each transaction is paired with its recovered signer address via
+/// [`Recovered<TransactionSigned>`].
+pub type RecoveredBlock = SealedBlock<Recovered<TransactionSigned>>;
+
+impl Default for RecoveredBlock {
+    fn default() -> Self {
+        Self { header: Sealed::new(Header::default()), transactions: Vec::new() }
+    }
+}
+
+impl RecoveredBlock {
+    /// Iterate over the sender addresses of all transactions.
+    pub fn senders(&self) -> impl ExactSizeIterator<Item = Address> + '_ {
+        self.transactions.iter().map(Recovered::signer)
+    }
+}
+
+impl<T> BlockHeader for SealedBlock<T> {
+    delegate_block_header!(header);
+}
+
+/// Typed Transaction type without a signature.
 pub type Transaction = EthereumTypedTransaction<TxEip4844>;
 
 /// Signed transaction.
 pub type TransactionSigned = EthereumTxEnvelope<TxEip4844>;
 
-/// Ethereum full block.
-///
-/// Withdrawals can be optionally included at the end of the RLP encoded message.
-pub type Block<T = TransactionSigned, H = Header> = AlloyBlock<T, H>;
+/// Ethereum full block type (from alloy).
+pub type Block = AlloyBlock<TransactionSigned>;

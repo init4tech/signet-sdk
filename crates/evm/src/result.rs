@@ -1,7 +1,7 @@
 use crate::ExecutionOutcome;
 use alloy::{consensus::Header, primitives::B256};
 use signet_journal::{HostJournal, JournalMeta};
-use signet_types::primitives::{RecoveredBlock, TransactionSigned};
+use signet_types::primitives::RecoveredBlock;
 use std::borrow::Cow;
 use trevm::journal::BundleStateIndex;
 
@@ -10,24 +10,24 @@ use trevm::journal::BundleStateIndex;
 /// This is a convenience struct that combines the consensus block object with
 /// the result of its execution.
 #[derive(Debug, Default)]
-pub struct BlockResult<T = TransactionSigned> {
+pub struct BlockResult {
     /// The host height.
     pub host_height: u64,
 
-    /// A reth [`RecoveredBlock`], containing the sealed block and a vec of
-    /// transaction senders.
-    pub sealed_block: RecoveredBlock<T>,
+    /// A [`RecoveredBlock`], containing the sealed header and sender-recovered
+    /// transactions.
+    pub sealed_block: RecoveredBlock,
 
-    /// The reth [`ExecutionOutcome`] containing the net state changes and
+    /// The [`ExecutionOutcome`] containing the net state changes and
     /// receipts.
     pub execution_outcome: ExecutionOutcome,
 }
 
-impl<T> BlockResult<T> {
+impl BlockResult {
     /// Create a new block result.
     pub const fn new(
         host_height: u64,
-        sealed_block: RecoveredBlock<T>,
+        sealed_block: RecoveredBlock,
         execution_outcome: ExecutionOutcome,
     ) -> Self {
         Self { host_height, sealed_block, execution_outcome }
@@ -35,11 +35,11 @@ impl<T> BlockResult<T> {
 
     /// Get the rollup block header.
     pub const fn header(&self) -> &Header {
-        self.sealed_block.block.header.inner()
+        self.sealed_block.header.inner()
     }
 
     /// Get the sealed block.
-    pub const fn sealed_block(&self) -> &RecoveredBlock<T> {
+    pub const fn sealed_block(&self) -> &RecoveredBlock {
         &self.sealed_block
     }
 

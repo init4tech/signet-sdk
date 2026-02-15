@@ -505,7 +505,7 @@ mod block_driver {
 
         // All transactions should be processed
         assert_eq!(
-            sealed_block.block.body.transactions().count(),
+            sealed_block.transactions().len(),
             3,
             "all 3 transactions should be in the block"
         );
@@ -567,7 +567,7 @@ mod block_driver {
 
         // Order tx should be dropped, other 2 should succeed
         assert_eq!(
-            sealed_block.block.body.transactions().count(),
+            sealed_block.transactions().len(),
             2,
             "order tx should be dropped, only 2 transactions in block"
         );
@@ -605,7 +605,7 @@ mod block_driver {
 
         // Order tx should be dropped, other 2 should succeed
         assert_eq!(
-            sealed_block.block.body.transactions().count(),
+            sealed_block.transactions().len(),
             2,
             "order tx should be dropped when no fills, only 2 transactions in block"
         );

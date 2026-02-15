@@ -13,7 +13,7 @@ use alloy::{
 use signet_evm::ExecutionOutcome;
 use signet_extract::{Events, Extractable, Extracts};
 use signet_types::primitives::{
-    BlockBody, RecoveredBlock, SealedBlock, SealedHeader, Transaction, TransactionSigned,
+    RecoveredBlock, SealedBlock, SealedHeader, Transaction, TransactionSigned,
 };
 use signet_types::{
     constants::{KnownChains, ParseChainError, SignetSystemConstants},
@@ -336,21 +336,14 @@ impl HostBlockSpec {
     /// Make a block
     pub fn sealed_block(&self) -> SealedBlock {
         let header = self.header();
-
-        let body = BlockBody { transactions: self.make_txns(), ommers: vec![], withdrawals: None };
-
-        SealedBlock::new_unchecked(header, body)
+        SealedBlock::new(header, self.make_txns())
     }
 
-    /// Make a block with senders
-    ///
-    /// This function is a little weird because reth @ 1.2.0 rejiggered the
-    /// block structs in odd ways.
+    /// Make a block with senders.
     pub fn recovered_block(&self) -> RecoveredBlock {
         let block = self.sealed_block();
-        let senders = block.body.transactions().map(|_| Address::ZERO).collect::<Vec<_>>();
-
-        RecoveredBlock::new(block, senders)
+        let senders = vec![Address::ZERO; block.transactions().len()];
+        block.recover(senders)
     }
 
     /// Make an execution outcome

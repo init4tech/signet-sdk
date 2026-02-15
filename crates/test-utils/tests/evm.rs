@@ -96,8 +96,10 @@ fn test_simple_send() {
     let (sealed_block, receipts) = driver.finish();
 
     // Assert that the EVM balance increased
-    assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(sealed_block.block.body.transactions().next(), Some(&tx.clone().into()));
+    assert_eq!(sealed_block.senders().count(), 1);
+    assert_eq!(sealed_block.transactions().len(), 1);
+    let actual: &TransactionSigned = &sealed_block.transactions()[0];
+    assert_eq!(actual, &TransactionSigned::from(tx.clone()));
     assert_eq!(receipts.len(), 1);
 
     assert_eq!(trevm.read_balance(to), U256::from(100));
@@ -124,11 +126,9 @@ fn test_two_sends() {
     let (sealed_block, receipts) = driver.finish();
 
     // Assert that the EVM balance increased
-    assert_eq!(sealed_block.senders.len(), 2);
-    assert_eq!(
-        sealed_block.block.body.transactions().collect::<Vec<_>>(),
-        vec![&tx1.clone().into(), &tx2.clone().into()]
-    );
+    assert_eq!(sealed_block.senders().count(), 2);
+    let txns: Vec<&TransactionSigned> = sealed_block.transactions().iter().map(|t| &**t).collect();
+    assert_eq!(txns, vec![&TransactionSigned::from(tx1), &TransactionSigned::from(tx2)]);
     assert_eq!(receipts.len(), 2);
 
     assert_eq!(trevm.read_balance(to), U256::from(100));
@@ -152,11 +152,9 @@ fn test_execute_two_blocks() {
     let mut trevm = context.trevm().drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
-    assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(
-        sealed_block.block.body.transactions().collect::<Vec<_>>(),
-        vec![&tx.clone().into()]
-    );
+    assert_eq!(sealed_block.senders().count(), 1);
+    let actual: &TransactionSigned = &sealed_block.transactions()[0];
+    assert_eq!(actual, &TransactionSigned::from(tx.clone()));
     assert_eq!(receipts.len(), 1);
     assert_eq!(trevm.read_balance(to), U256::from(100));
     assert_eq!(trevm.read_nonce(sender), 1);
@@ -174,11 +172,9 @@ fn test_execute_two_blocks() {
     let mut trevm = trevm.drive_block(&mut driver).unwrap();
     let (sealed_block, receipts) = driver.finish();
 
-    assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(
-        sealed_block.block.body.transactions().collect::<Vec<_>>(),
-        vec![&tx.clone().into()]
-    );
+    assert_eq!(sealed_block.senders().count(), 1);
+    let actual: &TransactionSigned = &sealed_block.transactions()[0];
+    assert_eq!(actual, &TransactionSigned::from(tx.clone()));
     assert_eq!(receipts.len(), 1);
     assert_eq!(trevm.read_balance(to), U256::from(200));
 }
@@ -216,8 +212,9 @@ fn test_an_enter() {
     let expected_tx =
         MintToken::from_enter(RU_WETH, &extracts.enters[0]).with_nonce(0).produce_transaction();
 
-    assert_eq!(sealed_block.senders.len(), 1);
-    assert_eq!(sealed_block.block.body.transactions().collect::<Vec<_>>(), vec![&expected_tx]);
+    assert_eq!(sealed_block.senders().count(), 1);
+    let actual: &TransactionSigned = &sealed_block.transactions()[0];
+    assert_eq!(actual, &expected_tx);
     assert_eq!(receipts.len(), 1);
     dbg!(&receipts);
 
@@ -349,11 +346,12 @@ fn test_a_transact() {
     let expected_tx_4 = extracts.transacts[0].make_transaction(0, false);
 
     assert_eq!(
-        sealed_block.senders,
+        sealed_block.senders().collect::<Vec<_>>(),
         vec![MINTER_ADDRESS, MINTER_ADDRESS, MINTER_ADDRESS, MINTER_ADDRESS, sender]
     );
+    let txns: Vec<&TransactionSigned> = sealed_block.transactions().iter().map(|t| &**t).collect();
     assert_eq!(
-        sealed_block.block.body.transactions().collect::<Vec<_>>(),
+        txns,
         vec![&expected_tx_0, &expected_tx_1, &expected_tx_2, &expected_tx_3, &expected_tx_4]
     );
     assert_eq!(receipts.len(), 5);
