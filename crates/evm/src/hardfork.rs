@@ -118,6 +118,44 @@ impl EthereumHardfork {
         }
     }
 
+    /// Returns the single [`EthereumHardfork`] bit corresponding to a
+    /// [`SpecId`]. Does not include predecessor forks.
+    ///
+    /// `FRONTIER_THAWING` maps to [`EthereumHardfork::Frontier`] as there is
+    /// no distinct bit for it.
+    ///
+    /// This exhaustive match also serves as a compilation canary: when revm
+    /// adds a new [`SpecId`] variant, this function will fail to compile,
+    /// signaling that [`EthereumHardfork`] and [`spec_id`] need updating.
+    ///
+    /// [`SpecId`]: trevm::revm::primitives::hardfork::SpecId
+    /// [`spec_id`]: EthereumHardfork::spec_id
+    pub const fn bit_for_spec_id(spec: trevm::revm::primitives::hardfork::SpecId) -> Self {
+        use trevm::revm::primitives::hardfork::SpecId;
+        match spec {
+            SpecId::FRONTIER | SpecId::FRONTIER_THAWING => Self::Frontier,
+            SpecId::HOMESTEAD => Self::Homestead,
+            SpecId::DAO_FORK => Self::Dao,
+            SpecId::TANGERINE => Self::Tangerine,
+            SpecId::SPURIOUS_DRAGON => Self::SpuriousDragon,
+            SpecId::BYZANTIUM => Self::Byzantium,
+            SpecId::CONSTANTINOPLE => Self::Constantinople,
+            SpecId::PETERSBURG => Self::Petersburg,
+            SpecId::ISTANBUL => Self::Istanbul,
+            SpecId::MUIR_GLACIER => Self::MuirGlacier,
+            SpecId::BERLIN => Self::Berlin,
+            SpecId::LONDON => Self::London,
+            SpecId::ARROW_GLACIER => Self::ArrowGlacier,
+            SpecId::GRAY_GLACIER => Self::GrayGlacier,
+            SpecId::MERGE => Self::Paris,
+            SpecId::SHANGHAI => Self::Shanghai,
+            SpecId::CANCUN => Self::Cancun,
+            SpecId::PRAGUE => Self::Prague,
+            SpecId::OSAKA => Self::Osaka,
+            SpecId::AMSTERDAM => Self::Amsterdam,
+        }
+    }
+
     /// Returns all active hardforks at the given block number and timestamp,
     /// as determined by the given [`ChainConfig`].
     ///
@@ -265,6 +303,39 @@ pub fn genesis_header(genesis: &Genesis, hardforks: &EthereumHardfork) -> Header
 mod tests {
     use super::*;
     use alloy::consensus::Header;
+    use trevm::revm::primitives::hardfork::SpecId;
+
+    #[test]
+    fn spec_id_roundtrips_through_bit() {
+        // FRONTIER_THAWING is excluded: it maps to the Frontier bit, which
+        // round-trips back to SpecId::FRONTIER.
+        let all_specs = [
+            SpecId::FRONTIER,
+            SpecId::HOMESTEAD,
+            SpecId::DAO_FORK,
+            SpecId::TANGERINE,
+            SpecId::SPURIOUS_DRAGON,
+            SpecId::BYZANTIUM,
+            SpecId::CONSTANTINOPLE,
+            SpecId::PETERSBURG,
+            SpecId::ISTANBUL,
+            SpecId::MUIR_GLACIER,
+            SpecId::BERLIN,
+            SpecId::LONDON,
+            SpecId::ARROW_GLACIER,
+            SpecId::GRAY_GLACIER,
+            SpecId::MERGE,
+            SpecId::SHANGHAI,
+            SpecId::CANCUN,
+            SpecId::PRAGUE,
+            SpecId::OSAKA,
+            SpecId::AMSTERDAM,
+        ];
+        for spec in all_specs {
+            let bit = EthereumHardfork::bit_for_spec_id(spec);
+            assert_eq!(bit.spec_id(), spec, "roundtrip failed for {spec:?}");
+        }
+    }
 
     #[test]
     fn frontier_always_active() {
