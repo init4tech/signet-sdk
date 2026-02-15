@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::types::{
-    CacheObject, CacheResponse, OrderKey, TxCacheOrdersResponse, TxCacheSendBundleResponse,
-    TxCacheSendTransactionResponse, TxCacheTransactionsResponse, TxKey,
+    BundleReceipt, CacheObject, CacheResponse, OrderKey, OrderList, TransactionList,
+    TransactionReceipt, TxKey,
 };
 use alloy::consensus::TxEnvelope;
 use serde::{de::DeserializeOwned, Serialize};
@@ -145,7 +145,7 @@ impl TxCache {
     ///
     /// # Returns
     ///
-    /// A [`TxCacheSendTransactionResponse`] containing the transaction's cache
+    /// A [`TransactionReceipt`] containing the transaction's cache
     /// identifier on success.
     ///
     /// # Errors
@@ -153,10 +153,7 @@ impl TxCache {
     /// Returns an error if the request fails or the transaction cache rejects
     /// the transaction.
     #[instrument(skip_all)]
-    pub async fn forward_raw_transaction(
-        &self,
-        tx: TxEnvelope,
-    ) -> Result<TxCacheSendTransactionResponse> {
+    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<TransactionReceipt> {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
@@ -172,7 +169,7 @@ impl TxCache {
     ///
     /// # Returns
     ///
-    /// A [`TxCacheSendBundleResponse`] containing the bundle's cache identifier
+    /// A [`BundleReceipt`] containing the bundle's cache identifier
     /// (UUID) on success.
     ///
     /// # Errors
@@ -180,10 +177,7 @@ impl TxCache {
     /// Returns an error if the request fails or the transaction cache rejects
     /// the bundle.
     #[instrument(skip_all)]
-    pub async fn forward_bundle(
-        &self,
-        bundle: SignetEthBundle,
-    ) -> Result<TxCacheSendBundleResponse> {
+    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<BundleReceipt> {
         self.forward_inner(BUNDLES, bundle).await
     }
 
@@ -219,7 +213,7 @@ impl TxCache {
     ///
     /// # Returns
     ///
-    /// A [`CacheResponse`] containing a [`TxCacheTransactionsResponse`] with
+    /// A [`CacheResponse`] containing a [`TransactionList`] with
     /// the transactions and pagination information. If more transactions are
     /// available, the response will contain a key to fetch the next page.
     ///
@@ -230,7 +224,7 @@ impl TxCache {
     pub async fn get_transactions(
         &self,
         query: Option<TxKey>,
-    ) -> Result<CacheResponse<TxCacheTransactionsResponse>> {
+    ) -> Result<CacheResponse<TransactionList>> {
         self.get_inner(TRANSACTIONS, query).await
     }
 
@@ -248,7 +242,7 @@ impl TxCache {
     ///
     /// # Returns
     ///
-    /// A [`CacheResponse`] containing a [`TxCacheOrdersResponse`] with the
+    /// A [`CacheResponse`] containing an [`OrderList`] with the
     /// orders and pagination information. If more orders are available, the
     /// response will contain a key to fetch the next page.
     ///
@@ -256,10 +250,7 @@ impl TxCache {
     ///
     /// Returns an error if the request fails or the response cannot be parsed.
     #[instrument(skip_all)]
-    pub async fn get_orders(
-        &self,
-        query: Option<OrderKey>,
-    ) -> Result<CacheResponse<TxCacheOrdersResponse>> {
+    pub async fn get_orders(&self, query: Option<OrderKey>) -> Result<CacheResponse<OrderList>> {
         self.get_inner(ORDERS, query).await
     }
 }
