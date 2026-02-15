@@ -41,7 +41,7 @@ fn tc_ext_001_extract_enters_only() {
         .with_block_number(TEST_SYS.host_deploy_height() + 1)
         .enter(TEST_USERS[0], (GWEI_TO_WEI * 5) as usize)
         .enter(TEST_USERS[1], (GWEI_TO_WEI * 3) as usize)
-        .enter(TEST_USERS[2], (GWEI_TO_WEI * 1) as usize);
+        .enter(TEST_USERS[2], GWEI_TO_WEI as usize);
     let (chain, _) = hbs.to_chain();
 
     let extractor = Extractor::new(TEST_SYS);
@@ -58,7 +58,7 @@ fn tc_ext_001_extract_enters_only() {
     assert_eq!(enters[1].rollupRecipient, TEST_USERS[1]);
     assert_eq!(enters[1].amount, U256::from(GWEI_TO_WEI * 3));
     assert_eq!(enters[2].rollupRecipient, TEST_USERS[2]);
-    assert_eq!(enters[2].amount, U256::from(GWEI_TO_WEI * 1));
+    assert_eq!(enters[2].amount, U256::from(GWEI_TO_WEI));
 
     assert_eq!(extracts.enter_tokens().count(), 0);
     assert_eq!(extracts.transacts().count(), 0);
