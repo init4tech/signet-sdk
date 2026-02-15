@@ -299,6 +299,49 @@ pub fn genesis_header(genesis: &Genesis, hardforks: &EthereumHardfork) -> Header
     }
 }
 
+/// Compilation canary: exhaustive destructure of [`ChainConfig`]. When alloy
+/// adds a new field, this will fail to compile, signaling that
+/// [`EthereumHardfork::active_hardforks`] needs updating.
+#[allow(dead_code, unused_variables)]
+const fn chain_config_canary(config: &ChainConfig) {
+    let ChainConfig {
+        chain_id,
+        homestead_block,
+        dao_fork_block,
+        dao_fork_support,
+        eip150_block,
+        eip155_block,
+        eip158_block,
+        byzantium_block,
+        constantinople_block,
+        petersburg_block,
+        istanbul_block,
+        muir_glacier_block,
+        berlin_block,
+        london_block,
+        arrow_glacier_block,
+        gray_glacier_block,
+        merge_netsplit_block,
+        shanghai_time,
+        cancun_time,
+        prague_time,
+        osaka_time,
+        bpo1_time,
+        bpo2_time,
+        bpo3_time,
+        bpo4_time,
+        bpo5_time,
+        terminal_total_difficulty,
+        terminal_total_difficulty_passed,
+        ethash,
+        clique,
+        parlia,
+        extra_fields,
+        deposit_contract_address,
+        blob_schedule,
+    } = config;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
