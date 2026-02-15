@@ -5,38 +5,30 @@ use alloy::{
 pub use signet_constants::test_utils::*;
 use signet_evm::ExecutionOutcome;
 use signet_extract::Extractable;
-use signet_types::primitives::{
-    BlockBody, RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned,
-};
+use signet_types::primitives::{RecoveredBlock, SealedBlock, SealedHeader};
 
 /// A simple chain of blocks with receipts.
-#[derive(Clone, PartialEq, Eq)]
-pub struct Chain<T = TransactionSigned, H = Header> {
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct Chain {
     /// The blocks
-    pub blocks: Vec<RecoveredBlock<T, H>>,
+    pub blocks: Vec<RecoveredBlock>,
 
     pub execution_outcome: ExecutionOutcome,
 }
 
-impl Default for Chain<TransactionSigned, Header> {
-    fn default() -> Self {
-        Self { blocks: vec![], execution_outcome: Default::default() }
-    }
-}
-
-impl core::fmt::Debug for Chain<TransactionSigned, Header> {
+impl core::fmt::Debug for Chain {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Chain").field("blocks", &self.blocks.len()).finish_non_exhaustive()
     }
 }
 
-impl<T, H> Chain<T, H> {
+impl Chain {
     /// Create a new chain from a block
-    pub fn from_block(block: RecoveredBlock<T, H>, execution_outcome: ExecutionOutcome) -> Self {
+    pub fn from_block(block: RecoveredBlock, execution_outcome: ExecutionOutcome) -> Self {
         Self { blocks: vec![block], execution_outcome }
     }
 
-    pub fn append_block(&mut self, block: RecoveredBlock<T, H>, outcome: ExecutionOutcome) {
+    pub fn append_block(&mut self, block: RecoveredBlock, outcome: ExecutionOutcome) {
         self.blocks.push(block);
         self.execution_outcome.append(outcome);
     }
@@ -63,6 +55,5 @@ pub fn fake_block(number: u64) -> RecoveredBlock {
         ..Default::default()
     };
     let sealed = SealedHeader::new(header);
-    let block = SealedBlock::new_unchecked(sealed, BlockBody::default());
-    RecoveredBlock::new(block, vec![])
+    SealedBlock::new(sealed, vec![]).recover(vec![])
 }

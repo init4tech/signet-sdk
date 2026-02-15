@@ -101,7 +101,7 @@ impl NotificationSpec {
             let (mut chain, sidecar) = self.new[0].to_chain();
             // accumulate sidecar if necessary
             if let Some(sidecar) = sidecar {
-                let tx = self.new[0].sealed_block().body.transactions().last().unwrap().clone();
+                let tx = self.new[0].sealed_block().transactions().last().unwrap().clone();
                 sidecars.insert(num, (sidecar, tx));
             }
 
@@ -113,7 +113,7 @@ impl NotificationSpec {
 
                 // accumualate the sidecar here if necessary
                 if let Some(sidecar) = block.sidecar.clone() {
-                    let tx = block.sealed_block().body.transactions().last().unwrap().clone();
+                    let tx = block.sealed_block().transactions().last().unwrap().clone();
                     sidecars.insert(block.block_number(), (sidecar, tx));
                 }
 

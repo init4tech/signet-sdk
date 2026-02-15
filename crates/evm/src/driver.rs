@@ -13,7 +13,7 @@ use alloy::{
 use signet_extract::{Extractable, Extracts};
 use signet_types::{
     constants::SignetSystemConstants,
-    primitives::{BlockBody, RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
+    primitives::{RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
     AggregateFills, MarketError,
 };
 #[cfg(doc)]
@@ -314,9 +314,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         let header = self.construct_sealed_header();
         let (receipts, senders, _) = self.output.into_parts();
 
-        let body = BlockBody { transactions: self.processed, ommers: vec![], withdrawals: None };
-        let block = SealedBlock { header, body };
-        let block = RecoveredBlock::new(block, senders);
+        let block = SealedBlock::new(header, self.processed).recover(senders);
 
         (block, receipts)
     }

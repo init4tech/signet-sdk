@@ -1,5 +1,5 @@
 use alloy::{consensus::TxReceipt, primitives::Log};
-use signet_types::primitives::{RecoveredBlock, TransactionSigned};
+use signet_types::primitives::TransactionSigned;
 
 /// A trait for types from which data can be extracted. This currently exists
 /// to provide a common interface for extracting data from host chain blocks
@@ -19,23 +19,11 @@ pub trait Extractable: core::fmt::Debug + Sync {
 /// receipts which may be in alloy or reth types.
 pub trait HasTxns {
     /// Get the transactions in the block.
-    fn transactions(&self) -> &[TransactionSigned];
+    fn transactions(&self) -> impl ExactSizeIterator<Item = &TransactionSigned>;
 }
 
-impl HasTxns for signet_types::primitives::BlockBody {
-    fn transactions(&self) -> &[TransactionSigned] {
-        &self.transactions
-    }
-}
-
-impl HasTxns for signet_types::primitives::SealedBlock {
-    fn transactions(&self) -> &[TransactionSigned] {
-        self.body.transactions.as_slice()
-    }
-}
-
-impl HasTxns for RecoveredBlock {
-    fn transactions(&self) -> &[TransactionSigned] {
-        self.block.body.transactions.as_slice()
+impl<T: AsRef<TransactionSigned>> HasTxns for signet_types::primitives::SealedBlock<T> {
+    fn transactions(&self) -> impl ExactSizeIterator<Item = &TransactionSigned> {
+        self.transactions.iter().map(AsRef::as_ref)
     }
 }
