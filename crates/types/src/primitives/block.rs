@@ -5,9 +5,8 @@ use alloy::{
         Block as AlloyBlock, BlockBody as AlloyBlockBody, BlockHeader, EthereumTxEnvelope,
         EthereumTypedTransaction, Header, TxEip4844,
     },
-    primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256},
+    primitives::{Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256},
 };
-use std::sync::OnceLock;
 
 /// Delegates all required [`BlockHeader`] methods to an inner field.
 macro_rules! delegate_block_header {
@@ -39,51 +38,25 @@ macro_rules! delegate_block_header {
 /// A type alias for the block body used in Ethereum blocks.
 pub type BlockBody<T = TransactionSigned, H = Header> = AlloyBlockBody<T, H>;
 
-/// A Sealed header type
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct SealedHeader<H = Header> {
-    /// Block hash
-    hash: OnceLock<BlockHash>,
-    /// Locked Header fields.
-    header: H,
-}
-
-impl<H> SealedHeader<H> {
-    /// Create a new sealed header.
-    pub const fn new(header: H) -> Self {
-        Self { hash: OnceLock::new(), header }
-    }
-
-    /// Get the header
-    pub const fn header(&self) -> &H {
-        &self.header
-    }
-}
-
-impl SealedHeader {
-    /// Get the block hash of the sealed header.
-    pub fn hash(&self) -> BlockHash {
-        *self.hash.get_or_init(|| BlockHash::from(self.header.hash_slow()))
-    }
-
-    /// Split the sealed header into its components.
-    pub fn split(self) -> (BlockHash, Header) {
-        let hash = self.hash();
-        (hash, self.header)
-    }
-}
-
-impl<H: BlockHeader> BlockHeader for SealedHeader<H> {
-    delegate_block_header!(header);
-}
+/// A sealed header with a cached block hash.
+///
+/// This is a type alias for [`Sealed<H>`], which eagerly computes and
+/// stores the header hash on construction.
+pub type SealedHeader<H = Header> = Sealed<H>;
 
 /// Ethereum sealed block type.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SealedBlock<T = TransactionSigned, H = Header> {
     /// The sealed header of the block.
     pub header: SealedHeader<H>,
     /// The transactions in the block.
     pub body: AlloyBlockBody<T, H>,
+}
+
+impl<T: Default, H: Sealable + Default> Default for SealedBlock<T, H> {
+    fn default() -> Self {
+        Self { header: Sealed::new(H::default()), body: AlloyBlockBody::default() }
+    }
 }
 
 impl<T, H> SealedBlock<T, H> {
@@ -96,15 +69,18 @@ impl<T, H> SealedBlock<T, H> {
     #[doc(hidden)]
     pub fn blank_for_testing() -> Self
     where
-        H: Default,
+        H: Sealable + Default,
     {
-        Self { header: SealedHeader::new(H::default()), body: AlloyBlockBody::default() }
+        Self { header: Sealed::new(H::default()), body: AlloyBlockBody::default() }
     }
 
     /// Create a new empty sealed block with the given header for testing.
     #[doc(hidden)]
-    pub fn blank_with_header(header: H) -> Self {
-        Self { header: SealedHeader::new(header), body: AlloyBlockBody::default() }
+    pub fn blank_with_header(header: H) -> Self
+    where
+        H: Sealable,
+    {
+        Self { header: Sealed::new(header), body: AlloyBlockBody::default() }
     }
 
     /// Get the transactions in the block.
@@ -118,12 +94,18 @@ impl<T, H: BlockHeader> BlockHeader for SealedBlock<T, H> {
 }
 
 /// A [`SealedBlock`] with the senders of the transactions.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecoveredBlock<T = TransactionSigned, H = Header> {
     /// The block.
     pub block: SealedBlock<T, H>,
     /// The senders
     pub senders: Vec<Address>,
+}
+
+impl<T: Default, H: Sealable + Default> Default for RecoveredBlock<T, H> {
+    fn default() -> Self {
+        Self { block: SealedBlock::default(), senders: Vec::new() }
+    }
 }
 
 impl<T, H> RecoveredBlock<T, H> {
@@ -136,14 +118,17 @@ impl<T, H> RecoveredBlock<T, H> {
     #[doc(hidden)]
     pub fn blank_for_testing() -> Self
     where
-        H: Default,
+        H: Sealable + Default,
     {
         Self { block: SealedBlock::blank_for_testing(), senders: Vec::new() }
     }
 
     /// Create a new empty recovered block with the given header for testing.
     #[doc(hidden)]
-    pub fn blank_with_header(header: H) -> Self {
+    pub fn blank_with_header(header: H) -> Self
+    where
+        H: Sealable,
+    {
         Self { block: SealedBlock::blank_with_header(header), senders: Vec::new() }
     }
 

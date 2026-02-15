@@ -35,7 +35,7 @@ impl<T> BlockResult<T> {
 
     /// Get the rollup block header.
     pub const fn header(&self) -> &Header {
-        self.sealed_block.block.header.header()
+        self.sealed_block.block.header.inner()
     }
 
     /// Get the sealed block.
