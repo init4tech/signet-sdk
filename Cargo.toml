@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.16.0-rc.10"
+version = "0.16.0-rc.11"
 edition = "2021"
 rust-version = "1.87"
 authors = ["init4"]
@@ -34,19 +34,19 @@ debug = false
 incremental = false
 
 [workspace.dependencies]
-signet-bundle = { version = "0.16.0-rc.9", path = "crates/bundle" }
-signet-constants = { version = "0.16.0-rc.9", path = "crates/constants" }
-signet-evm = { version = "0.16.0-rc.9", path = "crates/evm" }
-signet-extract = { version = "0.16.0-rc.9", path = "crates/extract" }
-signet-journal = { version = "0.16.0-rc.9", path = "crates/journal" }
-signet-node = { version = "0.16.0-rc.9", path = "crates/node" }
-signet-orders = { version = "0.16.0-rc.9", path = "crates/orders" }
-signet-sim = { version = "0.16.0-rc.9", path = "crates/sim" }
-signet-types = { version = "0.16.0-rc.9", path = "crates/types" }
-signet-tx-cache = { version = "0.16.0-rc.9", path = "crates/tx-cache" }
-signet-zenith = { version = "0.16.0-rc.9", path = "crates/zenith" }
+signet-bundle = { version = "0.16.0-rc.11", path = "crates/bundle" }
+signet-constants = { version = "0.16.0-rc.11", path = "crates/constants" }
+signet-evm = { version = "0.16.0-rc.11", path = "crates/evm" }
+signet-extract = { version = "0.16.0-rc.11", path = "crates/extract" }
+signet-journal = { version = "0.16.0-rc.11", path = "crates/journal" }
+signet-node = { version = "0.16.0-rc.11", path = "crates/node" }
+signet-orders = { version = "0.16.0-rc.11", path = "crates/orders" }
+signet-sim = { version = "0.16.0-rc.11", path = "crates/sim" }
+signet-types = { version = "0.16.0-rc.11", path = "crates/types" }
+signet-tx-cache = { version = "0.16.0-rc.11", path = "crates/tx-cache" }
+signet-zenith = { version = "0.16.0-rc.11", path = "crates/zenith" }
 
-signet-test-utils = { version = "0.16.0-rc.9", path = "crates/test-utils" }
+signet-test-utils = { version = "0.16.0-rc.11", path = "crates/test-utils" }
 
 # trevm
 trevm = { version = "0.34.0", features = ["full_env_cfg"] }

@@ -54,7 +54,7 @@ pub trait ExtractStep<C: Extractable> {
         'a: 'c,
         'b: 'c,
     {
-        block.transactions().iter().zip(receipts.iter()).flat_map(|(tx, receipt)| {
+        block.transactions().zip(receipts.iter()).flat_map(|(tx, receipt)| {
             self.extract_receipt(receipt).map(move |(log_index, event)| ExtractedEvent {
                 tx,
                 receipt,

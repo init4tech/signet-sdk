@@ -1,4 +1,3 @@
 mod block;
-pub use block::{
-    Block, BlockBody, RecoveredBlock, SealedBlock, SealedHeader, Transaction, TransactionSigned,
-};
+pub use alloy::consensus::crypto::RecoveryError;
+pub use block::{Block, RecoveredBlock, SealedBlock, SealedHeader, Transaction, TransactionSigned};

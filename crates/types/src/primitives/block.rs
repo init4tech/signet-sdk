@@ -1,414 +1,199 @@
-//! Many of these types are re-produced from the `reth-primitives` crate family.
+//! Signet block primitives.
+//!
+//! These types wrap alloy consensus types to provide a simplified block
+//! representation for the signet rollup. Unlike Ethereum blocks, signet
+//! blocks have no ommers or withdrawals.
 
 use alloy::{
+    consensus::crypto::RecoveryError,
     consensus::{
-        Block as AlloyBlock, BlockBody as AlloyBlockBody, BlockHeader, EthereumTxEnvelope,
-        EthereumTypedTransaction, Header, TxEip4844,
+        transaction::{Recovered, SignerRecoverable},
+        Block as AlloyBlock, BlockHeader, EthereumTxEnvelope, EthereumTypedTransaction, Header,
+        TxEip4844,
     },
-    primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256},
+    primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256},
 };
-use std::sync::OnceLock;
 
-/// A type alias for the block body used in Ethereum blocks.
-pub type BlockBody<T = TransactionSigned, H = Header> = AlloyBlockBody<T, H>;
-
-/// A Sealed header type
-#[derive(Debug, Clone, Default)]
-pub struct SealedHeader<H = Header> {
-    /// Block hash
-    hash: OnceLock<BlockHash>,
-    /// Locked Header fields.
-    header: H,
-}
-
-impl<H> SealedHeader<H> {
-    /// Create a new sealed header.
-    pub const fn new(header: H) -> Self {
-        Self { hash: OnceLock::new(), header }
-    }
-
-    /// Get the header
-    pub const fn header(&self) -> &H {
-        &self.header
-    }
-}
-
-impl SealedHeader {
-    /// Get the block hash of the sealed header.
-    pub fn hash(&self) -> BlockHash {
-        *self.hash.get_or_init(|| BlockHash::from(self.header.hash_slow()))
-    }
-
-    /// Split the sealed header into its components.
-    pub fn split(self) -> (BlockHash, Header) {
-        let hash = self.hash();
-        (hash, self.header)
-    }
-}
-
-impl<H: BlockHeader> BlockHeader for SealedHeader<H> {
-    fn parent_hash(&self) -> B256 {
-        self.header.parent_hash()
-    }
-
-    fn ommers_hash(&self) -> B256 {
-        self.header.ommers_hash()
-    }
-
-    fn beneficiary(&self) -> Address {
-        self.header.beneficiary()
-    }
-
-    fn state_root(&self) -> B256 {
-        self.header.state_root()
-    }
-
-    fn transactions_root(&self) -> B256 {
-        self.header.transactions_root()
-    }
-
-    fn receipts_root(&self) -> B256 {
-        self.header.receipts_root()
-    }
-
-    fn withdrawals_root(&self) -> Option<B256> {
-        self.header.withdrawals_root()
-    }
-
-    fn logs_bloom(&self) -> Bloom {
-        self.header.logs_bloom()
-    }
-
-    fn difficulty(&self) -> U256 {
-        self.header.difficulty()
-    }
-
-    fn number(&self) -> BlockNumber {
-        self.header.number()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.header.gas_limit()
-    }
-
-    fn gas_used(&self) -> u64 {
-        self.header.gas_used()
-    }
-
-    fn timestamp(&self) -> u64 {
-        self.header.timestamp()
-    }
-
-    fn mix_hash(&self) -> Option<B256> {
-        self.header.mix_hash()
-    }
-
-    fn nonce(&self) -> Option<B64> {
-        self.header.nonce()
-    }
-
-    fn base_fee_per_gas(&self) -> Option<u64> {
-        self.header.base_fee_per_gas()
-    }
-
-    fn blob_gas_used(&self) -> Option<u64> {
-        self.header.blob_gas_used()
-    }
-
-    fn excess_blob_gas(&self) -> Option<u64> {
-        self.header.excess_blob_gas()
-    }
-
-    fn parent_beacon_block_root(&self) -> Option<B256> {
-        self.header.parent_beacon_block_root()
-    }
-
-    fn requests_hash(&self) -> Option<B256> {
-        self.header.requests_hash()
-    }
-
-    fn extra_data(&self) -> &Bytes {
-        self.header.extra_data()
-    }
-}
-
-impl<H: PartialEq> PartialEq for SealedHeader<H> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self.hash.get(), other.hash.get()) {
-            (Some(lhs), Some(rhs)) => lhs == rhs,
-            _ => self.header == other.header,
-        }
-    }
-}
-
-impl<H: Eq> Eq for SealedHeader<H> {}
+/// A sealed header with a cached block hash.
+///
+/// This is a type alias for [`Sealed<Header>`], which eagerly computes and
+/// stores the header hash on construction.
+pub type SealedHeader = Sealed<Header>;
 
 /// Ethereum sealed block type.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct SealedBlock<T = TransactionSigned, H = Header> {
+///
+/// Parameterized on the transaction type `T`:
+/// - `SealedBlock<TransactionSigned>` — a block with signed transactions
+/// - `SealedBlock<Recovered<TransactionSigned>>` — a block with sender-recovered
+///   transactions (see [`RecoveredBlock`])
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SealedBlock<T = TransactionSigned> {
     /// The sealed header of the block.
-    pub header: SealedHeader<H>,
+    pub header: SealedHeader,
     /// The transactions in the block.
-    pub body: AlloyBlockBody<T, H>,
+    pub transactions: Vec<T>,
 }
 
-impl<T, H> SealedBlock<T, H> {
-    /// Create a new sealed block without checking the header hash.
-    pub const fn new_unchecked(header: SealedHeader<H>, body: AlloyBlockBody<T, H>) -> Self {
-        Self { header, body }
+impl<T> SealedBlock<T> {
+    /// Create a new sealed block.
+    pub const fn new(header: SealedHeader, transactions: Vec<T>) -> Self {
+        Self { header, transactions }
     }
 
     /// Create a new empty sealed block for testing.
     #[doc(hidden)]
-    pub fn blank_for_testing() -> Self
-    where
-        H: Default,
-    {
-        Self { header: SealedHeader::new(H::default()), body: AlloyBlockBody::default() }
+    pub fn blank_for_testing() -> Self {
+        Self { header: Sealed::new(Header::default()), transactions: Vec::new() }
     }
 
     /// Create a new empty sealed block with the given header for testing.
     #[doc(hidden)]
-    pub fn blank_with_header(header: H) -> Self {
-        Self { header: SealedHeader::new(header), body: AlloyBlockBody::default() }
+    pub fn blank_with_header(header: Header) -> Self {
+        Self { header: Sealed::new(header), transactions: Vec::new() }
     }
 
     /// Get the transactions in the block.
-    fn transactions(&self) -> &[T] {
-        &self.body.transactions
+    pub fn transactions(&self) -> &[T] {
+        &self.transactions
     }
 }
 
-impl<T, H: BlockHeader> BlockHeader for SealedBlock<T, H> {
+impl Default for SealedBlock {
+    fn default() -> Self {
+        Self::blank_for_testing()
+    }
+}
+
+impl SealedBlock {
+    /// Recover transaction signers by verifying each signature.
+    ///
+    /// Returns an error if any transaction signature is invalid.
+    pub fn recover(self) -> Result<RecoveredBlock, RecoveryError> {
+        let transactions = self
+            .transactions
+            .into_iter()
+            .map(|tx| {
+                let sender = tx.recover_signer()?;
+                Ok(Recovered::new_unchecked(tx, sender))
+            })
+            .collect::<Result<Vec<_>, RecoveryError>>()?;
+        Ok(SealedBlock { header: self.header, transactions })
+    }
+
+    /// Zip transactions with pre-verified senders to produce a
+    /// [`RecoveredBlock`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `senders.len() != self.transactions.len()`.
+    pub fn recover_unchecked(self, senders: Vec<Address>) -> RecoveredBlock {
+        assert_eq!(
+            self.transactions.len(),
+            senders.len(),
+            "senders length mismatch: expected {}, got {}",
+            self.transactions.len(),
+            senders.len(),
+        );
+        let transactions = self
+            .transactions
+            .into_iter()
+            .zip(senders)
+            .map(|(tx, sender)| Recovered::new_unchecked(tx, sender))
+            .collect();
+        SealedBlock { header: self.header, transactions }
+    }
+}
+
+/// A [`SealedBlock`] with sender-recovered transactions.
+///
+/// Each transaction is paired with its recovered signer address via
+/// [`Recovered<TransactionSigned>`].
+pub type RecoveredBlock = SealedBlock<Recovered<TransactionSigned>>;
+
+impl Default for RecoveredBlock {
+    fn default() -> Self {
+        Self { header: Sealed::new(Header::default()), transactions: Vec::new() }
+    }
+}
+
+impl RecoveredBlock {
+    /// Iterate over the sender addresses of all transactions.
+    pub fn senders(&self) -> impl ExactSizeIterator<Item = Address> + '_ {
+        self.transactions.iter().map(Recovered::signer)
+    }
+}
+
+impl<T> BlockHeader for SealedBlock<T> {
     fn parent_hash(&self) -> B256 {
         self.header.parent_hash()
     }
-
     fn ommers_hash(&self) -> B256 {
         self.header.ommers_hash()
     }
-
     fn beneficiary(&self) -> Address {
         self.header.beneficiary()
     }
-
     fn state_root(&self) -> B256 {
         self.header.state_root()
     }
-
     fn transactions_root(&self) -> B256 {
         self.header.transactions_root()
     }
-
     fn receipts_root(&self) -> B256 {
         self.header.receipts_root()
     }
-
     fn withdrawals_root(&self) -> Option<B256> {
         self.header.withdrawals_root()
     }
-
     fn logs_bloom(&self) -> Bloom {
         self.header.logs_bloom()
     }
-
     fn difficulty(&self) -> U256 {
         self.header.difficulty()
     }
-
     fn number(&self) -> BlockNumber {
         self.header.number()
     }
-
     fn gas_limit(&self) -> u64 {
         self.header.gas_limit()
     }
-
     fn gas_used(&self) -> u64 {
         self.header.gas_used()
     }
-
     fn timestamp(&self) -> u64 {
         self.header.timestamp()
     }
-
     fn mix_hash(&self) -> Option<B256> {
         self.header.mix_hash()
     }
-
     fn nonce(&self) -> Option<B64> {
         self.header.nonce()
     }
-
     fn base_fee_per_gas(&self) -> Option<u64> {
         self.header.base_fee_per_gas()
     }
-
     fn blob_gas_used(&self) -> Option<u64> {
         self.header.blob_gas_used()
     }
-
     fn excess_blob_gas(&self) -> Option<u64> {
         self.header.excess_blob_gas()
     }
-
     fn parent_beacon_block_root(&self) -> Option<B256> {
         self.header.parent_beacon_block_root()
     }
-
     fn requests_hash(&self) -> Option<B256> {
         self.header.requests_hash()
     }
-
     fn extra_data(&self) -> &Bytes {
         self.header.extra_data()
     }
 }
 
-/// A [`SealedBlock`] with the senders of the transactions.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct RecoveredBlock<T = TransactionSigned, H = Header> {
-    /// The block.
-    pub block: SealedBlock<T, H>,
-    /// The senders
-    pub senders: Vec<Address>,
-}
-
-impl<T, H> RecoveredBlock<T, H> {
-    /// Create a new recovered block.
-    pub const fn new(block: SealedBlock<T, H>, senders: Vec<Address>) -> Self {
-        Self { block, senders }
-    }
-
-    /// Create a new empty recovered block for testing.
-    #[doc(hidden)]
-    pub fn blank_for_testing() -> Self
-    where
-        H: Default,
-    {
-        Self { block: SealedBlock::blank_for_testing(), senders: Vec::new() }
-    }
-
-    /// Create a new empty recovered block with the given header for testing.
-    #[doc(hidden)]
-    pub fn blank_with_header(header: H) -> Self {
-        Self { block: SealedBlock::blank_with_header(header), senders: Vec::new() }
-    }
-
-    /// Get the transactions in the block.
-    pub fn transactions(&self) -> &[T] {
-        self.block.transactions()
-    }
-}
-
-impl<T, H: BlockHeader> BlockHeader for RecoveredBlock<T, H> {
-    fn parent_hash(&self) -> B256 {
-        self.block.parent_hash()
-    }
-
-    fn ommers_hash(&self) -> B256 {
-        self.block.ommers_hash()
-    }
-
-    fn beneficiary(&self) -> Address {
-        self.block.beneficiary()
-    }
-
-    fn state_root(&self) -> B256 {
-        self.block.state_root()
-    }
-
-    fn transactions_root(&self) -> B256 {
-        self.block.transactions_root()
-    }
-
-    fn receipts_root(&self) -> B256 {
-        self.block.receipts_root()
-    }
-
-    fn withdrawals_root(&self) -> Option<B256> {
-        self.block.withdrawals_root()
-    }
-
-    fn logs_bloom(&self) -> Bloom {
-        self.block.logs_bloom()
-    }
-
-    fn difficulty(&self) -> U256 {
-        self.block.difficulty()
-    }
-
-    fn number(&self) -> BlockNumber {
-        self.block.number()
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.block.gas_limit()
-    }
-
-    fn gas_used(&self) -> u64 {
-        self.block.gas_used()
-    }
-
-    fn timestamp(&self) -> u64 {
-        self.block.timestamp()
-    }
-
-    fn mix_hash(&self) -> Option<B256> {
-        self.block.mix_hash()
-    }
-
-    fn nonce(&self) -> Option<B64> {
-        self.block.nonce()
-    }
-
-    fn base_fee_per_gas(&self) -> Option<u64> {
-        self.block.base_fee_per_gas()
-    }
-
-    fn blob_gas_used(&self) -> Option<u64> {
-        self.block.blob_gas_used()
-    }
-
-    fn excess_blob_gas(&self) -> Option<u64> {
-        self.block.excess_blob_gas()
-    }
-
-    fn parent_beacon_block_root(&self) -> Option<B256> {
-        self.block.parent_beacon_block_root()
-    }
-
-    fn requests_hash(&self) -> Option<B256> {
-        self.block.requests_hash()
-    }
-
-    fn extra_data(&self) -> &Bytes {
-        self.block.extra_data()
-    }
-}
-
-/// Typed Transaction type without a signature
+/// Typed Transaction type without a signature.
 pub type Transaction = EthereumTypedTransaction<TxEip4844>;
 
 /// Signed transaction.
 pub type TransactionSigned = EthereumTxEnvelope<TxEip4844>;
 
-/// Ethereum full block.
-///
-/// Withdrawals can be optionally included at the end of the RLP encoded message.
-pub type Block<T = TransactionSigned, H = Header> = AlloyBlock<T, H>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sealed_header_eq_with_one_populated_hash() {
-        let header_a = SealedHeader::new(Header::default());
-        let header_b = SealedHeader::new(Header::default());
-        header_a.hash();
-        assert!(header_a.hash.get().is_some());
-        assert!(header_b.hash.get().is_none());
-        assert_eq!(header_a, header_b);
-    }
-}
+/// Ethereum full block type (from alloy).
+pub type Block = AlloyBlock<TransactionSigned>;
