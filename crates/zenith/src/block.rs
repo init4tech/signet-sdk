@@ -45,7 +45,7 @@ impl Coder for Alloy2718Coder {
 }
 
 /// A Zenith block is just a list of transactions.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(bound = "C::Tx: serde::Serialize + serde::de::DeserializeOwned")]
 pub struct ZenithBlock<C: Coder = Alloy2718Coder> {
     /// The zenith block header, which may be extracted from a
@@ -116,7 +116,7 @@ where
     ///     - On failure, discard all data, returning an empty tx list
     /// - Attempt to decode each item in the list as a transaction
     ///     - On failure, discard the item
-    /// - Return a list of succesfully decoded transactions
+    /// - Return a list of successfully decoded transactions
     pub fn from_header_and_data(header: ZenithHeader, buf: impl AsRef<[u8]>) -> Self {
         let b = buf.as_ref();
         let transactions = decode_txns::<C>(b);
@@ -217,6 +217,17 @@ where
     }
 }
 
+impl<C: Coder> PartialEq for ZenithBlock<C> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.block_data_hash.get(), other.block_data_hash.get()) {
+            (Some(lhs), Some(rhs)) => lhs == rhs,
+            _ => self.header == other.header && self.transactions == other.transactions,
+        }
+    }
+}
+
+impl<C: Coder> Eq for ZenithBlock<C> {}
+
 /// Decode transactions.
 ///
 /// A transaction is an RLP-encoded list of EIP-2718-encoded transaction
@@ -303,5 +314,22 @@ mod test {
         let junk = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
         let decoded = decode_txns::<Alloy2718Coder>(&junk);
         assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn zenith_block_eq_with_one_populated_hash() {
+        let header = ZenithHeader {
+            rollupChainId: U256::from(1),
+            hostBlockNumber: U256::from(100),
+            gasLimit: U256::from(30_000_000),
+            rewardAddress: Address::ZERO,
+            blockDataHash: [0u8; 32].into(),
+        };
+        let block_a = ZenithBlock::<Alloy2718Coder>::new(header, vec![]);
+        let block_b = ZenithBlock::<Alloy2718Coder>::new(header, vec![]);
+        block_a.block_data_hash();
+        assert!(block_a.block_data_hash.get().is_some());
+        assert!(block_b.block_data_hash.get().is_none());
+        assert_eq!(block_a, block_b);
     }
 }
