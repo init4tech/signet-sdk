@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::types::{
-    BundleReceipt, CacheObject, CacheResponse, OrderKey, OrderList, TransactionList,
-    TransactionReceipt, TxKey,
+    BundleResponse, CacheObject, CacheResponse, OrderKey, OrderList, TransactionList,
+    TransactionResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
 use serde::{de::DeserializeOwned, Serialize};
@@ -145,7 +145,7 @@ impl TxCache {
     ///
     /// # Returns
     ///
-    /// A [`TransactionReceipt`] containing the transaction's cache
+    /// A [`TransactionResponse`] containing the transaction's cache
     /// identifier on success.
     ///
     /// # Errors
@@ -153,7 +153,7 @@ impl TxCache {
     /// Returns an error if the request fails or the transaction cache rejects
     /// the transaction.
     #[instrument(skip_all)]
-    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<TransactionReceipt> {
+    pub async fn forward_raw_transaction(&self, tx: TxEnvelope) -> Result<TransactionResponse> {
         self.forward_inner(TRANSACTIONS, tx).await
     }
 
@@ -169,7 +169,7 @@ impl TxCache {
     ///
     /// # Returns
     ///
-    /// A [`BundleReceipt`] containing the bundle's cache identifier
+    /// A [`BundleResponse`] containing the bundle's cache identifier
     /// (UUID) on success.
     ///
     /// # Errors
@@ -177,7 +177,7 @@ impl TxCache {
     /// Returns an error if the request fails or the transaction cache rejects
     /// the bundle.
     #[instrument(skip_all)]
-    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<BundleReceipt> {
+    pub async fn forward_bundle(&self, bundle: SignetEthBundle) -> Result<BundleResponse> {
         self.forward_inner(BUNDLES, bundle).await
     }
 

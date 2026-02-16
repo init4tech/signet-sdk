@@ -208,31 +208,31 @@ impl BundleList {
 ///
 /// Contains the UUID assigned to the submitted bundle.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BundleReceipt {
+pub struct BundleResponse {
     /// The bundle id (a UUID)
     pub id: uuid::Uuid,
 }
 
-impl BundleReceipt {
-    /// Create a new bundle receipt from a bundle id.
+impl BundleResponse {
+    /// Create a new bundle response from a bundle id.
     pub const fn new(id: uuid::Uuid) -> Self {
         Self { id }
     }
 }
 
-impl From<uuid::Uuid> for BundleReceipt {
+impl From<uuid::Uuid> for BundleResponse {
     fn from(id: uuid::Uuid) -> Self {
         Self { id }
     }
 }
 
-impl From<BundleReceipt> for uuid::Uuid {
-    fn from(response: BundleReceipt) -> Self {
+impl From<BundleResponse> for uuid::Uuid {
+    fn from(response: BundleResponse) -> Self {
         response.id
     }
 }
 
-impl CacheObject for BundleReceipt {
+impl CacheObject for BundleResponse {
     type Key = BundleKey;
 }
 
@@ -289,40 +289,40 @@ impl TransactionList {
 ///
 /// Contains the transaction hash of the submitted transaction.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct TransactionReceipt {
+pub struct TransactionResponse {
     /// The transaction hash
     pub tx_hash: B256,
 }
 
-impl From<B256> for TransactionReceipt {
+impl From<B256> for TransactionResponse {
     fn from(tx_hash: B256) -> Self {
         Self { tx_hash }
     }
 }
 
-impl From<TransactionReceipt> for B256 {
-    fn from(response: TransactionReceipt) -> Self {
+impl From<TransactionResponse> for B256 {
+    fn from(response: TransactionResponse) -> Self {
         response.tx_hash
     }
 }
 
-impl CacheObject for TransactionReceipt {
+impl CacheObject for TransactionResponse {
     type Key = TxKey;
 }
 
-impl TransactionReceipt {
-    /// Create a new transaction receipt from a transaction hash.
+impl TransactionResponse {
+    /// Create a new transaction response from a transaction hash.
     pub const fn new(tx_hash: B256) -> Self {
         Self { tx_hash }
     }
 
-    /// Create a new transaction receipt from a transaction hash.
+    /// Create a new transaction response from a transaction hash.
     #[deprecated = "Use `From::from` instead, or `Self::new` in const contexts"]
     pub const fn from_tx_hash(tx_hash: B256) -> Self {
         Self { tx_hash }
     }
 
-    /// Convert the transaction receipt to a transaction hash.
+    /// Convert the transaction response to a transaction hash.
     #[deprecated = "Use `this.tx_hash` instead."]
     pub const fn into_tx_hash(self) -> B256 {
         self.tx_hash
@@ -377,29 +377,29 @@ impl OrderList {
 ///
 /// Contains the order ID of the submitted order.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct OrderReceipt {
+pub struct OrderResponse {
     /// The order id
     pub id: B256,
 }
 
-impl From<B256> for OrderReceipt {
+impl From<B256> for OrderResponse {
     fn from(id: B256) -> Self {
         Self { id }
     }
 }
 
-impl From<OrderReceipt> for B256 {
-    fn from(response: OrderReceipt) -> Self {
+impl From<OrderResponse> for B256 {
+    fn from(response: OrderResponse) -> Self {
         response.id
     }
 }
 
-impl CacheObject for OrderReceipt {
+impl CacheObject for OrderResponse {
     type Key = OrderKey;
 }
 
-impl OrderReceipt {
-    /// Create a new order receipt from an order id.
+impl OrderResponse {
+    /// Create a new order response from an order id.
     pub const fn new(id: B256) -> Self {
         Self { id }
     }
@@ -448,25 +448,37 @@ pub type TxCacheBundle = CachedBundle;
 /// Deprecated alias for [`BundleList`].
 pub type TxCacheBundlesResponse = BundleList;
 
-#[deprecated(since = "0.16.0", note = "renamed to `BundleReceipt`")]
-/// Deprecated alias for [`BundleReceipt`].
-pub type TxCacheSendBundleResponse = BundleReceipt;
+#[deprecated(since = "0.16.0", note = "renamed to `BundleResponse`")]
+/// Deprecated alias for [`BundleResponse`].
+pub type BundleReceipt = BundleResponse;
+
+#[deprecated(since = "0.16.0", note = "renamed to `BundleResponse`")]
+/// Deprecated alias for [`BundleResponse`].
+pub type TxCacheSendBundleResponse = BundleResponse;
 
 #[deprecated(since = "0.16.0", note = "renamed to `TransactionList`")]
 /// Deprecated alias for [`TransactionList`].
 pub type TxCacheTransactionsResponse = TransactionList;
 
-#[deprecated(since = "0.16.0", note = "renamed to `TransactionReceipt`")]
-/// Deprecated alias for [`TransactionReceipt`].
-pub type TxCacheSendTransactionResponse = TransactionReceipt;
+#[deprecated(since = "0.16.0", note = "renamed to `TransactionResponse`")]
+/// Deprecated alias for [`TransactionResponse`].
+pub type TransactionReceipt = TransactionResponse;
+
+#[deprecated(since = "0.16.0", note = "renamed to `TransactionResponse`")]
+/// Deprecated alias for [`TransactionResponse`].
+pub type TxCacheSendTransactionResponse = TransactionResponse;
 
 #[deprecated(since = "0.16.0", note = "renamed to `OrderList`")]
 /// Deprecated alias for [`OrderList`].
 pub type TxCacheOrdersResponse = OrderList;
 
-#[deprecated(since = "0.16.0", note = "renamed to `OrderReceipt`")]
-/// Deprecated alias for [`OrderReceipt`].
-pub type TxCacheSendOrderResponse = OrderReceipt;
+#[deprecated(since = "0.16.0", note = "renamed to `OrderResponse`")]
+/// Deprecated alias for [`OrderResponse`].
+pub type OrderReceipt = OrderResponse;
+
+#[deprecated(since = "0.16.0", note = "renamed to `OrderResponse`")]
+/// Deprecated alias for [`OrderResponse`].
+pub type TxCacheSendOrderResponse = OrderResponse;
 
 #[cfg(test)]
 mod tests {
