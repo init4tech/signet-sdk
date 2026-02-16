@@ -364,11 +364,7 @@ impl TxCache {
     ///
     /// [`TxCacheError::NotFound`]: crate::error::TxCacheError::NotFound
     #[instrument(skip_all)]
-    pub async fn update_order(
-        &self,
-        order_id: &str,
-        order: SignedOrder,
-    ) -> Result<OrderResponse> {
+    pub async fn update_order(&self, order_id: &str, order: SignedOrder) -> Result<OrderResponse> {
         let path = format!("{ORDERS}/{order_id}");
         self.put_inner(&path, order).await
     }
