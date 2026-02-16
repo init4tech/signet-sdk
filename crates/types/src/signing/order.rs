@@ -27,7 +27,7 @@ use std::{borrow::Cow, sync::OnceLock};
 /// Inputs cannot be transferred until the Order Outputs have already been filled.
 ///
 /// TODO: Link to docs.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignedOrder {
     /// The permit batch.
     #[serde(flatten)]
@@ -134,6 +134,17 @@ impl SignedOrder {
         buf.into()
     }
 }
+
+impl PartialEq for SignedOrder {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.order_hash.get(), other.order_hash.get()) {
+            (Some(lhs), Some(rhs)) => lhs == rhs,
+            _ => self.permit == other.permit && self.outputs == other.outputs,
+        }
+    }
+}
+
+impl Eq for SignedOrder {}
 
 /// An UnsignedOrder is a helper type used to easily transform an Order into a
 /// SignedOrder with correct permit2 semantics.
@@ -719,5 +730,15 @@ mod tests {
             order.order_hash(),
             &b256!("0x7401ff93a0f4d16b66cc5a51109808f6bb29560cce8d0d3e1fce44edc8474e27")
         );
+    }
+
+    #[test]
+    fn signed_order_eq_with_one_populated_hash() {
+        let order_a = basic_order();
+        let order_b = basic_order();
+        order_a.order_hash();
+        assert!(order_a.order_hash.get().is_some());
+        assert!(order_b.order_hash.get().is_none());
+        assert_eq!(order_a, order_b);
     }
 }

@@ -13,7 +13,7 @@ use std::sync::OnceLock;
 pub type BlockBody<T = TransactionSigned, H = Header> = AlloyBlockBody<T, H>;
 
 /// A Sealed header type
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SealedHeader<H = Header> {
     /// Block hash
     hash: OnceLock<BlockHash>,
@@ -131,6 +131,17 @@ impl<H: BlockHeader> BlockHeader for SealedHeader<H> {
         self.header.extra_data()
     }
 }
+
+impl<H: PartialEq> PartialEq for SealedHeader<H> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.hash.get(), other.hash.get()) {
+            (Some(lhs), Some(rhs)) => lhs == rhs,
+            _ => self.header == other.header,
+        }
+    }
+}
+
+impl<H: Eq> Eq for SealedHeader<H> {}
 
 /// Ethereum sealed block type.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -386,3 +397,18 @@ pub type TransactionSigned = EthereumTxEnvelope<TxEip4844>;
 ///
 /// Withdrawals can be optionally included at the end of the RLP encoded message.
 pub type Block<T = TransactionSigned, H = Header> = AlloyBlock<T, H>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sealed_header_eq_with_one_populated_hash() {
+        let header_a = SealedHeader::new(Header::default());
+        let header_b = SealedHeader::new(Header::default());
+        header_a.hash();
+        assert!(header_a.hash.get().is_some());
+        assert!(header_b.hash.get().is_none());
+        assert_eq!(header_a, header_b);
+    }
+}
