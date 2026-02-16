@@ -159,6 +159,10 @@ impl EthereumHardfork {
     /// Returns all active hardforks at the given block number and timestamp,
     /// as determined by the given [`ChainConfig`].
     ///
+    /// [`Amsterdam`](Self::Amsterdam) is not yet represented in [`ChainConfig`]
+    /// and cannot be activated through this method. The [`chain_config_canary`]
+    /// will catch the addition of the field when alloy adds it.
+    ///
     /// # Example
     ///
     /// ```
@@ -232,8 +236,12 @@ impl EthereumHardfork {
     /// ```
     pub fn latest_hardfork(config: &ChainConfig, block: u64, timestamp: u64) -> Self {
         let active = Self::active_hardforks(config, block, timestamp);
+        // BPO forks only change blob parameters, not EVM semantics, so exclude them when
+        // determining the latest spec-affecting fork.
+        let spec_forks =
+            active.difference(Self::Bpo1 | Self::Bpo2 | Self::Bpo3 | Self::Bpo4 | Self::Bpo5);
         // Frontier is always active, so bits() is always >= 1.
-        Self::from_bits_retain(1 << active.bits().ilog2())
+        Self::from_bits_retain(1 << spec_forks.bits().ilog2())
     }
 }
 
@@ -491,6 +499,19 @@ mod tests {
         let forks = EthereumHardfork::active_hardforks_at_header(&config, &header);
         assert!(forks.contains(EthereumHardfork::Homestead));
         assert!(forks.contains(EthereumHardfork::Shanghai));
+    }
+
+    #[test]
+    fn latest_hardfork_ignores_bpo_forks() {
+        let config = ChainConfig {
+            homestead_block: Some(0),
+            london_block: Some(0),
+            bpo1_time: Some(0),
+            bpo3_time: Some(0),
+            ..Default::default()
+        };
+        let latest = EthereumHardfork::latest_hardfork(&config, 100, 100);
+        assert_eq!(latest, EthereumHardfork::London);
     }
 
     #[test]
