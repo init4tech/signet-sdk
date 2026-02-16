@@ -294,7 +294,6 @@ impl TxCache {
     /// # Errors
     ///
     /// Returns [`TxCacheError::NotFound`] if the bundle does not exist.
-    /// Returns [`TxCacheError::Conflict`] if there is a version conflict.
     /// Returns an error if the request fails or the response cannot be parsed.
     ///
     /// # Example
@@ -316,7 +315,6 @@ impl TxCache {
     /// ```
     ///
     /// [`TxCacheError::NotFound`]: crate::error::TxCacheError::NotFound
-    /// [`TxCacheError::Conflict`]: crate::error::TxCacheError::Conflict
     #[instrument(skip_all)]
     pub async fn update_bundle(
         &self,
@@ -345,7 +343,6 @@ impl TxCache {
     /// # Errors
     ///
     /// Returns [`TxCacheError::NotFound`] if the order does not exist.
-    /// Returns [`TxCacheError::Conflict`] if there is a version conflict.
     /// Returns an error if the request fails or the response cannot be parsed.
     ///
     /// # Example
@@ -366,7 +363,6 @@ impl TxCache {
     /// ```
     ///
     /// [`TxCacheError::NotFound`]: crate::error::TxCacheError::NotFound
-    /// [`TxCacheError::Conflict`]: crate::error::TxCacheError::Conflict
     #[instrument(skip_all)]
     pub async fn update_order(
         &self,
