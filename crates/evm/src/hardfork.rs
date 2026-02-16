@@ -156,11 +156,43 @@ impl EthereumHardfork {
         }
     }
 
+    /// Returns the cumulative [`EthereumHardfork`] flags for a [`SpecId`],
+    /// i.e. the given spec and all its predecessors.
+    ///
+    /// BPO forks are excluded as they only change blob parameters, not EVM
+    /// semantics.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use signet_evm::EthereumHardfork;
+    /// use trevm::revm::primitives::hardfork::SpecId;
+    ///
+    /// let forks = EthereumHardfork::from_spec_id(SpecId::CANCUN);
+    /// assert!(forks.contains(EthereumHardfork::Frontier));
+    /// assert!(forks.contains(EthereumHardfork::Cancun));
+    /// assert!(!forks.contains(EthereumHardfork::Prague));
+    /// ```
+    ///
+    /// [`SpecId`]: trevm::revm::primitives::hardfork::SpecId
+    pub const fn from_spec_id(spec: trevm::revm::primitives::hardfork::SpecId) -> Self {
+        let bit = Self::bit_for_spec_id(spec);
+        // All bits up to and including this spec's bit position.
+        let mask = (bit.bits() << 1) - 1;
+        // Exclude BPO forks (blob parameter changes, not EVM spec changes).
+        let bpo = Self::Bpo1.bits()
+            | Self::Bpo2.bits()
+            | Self::Bpo3.bits()
+            | Self::Bpo4.bits()
+            | Self::Bpo5.bits();
+        Self::from_bits_retain(mask & !bpo)
+    }
+
     /// Returns all active hardforks at the given block number and timestamp,
     /// as determined by the given [`ChainConfig`].
     ///
     /// [`Amsterdam`](Self::Amsterdam) is not yet represented in [`ChainConfig`]
-    /// and cannot be activated through this method. The [`chain_config_canary`]
+    /// and cannot be activated through this method. The `chain_config_canary`
     /// will catch the addition of the field when alloy adds it.
     ///
     /// # Example
@@ -355,6 +387,60 @@ mod tests {
     use super::*;
     use alloy::consensus::Header;
     use trevm::revm::primitives::hardfork::SpecId;
+
+    #[test]
+    fn from_spec_id_includes_predecessors() {
+        let forks = EthereumHardfork::from_spec_id(SpecId::CANCUN);
+        assert!(forks.contains(EthereumHardfork::Frontier));
+        assert!(forks.contains(EthereumHardfork::Shanghai));
+        assert!(forks.contains(EthereumHardfork::Cancun));
+        assert!(!forks.contains(EthereumHardfork::Prague));
+    }
+
+    #[test]
+    fn from_spec_id_frontier_is_minimal() {
+        let forks = EthereumHardfork::from_spec_id(SpecId::FRONTIER);
+        assert_eq!(forks, EthereumHardfork::Frontier);
+    }
+
+    #[test]
+    fn from_spec_id_excludes_bpo_forks() {
+        let forks = EthereumHardfork::from_spec_id(SpecId::AMSTERDAM);
+        assert!(forks.contains(EthereumHardfork::Amsterdam));
+        assert!(forks.contains(EthereumHardfork::Osaka));
+        assert!(!forks.contains(EthereumHardfork::Bpo1));
+        assert!(!forks.contains(EthereumHardfork::Bpo5));
+    }
+
+    #[test]
+    fn from_spec_id_roundtrips() {
+        let all_specs = [
+            SpecId::FRONTIER,
+            SpecId::HOMESTEAD,
+            SpecId::DAO_FORK,
+            SpecId::TANGERINE,
+            SpecId::SPURIOUS_DRAGON,
+            SpecId::BYZANTIUM,
+            SpecId::CONSTANTINOPLE,
+            SpecId::PETERSBURG,
+            SpecId::ISTANBUL,
+            SpecId::MUIR_GLACIER,
+            SpecId::BERLIN,
+            SpecId::LONDON,
+            SpecId::ARROW_GLACIER,
+            SpecId::GRAY_GLACIER,
+            SpecId::MERGE,
+            SpecId::SHANGHAI,
+            SpecId::CANCUN,
+            SpecId::PRAGUE,
+            SpecId::OSAKA,
+            SpecId::AMSTERDAM,
+        ];
+        for spec in all_specs {
+            let cumulative = EthereumHardfork::from_spec_id(spec);
+            assert_eq!(cumulative.spec_id(), spec, "roundtrip failed for {spec:?}");
+        }
+    }
 
     #[test]
     fn spec_id_roundtrips_through_bit() {
