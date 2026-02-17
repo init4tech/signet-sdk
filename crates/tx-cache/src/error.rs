@@ -14,7 +14,6 @@ pub enum TxCacheError {
     /// The request was made during a slot that is not assigned to this builder.
     #[error("Request occurred during a slot that is not assigned to this builder")]
     NotOurSlot,
-
     /// An error occurred while parsing the URL.
     #[error(transparent)]
     Url(#[from] url::ParseError),
