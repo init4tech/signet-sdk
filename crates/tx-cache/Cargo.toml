@@ -16,6 +16,7 @@ signet-constants.workspace = true
 signet-types.workspace = true
 
 alloy.workspace = true
+futures-util.workspace = true
 
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }

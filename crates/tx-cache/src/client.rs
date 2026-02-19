@@ -4,6 +4,8 @@ use crate::types::{
     TransactionList, TransactionResponse, TxKey,
 };
 use alloy::consensus::TxEnvelope;
+use futures_util::future::Either;
+use futures_util::stream::{self, Stream, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use signet_bundle::SignetEthBundle;
 use signet_constants::parmigiana;
@@ -323,6 +325,52 @@ impl TxCache {
     ) -> Result<BundleResponse> {
         let path = format!("{BUNDLES}/{bundle_id}");
         self.put_inner(&path, bundle).await
+    }
+
+    /// Stream all transactions from the transaction cache, automatically
+    /// paginating through all available pages.
+    ///
+    /// Returns a [`Stream`] that yields each [`TxEnvelope`] individually,
+    /// fetching subsequent pages as needed. The stream ends when no more
+    /// pages are available or on the first error (which is yielded before
+    /// terminating).
+    pub fn stream_transactions(&self) -> impl Stream<Item = Result<TxEnvelope>> + Send + '_ {
+        stream::unfold(Some(None), move |cursor| async move {
+            let cursor = cursor?;
+
+            match self.get_transactions(cursor).await {
+                Ok(response) => {
+                    let (inner, next_cursor) = response.into_parts();
+                    let txns = stream::iter(inner.transactions).map(Ok);
+                    Some((Either::Left(txns), next_cursor.map(Some)))
+                }
+                Err(error) => Some((Either::Right(stream::once(async { Err(error) })), None)),
+            }
+        })
+        .flatten()
+    }
+
+    /// Stream all signed orders from the transaction cache, automatically
+    /// paginating through all available pages.
+    ///
+    /// Returns a [`Stream`] that yields each [`SignedOrder`] individually,
+    /// fetching subsequent pages as needed. The stream ends when no more
+    /// pages are available or on the first error (which is yielded before
+    /// terminating).
+    pub fn stream_orders(&self) -> impl Stream<Item = Result<SignedOrder>> + Send + '_ {
+        stream::unfold(Some(None), move |cursor| async move {
+            let cursor = cursor?;
+
+            match self.get_orders(cursor).await {
+                Ok(response) => {
+                    let (inner, next_cursor) = response.into_parts();
+                    let orders = stream::iter(inner.orders).map(Ok);
+                    Some((Either::Left(orders), next_cursor.map(Some)))
+                }
+                Err(error) => Some((Either::Right(stream::once(async { Err(error) })), None)),
+            }
+        })
+        .flatten()
     }
 
     /// Update an existing order in the transaction cache.

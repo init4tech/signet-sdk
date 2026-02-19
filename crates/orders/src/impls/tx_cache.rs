@@ -1,6 +1,5 @@
 use crate::{BundleSubmitter, OrderSource, OrderSubmitter};
-use futures_util::future::Either;
-use futures_util::stream::{self, Stream, StreamExt};
+use futures_util::stream::Stream;
 use signet_bundle::SignetEthBundle;
 use signet_tx_cache::{types::BundleResponse, TxCache, TxCacheError};
 use signet_types::SignedOrder;
@@ -17,19 +16,7 @@ impl OrderSource for TxCache {
     type Error = TxCacheError;
 
     fn get_orders(&self) -> impl Stream<Item = Result<SignedOrder, Self::Error>> + Send {
-        stream::unfold(Some(None), move |cursor| async move {
-            let cursor = cursor?;
-
-            match TxCache::get_orders(self, cursor).await {
-                Ok(response) => {
-                    let (inner, next_cursor) = response.into_parts();
-                    let orders = stream::iter(inner.orders).map(Ok);
-                    Some((Either::Left(orders), next_cursor.map(Some)))
-                }
-                Err(error) => Some((Either::Right(stream::once(async { Err(error) })), None)),
-            }
-        })
-        .flatten()
+        self.stream_orders()
     }
 }
 
