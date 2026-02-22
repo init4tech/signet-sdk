@@ -118,15 +118,21 @@ async fn fill_submits_signed_fills() {
         FillerOptions::new(),
     );
 
-    filler.fill(orders).await.unwrap();
+    filler.fill(orders, 5).await.unwrap();
 
     let bundles = bundle_submitter.submitted_bundles();
-    assert_eq!(bundles.len(), 1);
-    // Bundle should have 3 rollup txs (1 fill + 2 initiates) and 1 host tx (1 fill)
-    assert_eq!(bundles[0].bundle.txs.len(), 3);
-    assert_eq!(bundles[0].host_txs().len(), 1);
+    assert_eq!(bundles.len(), 5);
 
-    // Verify transaction order: fill must come before initiates
+    // Verify each bundle targets the correct block (101 through 105)
+    for (i, bundle) in bundles.iter().enumerate() {
+        assert_eq!(bundle.bundle.block_number, 101 + i as u64);
+
+        // Each bundle should have 3 rollup txs (1 fill + 2 initiates) and 1 host tx (1 fill)
+        assert_eq!(bundle.bundle.txs.len(), 3);
+        assert_eq!(bundle.host_txs().len(), 1);
+    }
+
+    // Verify transaction order in the first bundle: fill must come before initiates
     let rollup_txs = &bundles[0].bundle.txs;
     for (i, tx_bytes) in rollup_txs.iter().enumerate() {
         let envelope = TxEnvelope::decode_2718(&mut tx_bytes.as_ref()).unwrap();
@@ -153,7 +159,7 @@ async fn fill_with_empty_orders_returns_error() {
     let submitter = MockFillSubmitter::new();
     let filler = Filler::new(filler_key.clone(), source, submitter, TEST_SYS, FillerOptions::new());
 
-    let result = filler.fill(vec![]).await;
+    let result = filler.fill(vec![], 1).await;
     assert!(matches!(result, Err(FillerError::NoOrders)));
 }
 
@@ -170,7 +176,7 @@ async fn submission_error_propagates() {
         type Response = ();
         type Error = FillSubmissionError;
 
-        async fn submit_fills(&self, _: OrdersAndFills) -> Result<(), Self::Error> {
+        async fn submit_fills(&self, _: OrdersAndFills, _: u8) -> Result<(), Self::Error> {
             Err(FillSubmissionError)
         }
     }
@@ -196,7 +202,7 @@ async fn submission_error_propagates() {
         FillerOptions::new(),
     );
 
-    let FillerError::Submission(inner) = filler.fill(vec![order]).await.unwrap_err() else {
+    let FillerError::Submission(inner) = filler.fill(vec![order], 1).await.unwrap_err() else {
         panic!("expected Submission error");
     };
     inner.downcast_ref::<FillSubmissionError>().unwrap();

@@ -8,12 +8,12 @@ use alloy::{
     rpc::types::mev::EthSendBundle,
     transports::{RpcError, TransportErrorKind},
 };
-use futures_util::{stream, StreamExt, TryStreamExt};
+use futures_util::{future::try_join_all, stream, StreamExt, TryStreamExt};
 use signet_bundle::SignetEthBundle;
 use signet_constants::SignetSystemConstants;
 #[cfg(doc)]
 use signet_types::SignedFill;
-use tracing::{error, instrument};
+use tracing::{debug, error, instrument};
 
 /// Errors returned by [`FeePolicySubmitter`].
 #[derive(Debug, thiserror::Error)]
@@ -99,14 +99,19 @@ where
     RuP: TxBuilder<Ethereum>,
     HostP: TxBuilder<Ethereum>,
     B: BundleSubmitter + Send + Sync,
+    B::Response: Send,
 {
-    type Response = B::Response;
+    type Response = Vec<B::Response>;
     type Error = FeePolicyError;
 
-    #[instrument(skip_all, fields(order_count = orders.len(), fill_count = fills.len()))]
+    #[instrument(
+        skip_all,
+        fields(order_count = orders.len(), fill_count = fills.len(), target_block_count)
+    )]
     async fn submit_fills(
         &self,
         OrdersAndFills { orders, fills, signer_address }: OrdersAndFills,
+        target_block_count: u8,
     ) -> Result<Self::Response, Self::Error> {
         if fills.is_empty() {
             return Err(FeePolicyError::NoFills);
@@ -139,15 +144,21 @@ where
         let target_block =
             self.ru_provider.get_block_number().await.map_err(FeePolicyError::Rpc)? + 1;
 
-        let bundle = SignetEthBundle::new(
+        let base_bundle = SignetEthBundle::new(
             EthSendBundle { txs: rollup_txs, block_number: target_block, ..Default::default() },
             host_txs,
         );
 
-        self.submitter
-            .submit_bundle(bundle)
-            .await
-            .map_err(|error| FeePolicyError::Submission(Box::new(error)))
+        let targets = target_block..target_block + u64::from(target_block_count);
+        debug!(target_blocks = %format!("[{targets:?})"), "submitting fills");
+
+        try_join_all(targets.map(|target| {
+            let mut bundle = base_bundle.clone();
+            bundle.bundle.block_number = target;
+            self.submitter.submit_bundle(bundle)
+        }))
+        .await
+        .map_err(|error| FeePolicyError::Submission(Box::new(error)))
     }
 }
 

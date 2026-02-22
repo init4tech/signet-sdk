@@ -189,15 +189,19 @@ where
     /// Signs fills for all orders and submits them via the [`FillSubmitter`].
     ///
     /// Returns an error if `orders` is empty, or if signing or submission fails.
-    #[instrument(skip_all, fields(order_count = orders.len()))]
-    pub async fn fill(&self, orders: Vec<SignedOrder>) -> Result<Submit::Response, FillerError> {
+    #[instrument(skip_all, fields(order_count = orders.len(), target_block_count))]
+    pub async fn fill(
+        &self,
+        orders: Vec<SignedOrder>,
+        target_block_count: u8,
+    ) -> Result<Submit::Response, FillerError> {
         if orders.is_empty() {
             return Err(FillerError::NoOrders);
         }
 
         let orders_and_fills = self.sign_fills(orders).await?;
         self.submitter
-            .submit_fills(orders_and_fills)
+            .submit_fills(orders_and_fills, target_block_count)
             .await
             .map_err(|error| FillerError::Submission(Box::new(error)))
     }
