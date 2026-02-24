@@ -186,7 +186,8 @@ where
 {
     /// Fill one or more orders.
     ///
-    /// Signs fills for all orders and submits them via the [`FillSubmitter`].
+    /// Signs fills for all orders and submits them via the [`FillSubmitter`]. The bundle is
+    /// submitted to target the next `target_block_count` blocks.
     ///
     /// Returns an error if `orders` is empty, or if signing or submission fails.
     #[instrument(skip_all, fields(order_count = orders.len(), target_block_count))]
