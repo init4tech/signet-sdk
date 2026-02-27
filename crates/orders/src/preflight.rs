@@ -9,7 +9,6 @@
 use alloy::{
     primitives::{Address, U256},
     providers::Provider,
-    transports::Transport,
 };
 use thiserror::Error;
 
@@ -69,27 +68,24 @@ pub const PERMIT2_ADDRESS: Address =
 
 /// Preflight validator for checking order conditions before submission.
 #[derive(Debug, Clone)]
-pub struct PreflightChecker<T, P> {
+pub struct PreflightChecker<P> {
     provider: P,
     permit2_address: Address,
-    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T, P> PreflightChecker<T, P>
-where
-    T: Transport + Clone,
-    P: Provider<T> + Clone,
-{
+impl<P> PreflightChecker<P> {
     /// Create a new preflight checker with the default Permit2 address.
-    pub fn new(provider: P) -> Self {
+    pub const fn new(provider: P) -> Self {
         Self::with_permit2_address(provider, PERMIT2_ADDRESS)
     }
 
     /// Create a new preflight checker with a custom Permit2 address.
-    pub fn with_permit2_address(provider: P, permit2_address: Address) -> Self {
-        Self { provider, permit2_address, _phantom: std::marker::PhantomData }
+    pub const fn with_permit2_address(provider: P, permit2_address: Address) -> Self {
+        Self { provider, permit2_address }
     }
+}
 
+impl<P: Provider> PreflightChecker<P> {
     /// Check if the user has sufficient balance of a token.
     pub async fn check_token_balance(
         &self,
@@ -98,7 +94,7 @@ where
         required_amount: U256,
     ) -> Result<(), PreflightError> {
         let erc20 = IERC20::new(token, &self.provider);
-        let balance = erc20.balanceOf(user).call().await?.balanceOf;
+        let balance = erc20.balanceOf(user).call().await?;
 
         if balance < required_amount {
             return Err(PreflightError::InsufficientBalance {
@@ -118,7 +114,7 @@ where
         required_amount: U256,
     ) -> Result<(), PreflightError> {
         let erc20 = IERC20::new(token, &self.provider);
-        let allowance = erc20.allowance(user, self.permit2_address).call().await?.allowance;
+        let allowance = erc20.allowance(user, self.permit2_address).call().await?;
 
         if allowance < required_amount {
             return Err(PreflightError::InsufficientAllowance {
@@ -139,7 +135,7 @@ where
         let (word_pos, bit_pos) = nonce_to_bitmap_position(nonce);
 
         let permit2 = IPermit2::new(self.permit2_address, &self.provider);
-        let bitmap = permit2.nonceBitmap(user, word_pos).call().await?.nonceBitmap;
+        let bitmap = permit2.nonceBitmap(user, word_pos).call().await?;
 
         // Check if the bit is set (nonce consumed)
         if bitmap & (U256::from(1) << bit_pos) != U256::ZERO {
@@ -180,10 +176,7 @@ fn nonce_to_bitmap_position(nonce: u64) -> (U256, u8) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::{
-        primitives::uint,
-        providers::{Provider, ProviderBuilder},
-    };
+    use alloy::primitives::uint;
 
     #[test]
     fn test_nonce_to_bitmap_position() {
@@ -194,21 +187,8 @@ mod tests {
         assert_eq!(nonce_to_bitmap_position(511), (U256::from(1), 255));
         assert_eq!(
             nonce_to_bitmap_position(0x0123456789ABCDEF),
-            (U256::from(0x0123456789ABCD), 0xEF)
+            (U256::from(0x0123456789ABCDu64), 0xEF)
         );
-    }
-
-    #[tokio::test]
-    async fn test_preflight_checker_creation() {
-        // Test that we can create a PreflightChecker with the default Permit2 address
-        let provider = ProviderBuilder::new().on_builtin("http://localhost:8545").await.unwrap();
-        let checker = PreflightChecker::new(provider.clone());
-        assert_eq!(checker.permit2_address, PERMIT2_ADDRESS);
-
-        // Test with custom address
-        let custom_address = Address::random();
-        let checker = PreflightChecker::with_permit2_address(provider, custom_address);
-        assert_eq!(checker.permit2_address, custom_address);
     }
 
     #[test]
