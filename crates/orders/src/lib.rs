@@ -25,5 +25,8 @@ pub use filler::{Filler, FillerError, FillerOptions, OrdersAndFills};
 mod order_sender;
 pub use order_sender::{OrderSender, OrderSenderError};
 
+mod preflight;
+pub use preflight::{PreflightChecker, PreflightError, PERMIT2_ADDRESS};
+
 mod traits;
 pub use traits::{BundleSubmitter, FillSubmitter, OrderSource, OrderSubmitter, TxBuilder};
