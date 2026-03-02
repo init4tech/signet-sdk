@@ -19,6 +19,8 @@ mod impls;
 mod fee_policy;
 pub use fee_policy::{FeePolicyError, FeePolicySubmitter};
 
+pub mod permit2;
+
 mod filler;
 pub use filler::{Filler, FillerError, FillerOptions, OrdersAndFills};
 

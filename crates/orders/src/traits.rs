@@ -87,9 +87,11 @@ pub trait FillSubmitter {
 
     /// Submit signed fills to the backend.
     ///
-    /// The fills map contains one [`SignedFill`] per destination chain ID.
+    /// The fills map contains one [`SignedFill`] per destination chain ID. The bundle is submitted
+    /// to target the next `target_block_count` blocks.
     fn submit_fills(
         &self,
         orders_and_fills: OrdersAndFills,
+        target_block_count: u8,
     ) -> impl Future<Output = Result<Self::Response, Self::Error>> + Send;
 }

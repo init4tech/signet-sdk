@@ -208,7 +208,11 @@ impl FillSubmitter for MockFillSubmitter {
     type Response = ();
     type Error = Infallible;
 
-    async fn submit_fills(&self, orders_and_fills: OrdersAndFills) -> Result<(), Self::Error> {
+    async fn submit_fills(
+        &self,
+        orders_and_fills: OrdersAndFills,
+        _target_block_count: u8,
+    ) -> Result<(), Self::Error> {
         self.submissions.lock().unwrap().push(orders_and_fills);
         Ok(())
     }
