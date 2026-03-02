@@ -164,6 +164,18 @@ async fn fill_with_empty_orders_returns_error() {
 }
 
 #[tokio::test]
+async fn fill_with_zero_target_blocks_returns_error() {
+    let orders = default_test_orders().await;
+    let filler_key = &TEST_SIGNERS[1];
+    let source = MockOrderSource::empty();
+    let submitter = MockFillSubmitter::new();
+    let filler = Filler::new(filler_key.clone(), source, submitter, TEST_SYS, FillerOptions::new());
+
+    let result = filler.fill(orders, 0).await;
+    assert!(matches!(result, Err(FillerError::ZeroTargetBlocks)));
+}
+
+#[tokio::test]
 async fn submission_error_propagates() {
     #[derive(Debug, Clone)]
     struct FailingSubmitter;

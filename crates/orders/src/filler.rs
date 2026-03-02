@@ -17,6 +17,9 @@ pub enum FillerError {
     /// No orders to fill.
     #[error("no orders to fill")]
     NoOrders,
+    /// Zero target blocks specified.
+    #[error("cannot specify 0 target blocks")]
+    ZeroTargetBlocks,
     /// Failed to sign fills for orders.
     #[error("failed to sign fills: {0}")]
     Signing(#[from] SigningError),
@@ -198,6 +201,9 @@ where
     ) -> Result<Submit::Response, FillerError> {
         if orders.is_empty() {
             return Err(FillerError::NoOrders);
+        }
+        if target_block_count == 0 {
+            return Err(FillerError::ZeroTargetBlocks);
         }
 
         let orders_and_fills = self.sign_fills(orders).await?;
