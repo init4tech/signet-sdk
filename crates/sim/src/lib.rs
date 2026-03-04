@@ -19,7 +19,9 @@ mod built;
 pub use built::BuiltBlock;
 
 mod cache;
-pub use cache::{CacheError, SimCache, SimIdentifier, SimItem, SimItemValidity, StateSource};
+pub use cache::{
+    AcctInfo, CacheError, SimCache, SimIdentifier, SimItem, SimItemValidity, StateSource,
+};
 
 mod env;
 pub use env::{HostEnv, RollupEnv, SharedSimEnv, SimEnv};

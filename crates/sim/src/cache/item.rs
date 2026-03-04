@@ -113,12 +113,11 @@ impl SimItem {
         }
     }
 
-    fn check_tx<S>(&self, source: &S) -> Result<SimItemValidity, Box<dyn std::error::Error>>
+    async fn check_tx<S>(&self, source: &S) -> Result<SimItemValidity, Box<dyn std::error::Error>>
     where
         S: StateSource,
     {
         let item = self.as_tx().expect("SimItem is not a Tx");
-
         let total = U256::from(item.max_fee_per_gas() * item.gas_limit() as u128) + item.value();
 
         source
@@ -139,10 +138,11 @@ impl SimItem {
                 // nonce is equal and balance is sufficient
                 SimItemValidity::Now
             })
+            .await
             .map_err(Into::into)
     }
 
-    fn check_bundle_tx_list<S>(
+    async fn check_bundle_tx_list<S>(
         items: impl Iterator<Item = TxRequirement>,
         source: &S,
     ) -> Result<SimItemValidity, S::Error>
@@ -160,7 +160,7 @@ impl SimItem {
 
         // Peek to perform the balance check for the first tx
         if let Some(first) = items.peek() {
-            let info = source.account_details(&first.signer)?;
+            let info = source.account_details(&first.signer).await?;
 
             // check balance for the first tx is sufficient
             if first.balance > info.balance {
@@ -175,7 +175,7 @@ impl SimItem {
             let state_nonce = match nonce_cache.get(&requirement.signer) {
                 Some(cached_nonce) => *cached_nonce,
                 None => {
-                    let nonce = source.nonce(&requirement.signer)?;
+                    let nonce = source.nonce(&requirement.signer).await?;
                     nonce_cache.insert(requirement.signer, nonce);
                     nonce
                 }
@@ -198,7 +198,7 @@ impl SimItem {
         Ok(SimItemValidity::Now)
     }
 
-    fn check_bundle<S, S2>(
+    async fn check_bundle<S, S2>(
         &self,
         source: &S,
         host_source: &S2,
@@ -209,8 +209,8 @@ impl SimItem {
     {
         let item = self.as_bundle().expect("SimItem is not a Bundle");
 
-        let ru_tx = Self::check_bundle_tx_list(item.tx_reqs(), source)?;
-        let host_tx = Self::check_bundle_tx_list(item.host_tx_reqs(), host_source)?;
+        let ru_tx = Self::check_bundle_tx_list(item.tx_reqs(), source).await?;
+        let host_tx = Self::check_bundle_tx_list(item.host_tx_reqs(), host_source).await?;
 
         // Check both the regular txs and the host txs.
         Ok(ru_tx.min(host_tx))
@@ -220,7 +220,7 @@ impl SimItem {
     ///
     /// This will check that nonces and balances are sufficient for the item to
     /// be included on the current state.
-    pub fn check<S, S2>(
+    pub async fn check<S, S2>(
         &self,
         source: &S,
         host_source: &S2,
@@ -230,8 +230,8 @@ impl SimItem {
         S2: StateSource,
     {
         match self {
-            SimItem::Bundle(_) => self.check_bundle(source, host_source),
-            SimItem::Tx(_) => self.check_tx(source),
+            SimItem::Bundle(_) => self.check_bundle(source, host_source).await,
+            SimItem::Tx(_) => self.check_tx(source).await,
         }
     }
 }

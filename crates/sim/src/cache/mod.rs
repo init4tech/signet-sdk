@@ -5,7 +5,7 @@ mod item;
 pub use item::{SimIdentifier, SimItem};
 
 mod state;
-pub use state::StateSource;
+pub use state::{AcctInfo, StateSource};
 
 mod store;
 pub use store::SimCache;

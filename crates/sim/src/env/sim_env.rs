@@ -6,7 +6,7 @@ use signet_evm::SignetInspector;
 use signet_types::constants::SignetSystemConstants;
 use std::{borrow::Cow, sync::Arc};
 use tokio::sync::{mpsc, watch};
-use tracing::{instrument, trace, trace_span, warn};
+use tracing::{instrument, trace, trace_span};
 use trevm::{
     helpers::Ctx,
     revm::{
@@ -259,20 +259,8 @@ where
         max_gas: u64,
         max_host_gas: u64,
         best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
+        active_sim: Vec<(u128, SimItem)>,
     ) {
-        // Pull the `n` best items from the cache.
-        let active_sim = match self.sim_items.read_best_valid(
-            self.concurrency_limit,
-            &self.rollup_env().db(),
-            &self.host_env().db(),
-        ) {
-            Ok(items) => items,
-            Err(error) => {
-                warn!(%error, "State access error during sim round preflight");
-                return;
-            }
-        };
-
         // Create a channel to send the results back.
         let (candidates, mut candidates_rx) = mpsc::channel(self.concurrency_limit);
 
