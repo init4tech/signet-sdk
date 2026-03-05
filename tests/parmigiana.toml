@@ -1,0 +1,53 @@
+# Parmigiana Testnet Configuration
+#
+# This configuration file documents the Parmigiana testnet settings.
+# All values are sourced from signet_constants::parmigiana and should
+# NOT be hardcoded in tests. Use the constants directly in Rust code.
+#
+# This file serves as documentation and for tools that need TOML config.
+
+[network]
+name = "Parmigiana"
+# Chain IDs are defined in signet_constants::parmigiana::{HOST_CHAIN_ID, RU_CHAIN_ID}
+
+[host]
+# Host chain configuration - use signet_constants::parmigiana::HOST
+# chain_id = HOST_CHAIN_ID (3151908)
+# zenith = HOST_ZENITH
+# orders = HOST_ORDERS
+# passage = HOST_PASSAGE
+# transactor = HOST_TRANSACTOR
+
+[rollup]
+# Rollup chain configuration - use signet_constants::parmigiana::ROLLUP
+# chain_id = RU_CHAIN_ID (88888)
+# orders = RU_ORDERS
+# passage = RU_PASSAGE
+# base_fee_recipient = BASE_FEE_RECIPIENT
+
+[tokens.host]
+# Host tokens - use signet_constants::parmigiana::HOST_TOKENS
+# usdc = HOST_USDC
+# usdt = HOST_USDT
+# wbtc = HOST_WBTC
+# weth = HOST_WETH
+
+[tokens.rollup]
+# Rollup tokens - use signet_constants::parmigiana::RU_TOKENS
+# wbtc = RU_WBTC
+# weth = RU_WETH
+# wrapped = WRAPPED
+
+[endpoints]
+# Transaction cache endpoint
+tx_cache = "https://transactions.parmigiana.signet.sh"
+
+# RPC endpoints for test connections
+# These may be configured via environment variables:
+# - PARMIGIANA_HOST_RPC_URL
+# - PARMIGIANA_RU_RPC_URL
+
+[test_accounts]
+# Test accounts should be funded on Parmigiana testnet
+# Use signet_test_utils::users::TEST_SIGNERS for deterministic test keys
+# Addresses from TEST_USERS array (derived from TEST_SIGNERS)
