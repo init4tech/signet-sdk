@@ -24,11 +24,11 @@ trevm = { workspace = true, features = ["test-utils"] }
 alloy.workspace = true
 futures-util.workspace = true
 
+thiserror.workspace = true
 tokio = { workspace = true, features = ["test-util", "time"] }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 chrono.workspace = true
-thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
