@@ -19,7 +19,7 @@ pub const HOST_RPC_URL: &str = "https://host-rpc.parmigiana.signet.sh";
 /// Rollup HTTP RPC URL for the Parmigiana testnet.
 pub const RU_RPC_URL: &str = "https://rpc.parmigiana.signet.sh";
 /// Rollup WebSocket RPC URL for the Parmigiana testnet.
-pub const RU_WS_URL: &str = "ws://rpc.parmigiana.signet.sh";
+pub const RU_WS_URL: &str = "wss://rpc.parmigiana.signet.sh";
 
 /// Transport protocol for the rollup RPC connection.
 #[derive(Debug, Clone, Copy, Default)]
