@@ -16,7 +16,7 @@ use alloy::{
     primitives::{Address, Bytes, KECCAK256_EMPTY, U256},
 };
 use signet_constants::test_utils::*;
-use signet_sim::{BlockBuild, HostEnv, RollupEnv};
+use signet_sim::{AcctInfo, BlockBuild, HostEnv, RollupEnv, StateSource};
 use trevm::{
     helpers::Ctx,
     revm::{
@@ -112,12 +112,47 @@ pub fn host_sim_env() -> HostEnv<Arc<InMemoryDB>, NoOpInspector> {
     HostEnv::new(host_db, TEST_SYS, &HostTestCfg, &NoopBlock)
 }
 
+/// Async state source adapter for sync in-memory databases.
+///
+/// Wraps an `Arc<InMemoryDB>` and implements [`StateSource`] by delegating to sync
+/// `DatabaseRef` methods. Suitable for tests where no real I/O occurs.
+#[derive(Clone)]
+pub struct SyncAsyncSource(pub Arc<InMemoryDB>);
+
+impl StateSource for SyncAsyncSource {
+    type Error = <InMemoryDB as trevm::revm::DatabaseRef>::Error;
+
+    async fn account_details(&self, address: &Address) -> Result<AcctInfo, Self::Error> {
+        use trevm::revm::DatabaseRef;
+        let info = self.0.basic_ref(*address)?.unwrap_or_default();
+        let has_code = info.code_hash() != trevm::revm::primitives::KECCAK_EMPTY;
+        Ok(AcctInfo { nonce: info.nonce, balance: info.balance, has_code })
+    }
+}
+
 /// Create a [`BlockBuild`] simulator environment for testing.
 pub fn test_sim_env(
     deadline: tokio::time::Instant,
-) -> BlockBuild<Arc<InMemoryDB>, Arc<InMemoryDB>> {
-    let (ru_evm, host_evm) = (rollup_sim_env(), host_sim_env());
-    BlockBuild::new(ru_evm, host_evm, deadline, 10, Default::default(), 50_000_000, 50_000_000)
+) -> BlockBuild<Arc<InMemoryDB>, Arc<InMemoryDB>, SyncAsyncSource, SyncAsyncSource> {
+    let ru_evm = rollup_sim_env();
+    let host_evm = host_sim_env();
+
+    let mut ru_async_db = InMemoryDB::default();
+    setup_rollup_db(&mut ru_async_db).unwrap();
+    let mut host_async_db = InMemoryDB::default();
+    setup_host_db(&mut host_async_db).unwrap();
+
+    BlockBuild::new(
+        ru_evm,
+        host_evm,
+        deadline,
+        10,
+        Default::default(),
+        50_000_000,
+        50_000_000,
+        SyncAsyncSource(Arc::new(ru_async_db)),
+        SyncAsyncSource(Arc::new(host_async_db)),
+    )
 }
 
 fn modify_account<Db, F>(db: &mut Db, addr: Address, f: F) -> Result<AccountInfo, Db::Error>

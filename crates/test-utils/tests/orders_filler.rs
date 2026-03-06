@@ -1,4 +1,7 @@
 //! Integration tests for [`signet_orders::Filler`].
+
+#![recursion_limit = "256"]
+
 use alloy::{
     consensus::{Transaction, TxEnvelope},
     eips::eip2718::Decodable2718,

@@ -1,12 +1,43 @@
-use crate::{env::RollupEnv, outcome::SimulatedItem, HostEnv, SimCache, SimDb, SimEnv};
+use crate::{
+    cache::StateSource, env::RollupEnv, outcome::SimulatedItem, AcctInfo, HostEnv, SimCache, SimDb,
+    SimEnv,
+};
+use alloy::primitives::Address;
 use core::fmt;
 use std::{ops::Deref, sync::Arc};
 use tokio::{select, sync::watch};
-use tracing::{debug, trace, trace_span};
+use tracing::{debug, trace, trace_span, warn};
 use trevm::{
+    db::TryCachingDb,
     helpers::Ctx,
-    revm::{inspector::NoOpInspector, DatabaseRef, Inspector},
+    revm::{database::Cache, inspector::NoOpInspector, DatabaseRef, Inspector},
 };
+
+/// Composite async source that overlays the sim env's committed cache
+/// on top of a fallback [`StateSource`].
+///
+/// Accounts whose state was modified by prior sim rounds (present in
+/// the cache) are returned directly, avoiding async I/O. Accounts not
+/// in the cache fall through to the asynchronous source.
+struct CachedAsyncSource<'a, S> {
+    cache: &'a Cache,
+    fallback: &'a S,
+}
+
+impl<S: StateSource> StateSource for CachedAsyncSource<'_, S> {
+    type Error = S::Error;
+
+    async fn account_details(&self, address: &Address) -> Result<AcctInfo, Self::Error> {
+        if let Some(acct) = self.cache.accounts.get(address) {
+            return Ok(AcctInfo {
+                nonce: acct.info.nonce,
+                balance: acct.info.balance,
+                has_code: acct.info.code_hash() != trevm::revm::primitives::KECCAK_EMPTY,
+            });
+        }
+        self.fallback.account_details(address).await
+    }
+}
 
 /// A simulation environment.
 ///
@@ -89,8 +120,52 @@ where
     }
 
     /// Run a simulation round, returning the best item.
-    pub async fn sim_round(&mut self, max_gas: u64, max_host_gas: u64) -> Option<SimulatedItem> {
+    ///
+    /// Preflight validity checks (nonce/balance) are performed asynchronously
+    /// using the provided [`StateSource`]s. This avoids the tokio I/O
+    /// driver starvation deadlock that occurs when sync `DatabaseRef` calls
+    /// go through `block_in_place` + `Handle::block_on`.
+    pub async fn sim_round<AS, AH>(
+        &mut self,
+        max_gas: u64,
+        max_host_gas: u64,
+        async_ru_source: &AS,
+        async_host_source: &AH,
+    ) -> Option<SimulatedItem>
+    where
+        AS: StateSource,
+        AH: StateSource,
+    {
         let span = trace_span!("sim_round", max_gas, max_host_gas).or_current();
+
+        // Overlay the sim env's committed cache so that accounts touched
+        // by prior rounds (e.g. nonce bumps) are visible to the preflight
+        // validity check without requiring async I/O.
+        let ru_source = CachedAsyncSource {
+            cache: self.inner.rollup_env().db().cache(),
+            fallback: async_ru_source,
+        };
+        let host_source = CachedAsyncSource {
+            cache: self.inner.host_env().db().cache(),
+            fallback: async_host_source,
+        };
+
+        let active_sim = match self
+            .inner
+            .sim_items()
+            .read_best_valid(self.inner.concurrency_limit(), &ru_source, &host_source)
+            .await
+        {
+            Ok(items) => items,
+            Err(error) => {
+                warn!(%error, "preflight validity check failed");
+                return None;
+            }
+        };
+
+        if active_sim.is_empty() {
+            return None;
+        }
 
         // These will be moved into the blocking task.
         let scope_span = span.clone();
@@ -99,7 +174,7 @@ where
 
         // Spawn a blocking task to run the simulations.
         let sim_task = tokio::task::spawn_blocking(move || {
-            scope_span.in_scope(|| this.sim_round(max_gas, max_host_gas, best_tx))
+            scope_span.in_scope(|| this.sim_round(max_gas, max_host_gas, best_tx, active_sim))
         });
 
         // Either simulation is done, or we time out

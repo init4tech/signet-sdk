@@ -64,73 +64,6 @@ impl SimCache {
         vec
     }
 
-    /// Iter over the best items in the cache, writing only those that pass
-    /// preflight validity checks (nonce and initial fee) to the buffer.
-    ///
-    /// The state sources are used to validate the items against the current
-    /// nonce and balance, to prevent simulating invalid items.
-    ///
-    /// This will additionally remove items that can _never_ be valid from the
-    /// cache.
-    ///
-    /// When an error is encountered, the process stops and the error is
-    /// returned. At this point, the buffer may be partially written.
-    pub fn write_best_valid_to<S, S2>(
-        &self,
-        buf: &mut [MaybeUninit<(u128, SimItem)>],
-        source: &S,
-        host_source: &S2,
-    ) -> Result<usize, Box<dyn std::error::Error>>
-    where
-        S: StateSource,
-        S2: StateSource,
-    {
-        let mut cache = self.inner.upgradable_read();
-        let mut slots = buf.iter_mut();
-        let start = slots.len();
-
-        let mut never = Vec::new();
-
-        // Traverse the cache in reverse order (best items first), checking
-        // each item.
-        //
-        // Errors are shortcut by `try_for_each`. Passes are written to the
-        // buffer, consuming slots. Once no slots are left, the try_for_each
-        // returns early.
-        let res = cache
-            .items
-            .iter()
-            .rev()
-            .map(|(rank, item)| {
-                item.check(source, host_source).map(|validity| (validity, rank, item))
-            })
-            .try_for_each(|result| {
-                if slots.len() == 0 {
-                    return Ok(());
-                }
-                let (validity, rank, item) = result?;
-
-                if validity.is_valid_now() {
-                    slots.next().expect("checked by len").write((*rank, item.clone()));
-                }
-                if validity.is_never_valid() {
-                    never.push(*rank);
-                }
-
-                Ok(())
-            })
-            .map(|_| start - slots.len());
-
-        cache.with_upgraded(|cache| {
-            // Remove never valid items from the cache
-            never.iter().for_each(|rank| {
-                cache.remove_and_disallow(*rank);
-            });
-        });
-
-        res
-    }
-
     /// Get up to the `n` best items in the cache that pass preflight validity
     /// checks (nonce and initial fee). The returned vector may be smaller than
     /// `n` if not enough valid items are found.
@@ -140,7 +73,7 @@ impl SimCache {
     ///
     /// The state sources are used to validate the items against the current
     /// nonce and balance, to prevent simulating invalid items.
-    pub fn read_best_valid<S, S2>(
+    pub async fn read_best_valid<S, S2>(
         &self,
         n: usize,
         source: &S,
@@ -150,11 +83,41 @@ impl SimCache {
         S: StateSource,
         S2: StateSource,
     {
-        let mut vec = Vec::with_capacity(n);
-        let n = self.write_best_valid_to(vec.spare_capacity_mut(), source, host_source)?;
-        // SAFETY: We just wrote n items.
-        unsafe { vec.set_len(n) };
-        Ok(vec)
+        // Snapshot the entire cache under a short-lived read lock so that
+        // filtering out invalid items doesn't reduce the result set below `n`.
+        let candidates: Vec<(u128, SimItem)> = {
+            let cache = self.inner.read();
+            // Traverse the cache in reverse order (best items first).
+            cache.items.iter().rev().map(|(rank, item)| (*rank, item.clone())).collect()
+        };
+
+        let mut valid = Vec::with_capacity(n);
+        let mut never = Vec::new();
+
+        for (rank, item) in &candidates {
+            if valid.len() >= n {
+                break;
+            }
+
+            let validity = item.check(source, host_source).await?;
+
+            if validity.is_valid_now() {
+                valid.push((*rank, item.clone()));
+            }
+            if validity.is_never_valid() {
+                never.push(*rank);
+            }
+        }
+
+        // Remove never-valid items under a write lock.
+        if !never.is_empty() {
+            let mut cache = self.inner.write();
+            for rank in never {
+                cache.remove_and_disallow(rank);
+            }
+        }
+
+        Ok(valid)
     }
 
     /// Get the number of items in the cache.

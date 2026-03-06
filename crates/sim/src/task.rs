@@ -1,4 +1,6 @@
-use crate::{env::SimEnv, BuiltBlock, HostEnv, RollupEnv, SharedSimEnv, SimCache, SimDb};
+use crate::{
+    cache::StateSource, env::SimEnv, BuiltBlock, HostEnv, RollupEnv, SharedSimEnv, SimCache, SimDb,
+};
 use std::time::Duration;
 use tokio::select;
 use tracing::{debug, trace};
@@ -12,9 +14,22 @@ pub(crate) const SIM_SLEEP_MS: u64 = 50;
 
 /// Builds a single block by repeatedly invoking [`SimEnv`].
 #[derive(Debug)]
-pub struct BlockBuild<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspector> {
+pub struct BlockBuild<
+    RuDb,
+    HostDb,
+    RuAsync,
+    HostAsync,
+    RuInsp = NoOpInspector,
+    HostInsp = NoOpInspector,
+> {
     /// The simulation environment.
     env: SharedSimEnv<RuDb, HostDb, RuInsp, HostInsp>,
+
+    /// Async state source for the rollup chain, used for preflight validity checks.
+    ru_async_source: RuAsync,
+
+    /// Async state source for the host chain, used for preflight validity checks.
+    host_async_source: HostAsync,
 
     /// The block being built.
     block: BuiltBlock,
@@ -30,14 +45,18 @@ pub struct BlockBuild<RuDb, HostDb, RuInsp = NoOpInspector, HostInsp = NoOpInspe
     max_host_gas: u64,
 }
 
-impl<RuDb, HostDb, RuInsp, HostInsp> BlockBuild<RuDb, HostDb, RuInsp, HostInsp>
+impl<RuDb, HostDb, RuAsync, HostAsync, RuInsp, HostInsp>
+    BlockBuild<RuDb, HostDb, RuAsync, HostAsync, RuInsp, HostInsp>
 where
     RuDb: DatabaseRef + Send + Sync + 'static,
     RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync + 'static,
     HostDb: DatabaseRef + Send + Sync + 'static,
     HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync + 'static,
+    RuAsync: StateSource,
+    HostAsync: StateSource,
 {
     /// Create a new block building process.
+    #[expect(clippy::too_many_arguments, reason = "should be refactored to avoid this warning")]
     pub fn new(
         rollup: RollupEnv<RuDb, RuInsp>,
         host: HostEnv<HostDb, HostInsp>,
@@ -46,6 +65,8 @@ where
         sim_items: SimCache,
         max_gas: u64,
         max_host_gas: u64,
+        ru_async_source: RuAsync,
+        host_async_source: HostAsync,
     ) -> Self {
         let number = rollup.block().number;
 
@@ -59,6 +80,8 @@ where
         let finish_by = env.finish_by();
         Self {
             env: env.into(),
+            ru_async_source,
+            host_async_source,
             block: BuiltBlock::new(number.to()),
             finish_by,
             max_gas,
@@ -114,7 +137,16 @@ where
         let gas_allowed = self.max_gas - self.block.gas_used();
         let host_gas_allowed = self.max_host_gas - self.block.host_gas_used();
 
-        if let Some(simulated) = self.env.sim_round(gas_allowed, host_gas_allowed).await {
+        if let Some(simulated) = self
+            .env
+            .sim_round(
+                gas_allowed,
+                host_gas_allowed,
+                &self.ru_async_source,
+                &self.host_async_source,
+            )
+            .await
+        {
             debug!(
                 score = %simulated.score,
                 gas_used = simulated.gas_used,
@@ -163,6 +195,7 @@ where
             }
 
             // If there are items to simulate, we run a simulation round.
+            let prev_tx_count = self.block.transactions.len();
             let fut = self.round();
 
             select! {
@@ -179,6 +212,13 @@ where
                     trace!(remaining_items, "Round completed");
                 }
             }
+
+            // If the round didn't produce any new transactions (e.g. all
+            // cached items have Future validity), sleep to avoid spinning
+            // and allow new items to arrive.
+            if self.block.transactions.len() == prev_tx_count {
+                tokio::time::sleep_until(next_round_time).await;
+            }
         }
 
         debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
@@ -194,19 +234,21 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::future::Future;
-
     use super::*;
+    use crate::cache::StateSource;
+    use std::future::Future;
 
     /// Compile-time check to ensure that the block building process is
     /// `Send`.
-    fn _build_fut_is_send<RuDb, HostDb, RuInsp, HostInsp>(
-        b: BlockBuild<RuDb, HostDb, RuInsp, HostInsp>,
+    fn _build_fut_is_send<RuDb, HostDb, RuAsync, HostAsync, RuInsp, HostInsp>(
+        b: BlockBuild<RuDb, HostDb, RuAsync, HostAsync, RuInsp, HostInsp>,
     ) where
         RuDb: DatabaseRef + Send + Sync + 'static,
         RuInsp: Inspector<Ctx<SimDb<RuDb>>> + Default + Sync + 'static,
         HostDb: DatabaseRef + Send + Sync + 'static,
         HostInsp: Inspector<Ctx<SimDb<HostDb>>> + Default + Sync + 'static,
+        RuAsync: StateSource,
+        HostAsync: StateSource,
     {
         let _: Box<dyn Future<Output = BuiltBlock> + Send> = Box::new(b.build());
     }

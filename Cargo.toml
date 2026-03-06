@@ -49,7 +49,7 @@ signet-zenith = { version = "0.16.0-rc.12", path = "crates/zenith" }
 signet-test-utils = { version = "0.16.0-rc.12", path = "crates/test-utils" }
 
 # trevm
-trevm = { version = "0.34.0", features = ["full_env_cfg"] }
+trevm = { version = "0.34.1", features = ["full_env_cfg", "asyncdb"] }
 
 # Alloy periphery crates
 alloy-core = "1.4"
