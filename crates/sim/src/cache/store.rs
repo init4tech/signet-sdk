@@ -83,11 +83,12 @@ impl SimCache {
         S: StateSource,
         S2: StateSource,
     {
-        // Snapshot the top items under a short-lived read lock.
+        // Snapshot the entire cache under a short-lived read lock so that
+        // filtering out invalid items doesn't reduce the result set below `n`.
         let candidates: Vec<(u128, SimItem)> = {
             let cache = self.inner.read();
             // Traverse the cache in reverse order (best items first).
-            cache.items.iter().rev().take(n).map(|(rank, item)| (*rank, item.clone())).collect()
+            cache.items.iter().rev().map(|(rank, item)| (*rank, item.clone())).collect()
         };
 
         let mut valid = Vec::with_capacity(n);
