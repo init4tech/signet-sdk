@@ -177,7 +177,7 @@ fn adjust_decimals(amount: U256, decimals: u8, target_decimals: u8) -> U256 {
         let divisor = U256::from(10u64).pow(U256::from(divisor_exp));
         amount / divisor
     } else {
-        let multiplier_exp = target_decimals.checked_sub(decimals).unwrap_or_default();
+        let multiplier_exp = target_decimals.saturating_sub(decimals);
         let multiplier = U256::from(10u64).pow(U256::from(multiplier_exp));
         amount * multiplier
     }
