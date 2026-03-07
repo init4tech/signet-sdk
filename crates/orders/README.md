@@ -16,6 +16,8 @@ Utilities for placing and filling [orders] on Signet.
 - [`Filler`] — orchestrates the order-filling pipeline: fetch pending orders
   from an `OrderSource`, sign Permit2 fills, and submit them via a
   `FillSubmitter`. Returns a stream of orders and supports batch filling.
+- [`PreflightChecker`] — validates order conditions before submission: token
+  balance sufficiency, ERC20 approvals to Permit2, and nonce availability.
 - [`FeePolicySubmitter`] — a `FillSubmitter` that builds fill and initiate
   transactions, wraps them in a `SignetEthBundle`, and submits via a
   `BundleSubmitter`. Handles gas pricing for both rollup and host chains.
@@ -64,6 +66,22 @@ let filler = Filler::new(signer, tx_cache, submitter, constants, FillerOptions::
 // Fetch and fill
 let orders: Vec<_> = filler.get_orders().try_collect().await?;
 let response = filler.fill(orders).await?;
+```
+
+**Preflight validation:**
+
+```rust
+use signet_orders::PreflightChecker;
+
+let checker = PreflightChecker::new(provider);
+
+// Check all conditions before creating a fill
+let result = checker.check_all(token, user, amount, nonce).await?;
+
+// Or check individual conditions
+let balance_ok = checker.check_token_balance(token, user, amount).await.is_ok();
+let approval_ok = checker.check_erc20_approval(token, user, amount).await.is_ok();
+let nonce_ok = checker.check_permit2_nonce(user, nonce).await.is_ok();
 ```
 
 For a complete example of a filler service, see [signet-filler].
