@@ -26,7 +26,7 @@ mod order_sender;
 pub use order_sender::{OrderSender, OrderSenderError};
 
 mod preflight;
-pub use preflight::{PreflightChecker, PreflightError, PERMIT2_ADDRESS};
+pub use preflight::{Permit2PreflightExt, PreflightError};
 
 mod traits;
 pub use traits::{BundleSubmitter, FillSubmitter, OrderSource, OrderSubmitter, TxBuilder};

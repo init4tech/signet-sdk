@@ -42,6 +42,7 @@ pub use seq::{RequestSigner, SignRequest, SignResponse};
 mod signing;
 pub use signing::{
     SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
+    PERMIT2_ADDRESS,
 };
 
 mod utils;
