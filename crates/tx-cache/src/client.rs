@@ -440,7 +440,8 @@ impl TxCache {
             .join(feed)
             .inspect_err(|e| warn!(%e, "Failed to join URL for SSE subscription"))?;
 
-        let es = self.client.get(url).send().await?.bytes_stream().eventsource();
+        let es =
+            self.client.get(url).send().await?.error_for_status()?.bytes_stream().eventsource();
 
         Ok(es
             .map(|result| match result {
