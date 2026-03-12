@@ -21,6 +21,18 @@ pub enum TxCacheError {
     /// An error occurred while contacting the TxCache API.
     #[error("Error contacting TxCache API: {0}")]
     Reqwest(reqwest::Error),
+
+    /// An error occurred while parsing SSE events.
+    #[cfg(feature = "sse")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    #[error("SSE stream error: {0}")]
+    Sse(eventsource_stream::EventStreamError<reqwest::Error>),
+
+    /// Failed to deserialize an SSE event payload.
+    #[cfg(feature = "sse")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    #[error("Failed to deserialize SSE event: {0}")]
+    Deserialization(serde_json::Error),
 }
 
 impl From<reqwest::Error> for TxCacheError {
@@ -30,5 +42,19 @@ impl From<reqwest::Error> for TxCacheError {
             Some(reqwest::StatusCode::FORBIDDEN) => TxCacheError::NotOurSlot,
             _ => TxCacheError::Reqwest(err),
         }
+    }
+}
+
+#[cfg(feature = "sse")]
+impl From<eventsource_stream::EventStreamError<reqwest::Error>> for TxCacheError {
+    fn from(err: eventsource_stream::EventStreamError<reqwest::Error>) -> Self {
+        Self::Sse(err)
+    }
+}
+
+#[cfg(feature = "sse")]
+impl From<serde_json::Error> for TxCacheError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Deserialization(err)
     }
 }
