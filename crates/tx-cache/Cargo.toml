@@ -10,6 +10,10 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+sse = ["dep:eventsource-stream", "dep:serde_json", "reqwest/stream"]
+
 [dependencies]
 signet-bundle.workspace = true
 signet-constants.workspace = true
@@ -18,8 +22,10 @@ signet-types.workspace = true
 alloy.workspace = true
 futures-util.workspace = true
 
+eventsource-stream = { workspace = true, optional = true }
 reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
 tracing.workspace = true
 uuid = { workspace = true, features = ["serde"] }
 thiserror.workspace = true

@@ -417,3 +417,80 @@ impl TxCache {
         self.put_inner(&path, order).await
     }
 }
+
+#[cfg(feature = "sse")]
+const TRANSACTIONS_FEED: &str = "transactions/feed";
+#[cfg(feature = "sse")]
+const ORDERS_FEED: &str = "orders/feed";
+
+#[cfg(feature = "sse")]
+impl TxCache {
+    /// Connect to an SSE feed endpoint, returning a stream that
+    /// deserializes each event's JSON data into `T`. The stream
+    /// terminates on the first error, which is yielded as the final
+    /// item.
+    async fn subscribe_inner<T: serde::de::DeserializeOwned + Send + 'static>(
+        &self,
+        feed: &'static str,
+    ) -> Result<impl Stream<Item = Result<T>> + Send> {
+        use eventsource_stream::Eventsource;
+
+        let url = self
+            .url
+            .join(feed)
+            .inspect_err(|e| warn!(%e, "Failed to join URL for SSE subscription"))?;
+
+        let es =
+            self.client.get(url).send().await?.error_for_status()?.bytes_stream().eventsource();
+
+        Ok(es
+            .map(|result| match result {
+                Ok(event) => serde_json::from_str::<T>(&event.data).map_err(Into::into),
+                Err(e) => Err(e.into()),
+            })
+            .scan(false, |errored, result| {
+                if *errored {
+                    return std::future::ready(None);
+                }
+                if result.is_err() {
+                    *errored = true;
+                }
+                std::future::ready(Some(result))
+            }))
+    }
+
+    /// Subscribe to real-time transaction events via SSE.
+    ///
+    /// Connects to the `/transactions/feed` endpoint and returns a
+    /// [`Stream`] that yields each [`TxEnvelope`] as it arrives from
+    /// the server. Unlike [`stream_transactions`], which paginates
+    /// over existing data, this receives new transactions in
+    /// real-time.
+    ///
+    /// The stream terminates on the first error, which is yielded as
+    /// the final item.
+    ///
+    /// [`stream_transactions`]: TxCache::stream_transactions
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    pub async fn subscribe_transactions(
+        &self,
+    ) -> Result<impl Stream<Item = Result<TxEnvelope>> + Send> {
+        self.subscribe_inner(TRANSACTIONS_FEED).await
+    }
+
+    /// Subscribe to real-time order events via SSE.
+    ///
+    /// Connects to the `/orders/feed` endpoint and returns a
+    /// [`Stream`] that yields each [`SignedOrder`] as it arrives from
+    /// the server. Unlike [`stream_orders`], which paginates over
+    /// existing data, this receives new orders in real-time.
+    ///
+    /// The stream terminates on the first error, which is yielded as
+    /// the final item.
+    ///
+    /// [`stream_orders`]: TxCache::stream_orders
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    pub async fn subscribe_orders(&self) -> Result<impl Stream<Item = Result<SignedOrder>> + Send> {
+        self.subscribe_inner(ORDERS_FEED).await
+    }
+}
