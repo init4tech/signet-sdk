@@ -4,7 +4,7 @@ use alloy::{
 };
 pub use signet_constants::test_utils::*;
 use signet_evm::ExecutionOutcome;
-use signet_extract::Extractable;
+use signet_extract::{BlockAndReceipts, Extractable};
 use signet_types::primitives::{RecoveredBlock, SealedBlock, SealedHeader};
 
 /// A simple chain of blocks with receipts.
@@ -38,8 +38,13 @@ impl Extractable for Chain {
     type Block = RecoveredBlock;
     type Receipt = ReceiptEnvelope;
 
-    fn blocks_and_receipts(&self) -> impl Iterator<Item = (&Self::Block, &Vec<Self::Receipt>)> {
-        self.blocks.iter().zip(self.execution_outcome.receipts().iter())
+    fn blocks_and_receipts(
+        &self,
+    ) -> impl Iterator<Item = BlockAndReceipts<'_, Self::Block, Self::Receipt>> {
+        self.blocks
+            .iter()
+            .zip(self.execution_outcome.receipts().iter())
+            .map(|(block, receipts)| BlockAndReceipts { block, receipts })
     }
 }
 

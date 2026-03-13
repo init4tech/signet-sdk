@@ -2,6 +2,15 @@ use alloy::consensus::{BlockHeader, TxReceipt};
 use alloy::primitives::Log;
 use signet_types::primitives::TransactionSigned;
 
+/// A block with its associated receipts.
+#[derive(Debug)]
+pub struct BlockAndReceipts<'a, B, R> {
+    /// The block.
+    pub block: &'a B,
+    /// The receipts for this block's transactions.
+    pub receipts: &'a [R],
+}
+
 /// A trait for types from which data can be extracted. This currently exists
 /// to provide a common interface for extracting data from host chain blocks
 /// and receipts which may be in alloy or reth types.
@@ -12,17 +21,23 @@ pub trait Extractable: core::fmt::Debug + Sync {
     type Receipt: TxReceipt<Log = Log> + core::fmt::Debug + Sync;
 
     /// An iterator over the blocks and their receipts.
-    fn blocks_and_receipts(&self) -> impl Iterator<Item = (&Self::Block, &Vec<Self::Receipt>)>;
+    fn blocks_and_receipts(
+        &self,
+    ) -> impl Iterator<Item = BlockAndReceipts<'_, Self::Block, Self::Receipt>>;
 
     /// Block number of the first block in the segment, or `None` if empty.
     fn first_number(&self) -> Option<u64> {
-        self.blocks_and_receipts().next().map(|(b, _)| b.number())
+        self.blocks_and_receipts()
+            .next()
+            .map(|bar| bar.block.number())
     }
 
     /// Block number of the tip (last block) in the segment, or `None` if
     /// empty.
     fn tip_number(&self) -> Option<u64> {
-        self.blocks_and_receipts().last().map(|(b, _)| b.number())
+        self.blocks_and_receipts()
+            .last()
+            .map(|bar| bar.block.number())
     }
 
     /// Number of blocks in the segment.

@@ -83,7 +83,7 @@ pub trait ExtractStep<C: Extractable> {
     {
         extractable
             .blocks_and_receipts()
-            .map(|(block, receipts)| (block, self.extract_block(block, receipts)))
+            .map(|bar| (bar.block, self.extract_block(bar.block, bar.receipts)))
     }
 }
 
@@ -142,9 +142,9 @@ where
     {
         extractable
             .blocks_and_receipts()
-            .filter(|(host_block, _)| host_block.number() > self.host_deploy_height())
-            .map(|(host_block, receipts)| {
-                (host_block, ExtractStep::<C>::extract_block(self, host_block, receipts))
+            .filter(|bar| bar.block.number() > self.host_deploy_height())
+            .map(|bar| {
+                (bar.block, ExtractStep::<C>::extract_block(self, bar.block, bar.receipts))
             })
     }
 }
