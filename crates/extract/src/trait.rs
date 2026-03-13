@@ -27,17 +27,13 @@ pub trait Extractable: core::fmt::Debug + Sync {
 
     /// Block number of the first block in the segment, or `None` if empty.
     fn first_number(&self) -> Option<u64> {
-        self.blocks_and_receipts()
-            .next()
-            .map(|bar| bar.block.number())
+        self.blocks_and_receipts().next().map(|bar| bar.block.number())
     }
 
     /// Block number of the tip (last block) in the segment, or `None` if
     /// empty.
     fn tip_number(&self) -> Option<u64> {
-        self.blocks_and_receipts()
-            .last()
-            .map(|bar| bar.block.number())
+        self.blocks_and_receipts().last().map(|bar| bar.block.number())
     }
 
     /// Number of blocks in the segment.

@@ -143,8 +143,6 @@ where
         extractable
             .blocks_and_receipts()
             .filter(|bar| bar.block.number() > self.host_deploy_height())
-            .map(|bar| {
-                (bar.block, ExtractStep::<C>::extract_block(self, bar.block, bar.receipts))
-            })
+            .map(|bar| (bar.block, ExtractStep::<C>::extract_block(self, bar.block, bar.receipts)))
     }
 }
