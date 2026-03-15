@@ -143,17 +143,23 @@ impl<'a, C: Extractable> Extracts<'a, C> {
     /// Ingest an [`Events`] into the host events, updating the [`HostEvents`]
     /// or the [`AggregateFills`].
     pub fn ingest_event(&mut self, event: ExtractedEvent<'a, C::Receipt, Events>) {
-        match event.event {
-            Events::Enter(_) => {
-                self.events.ingest_enter(event.try_into_enter().expect("checked by match guard"));
+        // Destructure the event directly to avoid re-matching in try_into_*
+        // methods and the associated expect() calls.
+        let ExtractedEvent { tx, receipt, log_index, event: inner } = event;
+        match inner {
+            Events::Enter(enter) => {
+                self.events.ingest_enter(ExtractedEvent { tx, receipt, log_index, event: enter });
             }
-            Events::EnterToken(_) => {
+            Events::EnterToken(enter_token) => {
                 // NB: It is assumed that the `EnterToken` event has already
                 // been filtered to only include host tokens during the
                 // extraction process.
-                self.events.ingest_enter_token(
-                    event.try_into_enter_token().expect("checked by match guard"),
-                );
+                self.events.ingest_enter_token(ExtractedEvent {
+                    tx,
+                    receipt,
+                    log_index,
+                    event: enter_token,
+                });
             }
             Events::Filled(fill) => {
                 // Fill the swap, ignoring overflows
@@ -161,14 +167,21 @@ impl<'a, C: Extractable> Extracts<'a, C> {
                 // host chain, so no need to check the chain id
                 self.context.add_fill(self.host_chain_id, &fill);
             }
-            Events::Transact(_) => {
-                self.events
-                    .ingest_transact(event.try_into_transact().expect("checked by match guard"));
+            Events::Transact(transact) => {
+                self.events.ingest_transact(ExtractedEvent {
+                    tx,
+                    receipt,
+                    log_index,
+                    event: transact,
+                });
             }
-            Events::BlockSubmitted(_) => {
-                self.events.ingest_block_submitted(
-                    event.try_into_block_submitted().expect("checked by match guard"),
-                );
+            Events::BlockSubmitted(submitted) => {
+                self.events.ingest_block_submitted(ExtractedEvent {
+                    tx,
+                    receipt,
+                    log_index,
+                    event: submitted,
+                });
             }
         }
     }
