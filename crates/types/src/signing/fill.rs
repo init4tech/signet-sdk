@@ -236,15 +236,14 @@ impl<'a> UnsignedFill<'a> {
         &self,
         signer: &S,
     ) -> Result<HashMap<u64, SignedFill>, SigningError> {
-        let mut fills = HashMap::new();
+        let target_chain_ids = self.orders.target_chain_ids();
+        let mut fills = HashMap::with_capacity(target_chain_ids.len());
 
-        // loop through each target chain and sign the fills
-        for target_chain_id in self.orders.target_chain_ids() {
+        for target_chain_id in target_chain_ids {
             let signed_fill = self.sign_for(target_chain_id, signer).await?;
             fills.insert(target_chain_id, signed_fill);
         }
 
-        // return the fills
         Ok(fills)
     }
 
