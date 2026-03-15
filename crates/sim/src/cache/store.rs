@@ -94,18 +94,17 @@ impl SimCache {
         let mut valid = Vec::with_capacity(n);
         let mut never = Vec::new();
 
-        for (rank, item) in &candidates {
+        for (rank, item) in candidates {
             if valid.len() >= n {
                 break;
             }
 
             let validity = item.check(source, host_source).await?;
 
-            if validity.is_valid_now() {
-                valid.push((*rank, item.clone()));
-            }
             if validity.is_never_valid() {
-                never.push(*rank);
+                never.push(rank);
+            } else if validity.is_valid_now() {
+                valid.push((rank, item));
             }
         }
 
@@ -238,13 +237,17 @@ impl CacheStore {
 
     /// Add an item to the cache.
     fn add_inner(&mut self, mut cache_rank: u128, item: SimItem, capacity: usize) {
+        // Compute the identifier once to avoid repeated String allocations
+        // for bundle UUIDs.
+        let id = item.identifier_owned();
+
         // If the item is disallowed, we don't add it
-        if self.disallowed.contains(&item.identifier_owned()) {
+        if self.disallowed.contains(&id) {
             return;
         }
 
         // Check if we've already seen this item - if so, don't add it
-        if !self.seen.insert(item.identifier_owned()) {
+        if !self.seen.insert(id) {
             return;
         }
 
@@ -255,12 +258,12 @@ impl CacheStore {
 
         if self.items.len() >= capacity {
             // If we are at capacity, we need to remove the lowest score
-            if let Some((_, item)) = self.items.pop_first() {
-                self.seen.remove(&item.identifier_owned());
+            if let Some((_, evicted)) = self.items.pop_first() {
+                self.seen.remove(evicted.identifier().as_bytes());
             }
         }
 
-        self.items.insert(cache_rank, item.clone());
+        self.items.insert(cache_rank, item);
     }
 
     fn add_bundles<I, T>(&mut self, item: I, basefee: u64, capacity: usize)
