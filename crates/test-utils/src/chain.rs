@@ -1,10 +1,10 @@
 use alloy::{
-    consensus::{Header, ReceiptEnvelope},
+    consensus::{BlockHeader, Header, ReceiptEnvelope},
     primitives::{B256, B64, U256},
 };
 pub use signet_constants::test_utils::*;
 use signet_evm::ExecutionOutcome;
-use signet_extract::Extractable;
+use signet_extract::{BlockAndReceipts, Extractable};
 use signet_types::primitives::{RecoveredBlock, SealedBlock, SealedHeader};
 
 /// A simple chain of blocks with receipts.
@@ -38,9 +38,38 @@ impl Extractable for Chain {
     type Block = RecoveredBlock;
     type Receipt = ReceiptEnvelope;
 
-    fn blocks_and_receipts(&self) -> impl Iterator<Item = (&Self::Block, &Vec<Self::Receipt>)> {
-        self.blocks.iter().zip(self.execution_outcome.receipts().iter())
+    fn blocks_and_receipts(
+        &self,
+    ) -> impl Iterator<Item = BlockAndReceipts<'_, Self::Block, Self::Receipt>> {
+        self.blocks
+            .iter()
+            .zip(self.execution_outcome.receipts().iter())
+            .map(|(block, receipts)| BlockAndReceipts { block, receipts })
     }
+
+    fn first_number(&self) -> Option<u64> {
+        self.blocks.first().map(|b| b.number())
+    }
+
+    fn tip_number(&self) -> Option<u64> {
+        self.blocks.last().map(|b| b.number())
+    }
+
+    fn len(&self) -> usize {
+        self.blocks.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.blocks.is_empty()
+    }
+}
+
+/// Make a chain with `count` fake blocks numbered `0..count`.
+pub fn fake_chain(count: u64) -> Chain {
+    let blocks: Vec<_> = (0..count).map(fake_block).collect();
+    let receipts = vec![vec![]; count as usize];
+    let execution_outcome = ExecutionOutcome::new(Default::default(), receipts, 0);
+    Chain { blocks, execution_outcome }
 }
 
 /// Make a fake block with a specific number.
@@ -56,4 +85,36 @@ pub fn fake_block(number: u64) -> RecoveredBlock {
     };
     let sealed = SealedHeader::new(header);
     SealedBlock::new(sealed, vec![]).recover_unchecked(vec![])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_chain_metadata() {
+        let chain = fake_chain(0);
+        assert!(chain.is_empty());
+        assert_eq!(chain.len(), 0);
+        assert_eq!(chain.first_number(), None);
+        assert_eq!(chain.tip_number(), None);
+    }
+
+    #[test]
+    fn single_block_metadata() {
+        let chain = fake_chain(1);
+        assert!(!chain.is_empty());
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain.first_number(), Some(0));
+        assert_eq!(chain.tip_number(), Some(0));
+    }
+
+    #[test]
+    fn multi_block_metadata() {
+        let chain = fake_chain(5);
+        assert!(!chain.is_empty());
+        assert_eq!(chain.len(), 5);
+        assert_eq!(chain.first_number(), Some(0));
+        assert_eq!(chain.tip_number(), Some(4));
+    }
 }

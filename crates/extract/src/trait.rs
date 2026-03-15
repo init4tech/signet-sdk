@@ -1,5 +1,27 @@
-use alloy::{consensus::TxReceipt, primitives::Log};
+use alloy::{
+    consensus::{BlockHeader, TxReceipt},
+    primitives::Log,
+};
 use signet_types::primitives::TransactionSigned;
+
+/// A block with its associated receipts, yielded by
+/// [`Extractable::blocks_and_receipts`].
+///
+/// ```
+/// # use alloy::consensus::BlockHeader;
+/// # use signet_extract::BlockAndReceipts;
+/// # fn example(bar: BlockAndReceipts<'_, alloy::consensus::Header, alloy::consensus::ReceiptEnvelope>) {
+/// let _number = bar.block.number();
+/// let _count = bar.receipts.len();
+/// # }
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct BlockAndReceipts<'a, B, R> {
+    /// The block.
+    pub block: &'a B,
+    /// The receipts for this block's transactions.
+    pub receipts: &'a [R],
+}
 
 /// A trait for types from which data can be extracted. This currently exists
 /// to provide a common interface for extracting data from host chain blocks
@@ -11,7 +33,38 @@ pub trait Extractable: core::fmt::Debug + Sync {
     type Receipt: TxReceipt<Log = Log> + core::fmt::Debug + Sync;
 
     /// An iterator over the blocks and their receipts.
-    fn blocks_and_receipts(&self) -> impl Iterator<Item = (&Self::Block, &Vec<Self::Receipt>)>;
+    ///
+    /// Blocks must be yielded in ascending order by block number.
+    fn blocks_and_receipts(
+        &self,
+    ) -> impl Iterator<Item = BlockAndReceipts<'_, Self::Block, Self::Receipt>>;
+
+    /// Block number of the first block in the segment, or `None` if empty.
+    fn first_number(&self) -> Option<u64> {
+        self.blocks_and_receipts().next().map(|bar| bar.block.number())
+    }
+
+    /// Block number of the tip (last block) in the segment, or `None` if
+    /// empty.
+    ///
+    /// The default implementation consumes the entire iterator. Implementors
+    /// with indexed access should override this.
+    fn tip_number(&self) -> Option<u64> {
+        self.blocks_and_receipts().last().map(|bar| bar.block.number())
+    }
+
+    /// Number of blocks in the segment.
+    ///
+    /// The default implementation consumes the entire iterator. Implementors
+    /// that know their length should override this.
+    fn len(&self) -> usize {
+        self.blocks_and_receipts().count()
+    }
+
+    /// Whether the segment is empty.
+    fn is_empty(&self) -> bool {
+        self.blocks_and_receipts().next().is_none()
+    }
 }
 
 /// A trait for types that contain transactions. This currently exists to
