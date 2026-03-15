@@ -47,6 +47,10 @@ impl Extractable for Chain {
             .map(|(block, receipts)| BlockAndReceipts { block, receipts })
     }
 
+    fn first_number(&self) -> Option<u64> {
+        self.blocks.first().map(|b| b.number())
+    }
+
     fn tip_number(&self) -> Option<u64> {
         self.blocks.last().map(|b| b.number())
     }
