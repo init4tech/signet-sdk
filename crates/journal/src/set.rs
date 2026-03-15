@@ -87,8 +87,7 @@ impl<'a> JournalSet<'a> {
     pub fn from_journal(journal: Journal<'a>) -> Self {
         let latest_height = Some(journal.rollup_height());
         let latest_hash = Some(journal.journal_hash());
-        let mut journals = VecDeque::new();
-        journals.push_back(journal);
+        let journals = VecDeque::from([journal]);
         Self { journals, latest_height, latest_hash }
     }
 
@@ -132,10 +131,7 @@ impl<'a> JournalSet<'a> {
 
     /// Returns the earliest height of a journal in the set.
     pub fn earliest_height(&self) -> Option<u64> {
-        if let Some(journal) = self.journals.front() {
-            return Some(journal.rollup_height());
-        }
-        None
+        self.journals.front().map(|journal| journal.rollup_height())
     }
 
     /// Returns the latest hash of a journal in the set.

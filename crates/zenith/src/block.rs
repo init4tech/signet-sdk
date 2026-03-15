@@ -258,10 +258,12 @@ where
     C: Coder,
     C::Tx: 'a,
 {
-    let encoded_txns = transactions.into_iter().map(|tx| C::encode(tx)).collect::<Vec<Vec<u8>>>();
+    use alloy::rlp::Encodable;
 
-    let mut buf = Vec::new();
-    alloy::rlp::Encodable::encode(&encoded_txns, &mut buf);
+    let encoded_txns: Vec<Vec<u8>> = transactions.into_iter().map(|tx| C::encode(tx)).collect();
+
+    let mut buf = Vec::with_capacity(encoded_txns.length());
+    encoded_txns.encode(&mut buf);
     buf
 }
 
