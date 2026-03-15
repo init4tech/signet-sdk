@@ -7,13 +7,12 @@ use signet_evm::ExecutionOutcome;
 use signet_extract::{BlockAndReceipts, Extractable};
 use signet_types::primitives::{RecoveredBlock, SealedBlock, SealedHeader};
 
-/// A simple chain of blocks with receipts.
-#[derive(Clone, Default, PartialEq, Eq)]
+/// A simple, non-empty chain of blocks with receipts.
+#[derive(Clone, PartialEq, Eq)]
 pub struct Chain {
-    /// The blocks
-    pub blocks: Vec<RecoveredBlock>,
-
-    pub execution_outcome: ExecutionOutcome,
+    /// The blocks. Invariant: always non-empty.
+    blocks: Vec<RecoveredBlock>,
+    execution_outcome: ExecutionOutcome,
 }
 
 impl core::fmt::Debug for Chain {
@@ -23,14 +22,25 @@ impl core::fmt::Debug for Chain {
 }
 
 impl Chain {
-    /// Create a new chain from a block
+    /// Create a new chain from a single block.
     pub fn from_block(block: RecoveredBlock, execution_outcome: ExecutionOutcome) -> Self {
         Self { blocks: vec![block], execution_outcome }
     }
 
+    /// Append a block to the chain.
     pub fn append_block(&mut self, block: RecoveredBlock, outcome: ExecutionOutcome) {
         self.blocks.push(block);
         self.execution_outcome.append(outcome);
+    }
+
+    /// Get the blocks in the chain.
+    pub fn blocks(&self) -> &[RecoveredBlock] {
+        &self.blocks
+    }
+
+    /// Get the execution outcome.
+    pub fn execution_outcome(&self) -> &ExecutionOutcome {
+        &self.execution_outcome
     }
 }
 
@@ -47,25 +57,26 @@ impl Extractable for Chain {
             .map(|(block, receipts)| BlockAndReceipts { block, receipts })
     }
 
-    fn first_number(&self) -> Option<u64> {
-        self.blocks.first().map(|b| b.number())
+    fn first_number(&self) -> u64 {
+        self.blocks.first().expect("Chain must be non-empty").number()
     }
 
-    fn tip_number(&self) -> Option<u64> {
-        self.blocks.last().map(|b| b.number())
+    fn tip_number(&self) -> u64 {
+        self.blocks.last().expect("Chain must be non-empty").number()
     }
 
     fn len(&self) -> usize {
         self.blocks.len()
     }
-
-    fn is_empty(&self) -> bool {
-        self.blocks.is_empty()
-    }
 }
 
 /// Make a chain with `count` fake blocks numbered `0..count`.
+///
+/// # Panics
+///
+/// Panics if `count` is 0, as an empty chain is not valid.
 pub fn fake_chain(count: u64) -> Chain {
+    assert!(count > 0, "fake_chain requires at least one block");
     let blocks: Vec<_> = (0..count).map(fake_block).collect();
     let receipts = vec![vec![]; count as usize];
     let execution_outcome = ExecutionOutcome::new(Default::default(), receipts, 0);
@@ -92,29 +103,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_chain_metadata() {
-        let chain = fake_chain(0);
-        assert!(chain.is_empty());
-        assert_eq!(chain.len(), 0);
-        assert_eq!(chain.first_number(), None);
-        assert_eq!(chain.tip_number(), None);
+    #[should_panic(expected = "fake_chain requires at least one block")]
+    fn fake_chain_rejects_zero() {
+        fake_chain(0);
     }
 
     #[test]
     fn single_block_metadata() {
         let chain = fake_chain(1);
-        assert!(!chain.is_empty());
         assert_eq!(chain.len(), 1);
-        assert_eq!(chain.first_number(), Some(0));
-        assert_eq!(chain.tip_number(), Some(0));
+        assert_eq!(chain.first_number(), 0);
+        assert_eq!(chain.tip_number(), 0);
     }
 
     #[test]
     fn multi_block_metadata() {
         let chain = fake_chain(5);
-        assert!(!chain.is_empty());
         assert_eq!(chain.len(), 5);
-        assert_eq!(chain.first_number(), Some(0));
-        assert_eq!(chain.tip_number(), Some(4));
+        assert_eq!(chain.first_number(), 0);
+        assert_eq!(chain.tip_number(), 4);
     }
 }
