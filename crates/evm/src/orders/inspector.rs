@@ -159,9 +159,6 @@ where
 
         // Try to decode as an order next
         if let Ok(Log { data, .. }) = RollupOrders::Order::decode_log(&log) {
-            if self.fills_only {
-                return;
-            }
             self.orders.add(data);
         }
     }
