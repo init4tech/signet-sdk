@@ -268,14 +268,14 @@ where
         let outer_ref = &outer;
         let _og = outer.enter();
 
-        // to be used in the scope
-        let this_ref = self.clone();
+        // Borrow from the Arc — scoped threads guarantee the reference
+        // is valid for all spawned threads, avoiding per-thread Arc clones.
+        let this = &*self;
 
         std::thread::scope(|scope| {
             // Spawn a thread per bundle to simulate.
             for (cache_rank, item) in active_sim.into_iter() {
                 let c = candidates.clone();
-                let this_ref = this_ref.clone();
                 scope.spawn(move || {
                     let identifier = item.identifier();
                     let _ig = trace_span!(parent: outer_ref, "sim_task", %identifier).entered();
@@ -283,7 +283,7 @@ where
                     // If simulation is succesful, send the outcome via the
                     // channel.
 
-                    match this_ref.simulate(cache_rank, &item) {
+                    match this.simulate(cache_rank, &item) {
                         Ok(candidate) if candidate.score.is_zero() => {
                             trace!("zero score candidate, skipping");
                         }
@@ -308,7 +308,7 @@ where
                     };
                     // fall through applies to all errors, occurs if
                     // the simulation fails or the gas limit is exceeded.
-                    this_ref.sim_items.remove(cache_rank);
+                    this.sim_items.remove(cache_rank);
                 });
             }
             // Drop the TX so that the channel is closed when all threads
