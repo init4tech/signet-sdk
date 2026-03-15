@@ -179,12 +179,9 @@ impl Tx for FillShim<'_> {
                 access_list.clone_from(&tx.access_list);
                 blob_hashes.clear();
                 *max_fee_per_blob_gas = 0;
-                authorization_list.clone_from(
-                    &tx.authorization_list
-                        .iter()
-                        .cloned()
-                        .map(alloy::signers::Either::Left)
-                        .collect(),
+                authorization_list.clear();
+                authorization_list.extend(
+                    tx.authorization_list.iter().cloned().map(alloy::signers::Either::Left),
                 );
             }
         }
