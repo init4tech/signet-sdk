@@ -157,17 +157,15 @@ impl SignetCallBundle {
     pub fn decode_and_validate_txs<Db: Database>(
         &self,
     ) -> Result<Vec<TxEnvelope>, BundleError<Db>> {
-        let txs = self
-            .txs()
-            .iter()
-            .map(|tx| TxEnvelope::decode_2718(&mut tx.chunk()))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|err| BundleError::TransactionDecodingError(err))?;
-
-        if txs.iter().any(|tx| tx.is_eip4844()) {
-            return Err(BundleError::UnsupportedTransactionType);
+        let mut txs = Vec::with_capacity(self.txs().len());
+        for tx_bytes in self.txs() {
+            let tx = TxEnvelope::decode_2718(&mut tx_bytes.chunk())
+                .map_err(BundleError::TransactionDecodingError)?;
+            if tx.is_eip4844() {
+                return Err(BundleError::UnsupportedTransactionType);
+            }
+            txs.push(tx);
         }
-
         Ok(txs)
     }
 }
