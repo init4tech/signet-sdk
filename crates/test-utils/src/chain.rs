@@ -48,6 +48,14 @@ impl Extractable for Chain {
     }
 }
 
+/// Make a chain with `count` fake blocks numbered `0..count`.
+pub fn fake_chain(count: u64) -> Chain {
+    let blocks: Vec<_> = (0..count).map(fake_block).collect();
+    let receipts = vec![vec![]; count as usize];
+    let execution_outcome = ExecutionOutcome::new(Default::default(), receipts, 0);
+    Chain { blocks, execution_outcome }
+}
+
 /// Make a fake block with a specific number.
 pub fn fake_block(number: u64) -> RecoveredBlock {
     let header = Header {
@@ -61,4 +69,36 @@ pub fn fake_block(number: u64) -> RecoveredBlock {
     };
     let sealed = SealedHeader::new(header);
     SealedBlock::new(sealed, vec![]).recover_unchecked(vec![])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_chain_metadata() {
+        let chain = fake_chain(0);
+        assert!(chain.is_empty());
+        assert_eq!(chain.len(), 0);
+        assert_eq!(chain.first_number(), None);
+        assert_eq!(chain.tip_number(), None);
+    }
+
+    #[test]
+    fn single_block_metadata() {
+        let chain = fake_chain(1);
+        assert!(!chain.is_empty());
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain.first_number(), Some(0));
+        assert_eq!(chain.tip_number(), Some(0));
+    }
+
+    #[test]
+    fn multi_block_metadata() {
+        let chain = fake_chain(5);
+        assert!(!chain.is_empty());
+        assert_eq!(chain.len(), 5);
+        assert_eq!(chain.first_number(), Some(0));
+        assert_eq!(chain.tip_number(), Some(4));
+    }
 }

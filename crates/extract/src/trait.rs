@@ -1,9 +1,11 @@
-use alloy::consensus::{BlockHeader, TxReceipt};
-use alloy::primitives::Log;
+use alloy::{
+    consensus::{BlockHeader, TxReceipt},
+    primitives::Log,
+};
 use signet_types::primitives::TransactionSigned;
 
 /// A block with its associated receipts.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct BlockAndReceipts<'a, B, R> {
     /// The block.
     pub block: &'a B,
@@ -21,6 +23,8 @@ pub trait Extractable: core::fmt::Debug + Sync {
     type Receipt: TxReceipt<Log = Log> + core::fmt::Debug + Sync;
 
     /// An iterator over the blocks and their receipts.
+    ///
+    /// Blocks must be yielded in ascending order by block number.
     fn blocks_and_receipts(
         &self,
     ) -> impl Iterator<Item = BlockAndReceipts<'_, Self::Block, Self::Receipt>>;
@@ -32,11 +36,17 @@ pub trait Extractable: core::fmt::Debug + Sync {
 
     /// Block number of the tip (last block) in the segment, or `None` if
     /// empty.
+    ///
+    /// The default implementation consumes the entire iterator. Implementors
+    /// with indexed access should override this.
     fn tip_number(&self) -> Option<u64> {
         self.blocks_and_receipts().last().map(|bar| bar.block.number())
     }
 
     /// Number of blocks in the segment.
+    ///
+    /// The default implementation consumes the entire iterator. Implementors
+    /// that know their length should override this.
     fn len(&self) -> usize {
         self.blocks_and_receipts().count()
     }
