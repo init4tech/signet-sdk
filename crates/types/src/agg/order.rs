@@ -3,7 +3,7 @@ use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
 use signet_zenith::RollupOrders;
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Aggregated orders for a transaction or set of transactions.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Deserialize, Serialize)]
@@ -99,9 +99,10 @@ impl AggregateOrders {
 
     /// Get the unique target chain ids for the aggregated outputs.
     pub fn target_chain_ids(&self) -> Vec<u64> {
-        HashSet::<u64>::from_iter(self.outputs.keys().map(|(chain_id, _)| *chain_id))
-            .into_iter()
-            .collect()
+        let mut ids: Vec<u64> = self.outputs.keys().map(|(chain_id, _)| *chain_id).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
     }
 
     /// Get the aggregated Outputs for a given target chain id.
@@ -114,20 +115,19 @@ impl AggregateOrders {
     /// This function truncates `ru_chain_id` to u32. Chain IDs exceeding
     /// `u32::MAX` will be silently truncated.
     pub fn outputs_for(&self, target_chain_id: u64, ru_chain_id: u64) -> Vec<RollupOrders::Output> {
-        let mut o = Vec::new();
-        for ((chain_id, token), recipient_map) in &self.outputs {
-            if *chain_id == target_chain_id {
-                for (recipient, amount) in recipient_map {
-                    o.push(RollupOrders::Output {
-                        token: *token,
-                        amount: U256::from(*amount),
-                        recipient: *recipient,
-                        chainId: ru_chain_id as u32,
-                    });
-                }
-            }
-        }
-        o
+        self.outputs
+            .iter()
+            .filter(|((chain_id, _), _)| *chain_id == target_chain_id)
+            .flat_map(|((_, token), recipient_map)| {
+                let token = *token;
+                recipient_map.iter().map(move |(recipient, amount)| RollupOrders::Output {
+                    token,
+                    amount: *amount,
+                    recipient: *recipient,
+                    chainId: ru_chain_id as u32,
+                })
+            })
+            .collect()
     }
 
     /// Absorb the orders from another context.
