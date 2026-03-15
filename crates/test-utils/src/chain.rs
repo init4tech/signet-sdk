@@ -1,5 +1,5 @@
 use alloy::{
-    consensus::{Header, ReceiptEnvelope},
+    consensus::{BlockHeader, Header, ReceiptEnvelope},
     primitives::{B256, B64, U256},
 };
 pub use signet_constants::test_utils::*;
@@ -45,6 +45,18 @@ impl Extractable for Chain {
             .iter()
             .zip(self.execution_outcome.receipts().iter())
             .map(|(block, receipts)| BlockAndReceipts { block, receipts })
+    }
+
+    fn tip_number(&self) -> Option<u64> {
+        self.blocks.last().map(|b| b.number())
+    }
+
+    fn len(&self) -> usize {
+        self.blocks.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.blocks.is_empty()
     }
 }
 

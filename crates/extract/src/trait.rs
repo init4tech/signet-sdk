@@ -4,7 +4,17 @@ use alloy::{
 };
 use signet_types::primitives::TransactionSigned;
 
-/// A block with its associated receipts.
+/// A block with its associated receipts, yielded by
+/// [`Extractable::blocks_and_receipts`].
+///
+/// ```
+/// # use alloy::consensus::BlockHeader;
+/// # use signet_extract::BlockAndReceipts;
+/// # fn example(bar: BlockAndReceipts<'_, alloy::consensus::Header, alloy::consensus::ReceiptEnvelope>) {
+/// let _number = bar.block.number();
+/// let _count = bar.receipts.len();
+/// # }
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct BlockAndReceipts<'a, B, R> {
     /// The block.
