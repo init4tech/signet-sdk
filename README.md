@@ -48,6 +48,9 @@ See the [Signet docs] for more info.
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+For testing patterns, utilities, and best practices, see
+[docs/TESTING.md](docs/TESTING.md).
+
 [Signet]: https://signet.sh
 [trevm]: https://docs.rs/trevm/latest/trevm/
 [Signet docs]: https://signet.sh/docs
