@@ -1,26 +1,22 @@
 //! Preflight validation checks for orders and fills.
 //!
-//! This module provides a [`Permit2PreflightExt`] trait that extends any
+//! This module provides a [`Permit2Ext`] trait that extends any
 //! [`Provider`] with methods to validate that orders can be successfully
 //! filled before submitting them to the network. It checks:
 //! - Token balances are sufficient
 //! - ERC20 approvals are in place for Permit2
 //! - Permit2 nonces haven't been consumed
 
-use std::future::Future;
-
+use crate::OrdersAndFills;
 use alloy::{
     primitives::{Address, U256},
     providers::Provider,
 };
 use futures_util::future::try_join_all;
+use signet_constants::contracts::{IPermit2, IERC20};
 use signet_types::{SignedOrder, UnsignedOrder, PERMIT2_ADDRESS};
+use std::future::Future;
 use thiserror::Error;
-
-use crate::OrdersAndFills;
-
-/// Boxed future type alias used for concurrent preflight checks.
-type CheckFut<'a> = std::pin::Pin<Box<dyn Future<Output = Result<(), PreflightError>> + Send + 'a>>;
 
 /// Errors that can occur during preflight validation.
 #[derive(Debug, Error)]
@@ -55,23 +51,6 @@ pub enum PreflightError {
     },
 }
 
-// ERC20 interface for balance and allowance checks
-alloy::sol! {
-    #[sol(rpc)]
-    interface IERC20 {
-        function balanceOf(address account) external view returns (uint256);
-        function allowance(address owner, address spender) external view returns (uint256);
-    }
-}
-
-// Permit2 interface for nonce validation
-alloy::sol! {
-    #[sol(rpc)]
-    interface IPermit2 {
-        function nonceBitmap(address owner, uint256 wordPos) external view returns (uint256);
-    }
-}
-
 /// Convert a nonce to bitmap position (word position and bit position within the word).
 fn nonce_to_bitmap_position(nonce: U256) -> (U256, u8) {
     let word_pos = nonce >> 8;
@@ -81,20 +60,49 @@ fn nonce_to_bitmap_position(nonce: U256) -> (U256, u8) {
 
 /// Extension trait that adds Permit2 preflight validation to any [`Provider`].
 ///
+/// Provides low-level checks ([`sufficient_balance`], [`token_approved`],
+/// [`nonce_available`]) and high-level order validation methods.
+///
+/// [`sufficient_balance`]: Permit2Ext::sufficient_balance
+/// [`token_approved`]: Permit2Ext::token_approved
+/// [`nonce_available`]: Permit2Ext::nonce_available
+///
 /// # Example
 ///
 /// ```ignore
-/// use signet_orders::Permit2PreflightExt;
+/// use signet_orders::Permit2Ext;
 ///
-/// let result = provider.preflight_signed_order(&signed_order).await?;
+/// provider.check_signed_order(&signed_order).await?;
 /// ```
-pub trait Permit2PreflightExt {
+pub trait Permit2Ext {
+    /// Check if `user` has at least `amount` of `token`.
+    fn sufficient_balance(
+        &self,
+        token: Address,
+        user: Address,
+        amount: U256,
+    ) -> impl Future<Output = Result<(), PreflightError>> + Send;
+
+    /// Check if `user` has approved at least `amount` of `token` to Permit2.
+    fn token_approved(
+        &self,
+        token: Address,
+        user: Address,
+        amount: U256,
+    ) -> impl Future<Output = Result<(), PreflightError>> + Send;
+
+    /// Check if a Permit2 `nonce` is still available (not yet consumed).
+    fn nonce_available(
+        &self,
+        user: Address,
+        nonce: U256,
+    ) -> impl Future<Output = Result<(), PreflightError>> + Send;
+
     /// Validate all preflight conditions for a [`SignedOrder`].
     ///
     /// Checks token balances, ERC20 approvals, and Permit2 nonce for each
-    /// permitted token in the order. The owner address and nonce are extracted
-    /// from the order's permit data.
-    fn preflight_signed_order(
+    /// permitted token. Runs all checks concurrently.
+    fn check_signed_order(
         &self,
         order: &SignedOrder,
     ) -> impl Future<Output = Result<(), PreflightError>> + Send;
@@ -102,9 +110,8 @@ pub trait Permit2PreflightExt {
     /// Validate preflight conditions for an [`UnsignedOrder`].
     ///
     /// Checks token balances and ERC20 approvals for each input token.
-    /// Since unsigned orders do not yet have a finalized nonce, the nonce
-    /// check is skipped.
-    fn preflight_unsigned_order(
+    /// Nonce check is skipped since unsigned orders lack a finalized nonce.
+    fn check_unsigned_order(
         &self,
         order: &UnsignedOrder<'_>,
         user: Address,
@@ -112,122 +119,99 @@ pub trait Permit2PreflightExt {
 
     /// Validate preflight conditions for all orders in an [`OrdersAndFills`].
     ///
-    /// Runs preflight checks for every [`SignedOrder`] concurrently.
-    fn preflight_orders_and_fills(
+    /// Runs [`check_signed_order`] for every order concurrently.
+    ///
+    /// [`check_signed_order`]: Permit2Ext::check_signed_order
+    fn check_orders_and_fills(
         &self,
         orders_and_fills: &OrdersAndFills,
     ) -> impl Future<Output = Result<(), PreflightError>> + Send;
 }
 
-impl<P: Provider> Permit2PreflightExt for P {
-    async fn preflight_signed_order(&self, order: &SignedOrder) -> Result<(), PreflightError> {
-        let permit = order.permit();
-        let owner = permit.owner;
-        let nonce = permit.permit.nonce;
-
-        let mut checks: Vec<CheckFut<'_>> = Vec::new();
-
-        for tp in &permit.permit.permitted {
-            checks.push(Box::pin(check_token_balance(self, tp.token, owner, tp.amount)));
-            checks.push(Box::pin(check_erc20_approval(self, tp.token, owner, tp.amount)));
+impl<P: Provider> Permit2Ext for P {
+    async fn sufficient_balance(
+        &self,
+        token: Address,
+        user: Address,
+        amount: U256,
+    ) -> Result<(), PreflightError> {
+        let balance = IERC20::new(token, self).balanceOf(user).call().await?;
+        if balance < amount {
+            return Err(PreflightError::InsufficientBalance { have: balance, need: amount });
         }
-        checks.push(Box::pin(check_permit2_nonce(self, owner, nonce)));
-
-        try_join_all(checks).await?;
         Ok(())
     }
 
-    async fn preflight_unsigned_order(
+    async fn token_approved(
+        &self,
+        token: Address,
+        user: Address,
+        amount: U256,
+    ) -> Result<(), PreflightError> {
+        let allowance = IERC20::new(token, self).allowance(user, PERMIT2_ADDRESS).call().await?;
+        if allowance < amount {
+            return Err(PreflightError::InsufficientAllowance { have: allowance, need: amount });
+        }
+        Ok(())
+    }
+
+    async fn nonce_available(&self, user: Address, nonce: U256) -> Result<(), PreflightError> {
+        let (word_pos, bit_pos) = nonce_to_bitmap_position(nonce);
+        let bitmap =
+            IPermit2::new(PERMIT2_ADDRESS, self).nonceBitmap(user, word_pos).call().await?;
+        if bitmap & (U256::from(1) << bit_pos) != U256::ZERO {
+            return Err(PreflightError::NonceConsumed { word_pos, bit_pos });
+        }
+        Ok(())
+    }
+
+    async fn check_signed_order(&self, order: &SignedOrder) -> Result<(), PreflightError> {
+        let permit = order.permit();
+        let owner = permit.owner;
+
+        let balance_checks = permit
+            .permit
+            .permitted
+            .iter()
+            .map(|tp| self.sufficient_balance(tp.token, owner, tp.amount));
+        let approval_checks = permit
+            .permit
+            .permitted
+            .iter()
+            .map(|tp| self.token_approved(tp.token, owner, tp.amount));
+
+        tokio::try_join!(
+            try_join_all(balance_checks),
+            try_join_all(approval_checks),
+            self.nonce_available(owner, permit.permit.nonce),
+        )?;
+        Ok(())
+    }
+
+    async fn check_unsigned_order(
         &self,
         order: &UnsignedOrder<'_>,
         user: Address,
     ) -> Result<(), PreflightError> {
-        let checks: Vec<CheckFut<'_>> = order
+        let balance_checks = order
             .inputs()
             .iter()
-            .flat_map(|input| {
-                let token = input.token;
-                let amount = input.amount;
-                [
-                    Box::pin(check_token_balance(self, token, user, amount)) as CheckFut<'_>,
-                    Box::pin(check_erc20_approval(self, token, user, amount)),
-                ]
-            })
-            .collect();
+            .map(|input| self.sufficient_balance(input.token, user, input.amount));
+        let approval_checks =
+            order.inputs().iter().map(|input| self.token_approved(input.token, user, input.amount));
 
-        try_join_all(checks).await?;
+        tokio::try_join!(try_join_all(balance_checks), try_join_all(approval_checks),)?;
         Ok(())
     }
 
-    async fn preflight_orders_and_fills(
+    async fn check_orders_and_fills(
         &self,
         orders_and_fills: &OrdersAndFills,
     ) -> Result<(), PreflightError> {
-        let checks: Vec<_> = orders_and_fills
-            .orders()
-            .iter()
-            .map(|order| self.preflight_signed_order(order))
-            .collect();
-
-        try_join_all(checks).await?;
+        try_join_all(orders_and_fills.orders().iter().map(|order| self.check_signed_order(order)))
+            .await?;
         Ok(())
     }
-}
-
-/// Check if the user has sufficient balance of a token.
-async fn check_token_balance(
-    provider: &impl Provider,
-    token: Address,
-    user: Address,
-    required_amount: U256,
-) -> Result<(), PreflightError> {
-    let erc20 = IERC20::new(token, provider);
-    let balance = erc20.balanceOf(user).call().await?;
-
-    if balance < required_amount {
-        return Err(PreflightError::InsufficientBalance { have: balance, need: required_amount });
-    }
-
-    Ok(())
-}
-
-/// Check if the user has approved sufficient allowance to Permit2.
-async fn check_erc20_approval(
-    provider: &impl Provider,
-    token: Address,
-    user: Address,
-    required_amount: U256,
-) -> Result<(), PreflightError> {
-    let erc20 = IERC20::new(token, provider);
-    let allowance = erc20.allowance(user, PERMIT2_ADDRESS).call().await?;
-
-    if allowance < required_amount {
-        return Err(PreflightError::InsufficientAllowance {
-            have: allowance,
-            need: required_amount,
-        });
-    }
-
-    Ok(())
-}
-
-/// Check if a Permit2 nonce has been consumed.
-async fn check_permit2_nonce(
-    provider: &impl Provider,
-    user: Address,
-    nonce: U256,
-) -> Result<(), PreflightError> {
-    let (word_pos, bit_pos) = nonce_to_bitmap_position(nonce);
-
-    let permit2 = IPermit2::new(PERMIT2_ADDRESS, provider);
-    let bitmap = permit2.nonceBitmap(user, word_pos).call().await?;
-
-    // Check if the bit is set (nonce consumed)
-    if bitmap & (U256::from(1) << bit_pos) != U256::ZERO {
-        return Err(PreflightError::NonceConsumed { word_pos, bit_pos });
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
