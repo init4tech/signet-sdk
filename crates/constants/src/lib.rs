@@ -28,6 +28,8 @@ pub use types::{
     SignetConstants, SignetEnvironmentConstants, SignetSystemConstants, UsdRecords, MINTER_ADDRESS,
 };
 
+pub mod contracts;
+
 /// Placeholder address for the native token of the current chain. By convention this is `0xee...`.
 pub const NATIVE_TOKEN_ADDRESS: alloy::primitives::Address =
     alloy::primitives::Address::repeat_byte(0xee);
