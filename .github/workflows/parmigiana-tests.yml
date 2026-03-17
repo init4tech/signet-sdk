@@ -22,4 +22,4 @@ jobs:
           cache-on-failure: true
 
       - name: Run Parmigiana live tests
-        run: cargo test -p signet-test-utils --profile ci-rust --test parmigiana -- --ignored
+        run: PARMIGIANA_CARGO_PROFILE=ci-rust ./scripts/run_parmigiana_live.sh

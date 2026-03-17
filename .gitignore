@@ -4,3 +4,5 @@ Cargo.lock
 .idea/
 .claude/*.local.*
 CLAUDE.local.md
+.dmux/
+.dmux-hooks/
