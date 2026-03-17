@@ -14,7 +14,9 @@ This guide covers testing patterns, conventions, and utilities for contributing 
 
 ## Test ID Naming Conventions
 
-Signet uses a structured test ID system to categorize and identify tests across the codebase. Tests should use these prefixes in their function names and documentation:
+Signet uses a structured test ID system to categorize and identify tests across the codebase. Tests should use these prefixes in their function names and documentation.
+
+> **Note:** This naming convention is newly adopted and aspirational. Only a handful of existing tests currently use TC-* prefixes. New tests should follow this convention; existing tests may be migrated over time.
 
 ### Prefix Reference
 
@@ -111,14 +113,7 @@ cargo test -p signet-test-utils --test parmigiana -- --ignored
 
 ### Pre-commit Checks
 
-Before submitting a PR, run:
-
-```bash
-cargo +nightly fmt --all
-cargo clippy --all-features
-cargo test --all-features
-cargo test --no-default-features
-```
+See [CLAUDE.md](../CLAUDE.md) in the repo root for the canonical pre-commit checks.
 
 ---
 
