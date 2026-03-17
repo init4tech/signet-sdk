@@ -12,8 +12,8 @@ use alloy::{
     primitives::{Address, U256},
     providers::Provider,
 };
-use futures_util::future::try_join_all;
-use signet_constants::contracts::{IPermit2, IERC20};
+use futures_util::future::{try_join, try_join3, try_join_all};
+use signet_constants::{IPermit2, IERC20};
 use signet_types::{SignedOrder, UnsignedOrder, PERMIT2_ADDRESS};
 use std::future::Future;
 use thiserror::Error;
@@ -69,10 +69,15 @@ fn nonce_to_bitmap_position(nonce: U256) -> (U256, u8) {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # async fn example() -> Result<(), signet_orders::PreflightError> {
+/// # let provider = alloy::providers::ProviderBuilder::new().connect_http("http://localhost:8545".parse().unwrap());
+/// # let signed_order: signet_types::SignedOrder = unimplemented!();
 /// use signet_orders::Permit2Ext;
 ///
 /// provider.check_signed_order(&signed_order).await?;
+/// # Ok(())
+/// # }
 /// ```
 pub trait Permit2Ext {
     /// Check if `user` has at least `amount` of `token`.
@@ -136,10 +141,9 @@ impl<P: Provider> Permit2Ext for P {
         amount: U256,
     ) -> Result<(), PreflightError> {
         let balance = IERC20::new(token, self).balanceOf(user).call().await?;
-        if balance < amount {
-            return Err(PreflightError::InsufficientBalance { have: balance, need: amount });
-        }
-        Ok(())
+        (balance >= amount)
+            .then_some(())
+            .ok_or(PreflightError::InsufficientBalance { have: balance, need: amount })
     }
 
     async fn token_approved(
@@ -149,20 +153,18 @@ impl<P: Provider> Permit2Ext for P {
         amount: U256,
     ) -> Result<(), PreflightError> {
         let allowance = IERC20::new(token, self).allowance(user, PERMIT2_ADDRESS).call().await?;
-        if allowance < amount {
-            return Err(PreflightError::InsufficientAllowance { have: allowance, need: amount });
-        }
-        Ok(())
+        (allowance >= amount)
+            .then_some(())
+            .ok_or(PreflightError::InsufficientAllowance { have: allowance, need: amount })
     }
 
     async fn nonce_available(&self, user: Address, nonce: U256) -> Result<(), PreflightError> {
         let (word_pos, bit_pos) = nonce_to_bitmap_position(nonce);
         let bitmap =
             IPermit2::new(PERMIT2_ADDRESS, self).nonceBitmap(user, word_pos).call().await?;
-        if bitmap & (U256::from(1) << bit_pos) != U256::ZERO {
-            return Err(PreflightError::NonceConsumed { word_pos, bit_pos });
-        }
-        Ok(())
+        (bitmap & (U256::from(1) << bit_pos) == U256::ZERO)
+            .then_some(())
+            .ok_or(PreflightError::NonceConsumed { word_pos, bit_pos })
     }
 
     async fn check_signed_order(&self, order: &SignedOrder) -> Result<(), PreflightError> {
@@ -180,12 +182,13 @@ impl<P: Provider> Permit2Ext for P {
             .iter()
             .map(|tp| self.token_approved(tp.token, owner, tp.amount));
 
-        tokio::try_join!(
+        try_join3(
             try_join_all(balance_checks),
             try_join_all(approval_checks),
             self.nonce_available(owner, permit.permit.nonce),
-        )?;
-        Ok(())
+        )
+        .await
+        .map(|_| ())
     }
 
     async fn check_unsigned_order(
@@ -200,8 +203,7 @@ impl<P: Provider> Permit2Ext for P {
         let approval_checks =
             order.inputs().iter().map(|input| self.token_approved(input.token, user, input.amount));
 
-        tokio::try_join!(try_join_all(balance_checks), try_join_all(approval_checks),)?;
-        Ok(())
+        try_join(try_join_all(balance_checks), try_join_all(approval_checks)).await.map(|_| ())
     }
 
     async fn check_orders_and_fills(
@@ -209,15 +211,16 @@ impl<P: Provider> Permit2Ext for P {
         orders_and_fills: &OrdersAndFills,
     ) -> Result<(), PreflightError> {
         try_join_all(orders_and_fills.orders().iter().map(|order| self.check_signed_order(order)))
-            .await?;
-        Ok(())
+            .await
+            .map(|_| ())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use alloy::primitives::uint;
+    use super::{nonce_to_bitmap_position, PreflightError};
+    use alloy::primitives::{uint, U256};
+    use signet_types::PERMIT2_ADDRESS;
 
     #[test]
     fn test_nonce_to_bitmap_position() {
