@@ -20,5 +20,6 @@ signet-zenith.workspace = true
 alloy.workspace = true
 chrono.workspace = true
 futures-util.workspace = true
+tokio.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
