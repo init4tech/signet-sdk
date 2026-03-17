@@ -1,0 +1,25 @@
+name: Parmigiana Live Tests
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual runs
+
+jobs:
+  parmigiana:
+    name: Parmigiana testnet integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.87"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Run Parmigiana live tests
+        run: cargo test -p signet-test-utils --profile ci-rust --test parmigiana -- --ignored
