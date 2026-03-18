@@ -517,6 +517,41 @@ mod bundle_helper {
     }
 }
 
+mod permit2 {
+    use alloy::primitives::{address, Address, U256};
+
+    /// The canonical Permit2 contract address deployed on all supported chains.
+    pub const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
+
+    alloy::sol! {
+        /// Minimal ERC20 interface for balance and allowance checks.
+        #[sol(rpc)]
+        interface IERC20 {
+            function balanceOf(address account) external view returns (uint256);
+            function allowance(address owner, address spender) external view returns (uint256);
+        }
+    }
+
+    alloy::sol! {
+        /// Permit2 interface for nonce validation.
+        #[sol(rpc)]
+        interface IPermit2 {
+            function nonceBitmap(address owner, uint256 wordPos) external view returns (uint256);
+        }
+    }
+
+    impl<P, N> IPermit2::IPermit2Instance<P, N> {
+        /// Convert a nonce to its bitmap position (word position and bit
+        /// position within the word).
+        pub fn nonce_to_bitmap_position(&self, nonce: U256) -> (U256, u8) {
+            let word_pos = nonce >> 8;
+            let bit_pos = (nonce & U256::from(0xFF)).saturating_to::<u8>();
+            (word_pos, bit_pos)
+        }
+    }
+}
+
+pub use permit2::{IPermit2, IERC20, PERMIT2_ADDRESS};
 pub use zenith::Zenith;
 
 /// Contract Bindings for the RollupOrders contract.
