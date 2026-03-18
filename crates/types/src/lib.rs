@@ -42,8 +42,9 @@ pub use seq::{RequestSigner, SignRequest, SignResponse};
 mod signing;
 pub use signing::{
     SignedFill, SignedOrder, SignedPermitError, SigningError, UnsignedFill, UnsignedOrder,
-    PERMIT2_ADDRESS,
 };
+
+pub use signet_zenith::PERMIT2_ADDRESS;
 
 mod utils;
 pub use utils::{alias_address, unalias_address};

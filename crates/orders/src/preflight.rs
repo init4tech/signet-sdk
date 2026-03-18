@@ -13,8 +13,8 @@ use alloy::{
     providers::Provider,
 };
 use futures_util::future::{try_join, try_join3, try_join_all};
-use signet_constants::{IPermit2, IERC20};
-use signet_types::{SignedOrder, UnsignedOrder, PERMIT2_ADDRESS};
+use signet_types::{SignedOrder, UnsignedOrder};
+use signet_zenith::{IPermit2, IERC20, PERMIT2_ADDRESS};
 use std::future::Future;
 use thiserror::Error;
 
@@ -51,13 +51,6 @@ pub enum PreflightError {
     },
 }
 
-/// Convert a nonce to bitmap position (word position and bit position within the word).
-fn nonce_to_bitmap_position(nonce: U256) -> (U256, u8) {
-    let word_pos = nonce >> 8;
-    let bit_pos = (nonce & U256::from(0xFF)).saturating_to::<u8>();
-    (word_pos, bit_pos)
-}
-
 /// Extension trait that adds Permit2 preflight validation to any [`Provider`].
 ///
 /// Provides low-level checks ([`sufficient_balance`], [`token_approved`],
@@ -79,7 +72,7 @@ fn nonce_to_bitmap_position(nonce: U256) -> (U256, u8) {
 /// # Ok(())
 /// # }
 /// ```
-pub trait Permit2Ext {
+pub trait Permit2Ext: Sync {
     /// Check if `user` has at least `amount` of `token`.
     fn sufficient_balance(
         &self,
@@ -110,7 +103,31 @@ pub trait Permit2Ext {
     fn check_signed_order(
         &self,
         order: &SignedOrder,
-    ) -> impl Future<Output = Result<(), PreflightError>> + Send;
+    ) -> impl Future<Output = Result<(), PreflightError>> + Send {
+        async move {
+            let permit = order.permit();
+            let owner = permit.owner;
+
+            let balance_checks = permit
+                .permit
+                .permitted
+                .iter()
+                .map(|tp| self.sufficient_balance(tp.token, owner, tp.amount));
+            let approval_checks = permit
+                .permit
+                .permitted
+                .iter()
+                .map(|tp| self.token_approved(tp.token, owner, tp.amount));
+
+            try_join3(
+                try_join_all(balance_checks),
+                try_join_all(approval_checks),
+                self.nonce_available(owner, permit.permit.nonce),
+            )
+            .await
+            .map(|_| ())
+        }
+    }
 
     /// Validate preflight conditions for an [`UnsignedOrder`].
     ///
@@ -120,7 +137,20 @@ pub trait Permit2Ext {
         &self,
         order: &UnsignedOrder<'_>,
         user: Address,
-    ) -> impl Future<Output = Result<(), PreflightError>> + Send;
+    ) -> impl Future<Output = Result<(), PreflightError>> + Send {
+        async move {
+            let balance_checks = order
+                .inputs()
+                .iter()
+                .map(|input| self.sufficient_balance(input.token, user, input.amount));
+            let approval_checks = order
+                .inputs()
+                .iter()
+                .map(|input| self.token_approved(input.token, user, input.amount));
+
+            try_join(try_join_all(balance_checks), try_join_all(approval_checks)).await.map(|_| ())
+        }
+    }
 
     /// Validate preflight conditions for all orders in an [`OrdersAndFills`].
     ///
@@ -130,7 +160,15 @@ pub trait Permit2Ext {
     fn check_orders_and_fills(
         &self,
         orders_and_fills: &OrdersAndFills,
-    ) -> impl Future<Output = Result<(), PreflightError>> + Send;
+    ) -> impl Future<Output = Result<(), PreflightError>> + Send {
+        async move {
+            try_join_all(
+                orders_and_fills.orders().iter().map(|order| self.check_signed_order(order)),
+            )
+            .await
+            .map(|_| ())
+        }
+    }
 }
 
 impl<P: Provider> Permit2Ext for P {
@@ -159,80 +197,20 @@ impl<P: Provider> Permit2Ext for P {
     }
 
     async fn nonce_available(&self, user: Address, nonce: U256) -> Result<(), PreflightError> {
-        let (word_pos, bit_pos) = nonce_to_bitmap_position(nonce);
-        let bitmap =
-            IPermit2::new(PERMIT2_ADDRESS, self).nonceBitmap(user, word_pos).call().await?;
+        let permit2 = IPermit2::new(PERMIT2_ADDRESS, self);
+        let (word_pos, bit_pos) = permit2.nonce_to_bitmap_position(nonce);
+        let bitmap = permit2.nonceBitmap(user, word_pos).call().await?;
         (bitmap & (U256::from(1) << bit_pos) == U256::ZERO)
             .then_some(())
             .ok_or(PreflightError::NonceConsumed { word_pos, bit_pos })
-    }
-
-    async fn check_signed_order(&self, order: &SignedOrder) -> Result<(), PreflightError> {
-        let permit = order.permit();
-        let owner = permit.owner;
-
-        let balance_checks = permit
-            .permit
-            .permitted
-            .iter()
-            .map(|tp| self.sufficient_balance(tp.token, owner, tp.amount));
-        let approval_checks = permit
-            .permit
-            .permitted
-            .iter()
-            .map(|tp| self.token_approved(tp.token, owner, tp.amount));
-
-        try_join3(
-            try_join_all(balance_checks),
-            try_join_all(approval_checks),
-            self.nonce_available(owner, permit.permit.nonce),
-        )
-        .await
-        .map(|_| ())
-    }
-
-    async fn check_unsigned_order(
-        &self,
-        order: &UnsignedOrder<'_>,
-        user: Address,
-    ) -> Result<(), PreflightError> {
-        let balance_checks = order
-            .inputs()
-            .iter()
-            .map(|input| self.sufficient_balance(input.token, user, input.amount));
-        let approval_checks =
-            order.inputs().iter().map(|input| self.token_approved(input.token, user, input.amount));
-
-        try_join(try_join_all(balance_checks), try_join_all(approval_checks)).await.map(|_| ())
-    }
-
-    async fn check_orders_and_fills(
-        &self,
-        orders_and_fills: &OrdersAndFills,
-    ) -> Result<(), PreflightError> {
-        try_join_all(orders_and_fills.orders().iter().map(|order| self.check_signed_order(order)))
-            .await
-            .map(|_| ())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{nonce_to_bitmap_position, PreflightError};
-    use alloy::primitives::{uint, U256};
-    use signet_types::PERMIT2_ADDRESS;
-
-    #[test]
-    fn test_nonce_to_bitmap_position() {
-        assert_eq!(nonce_to_bitmap_position(U256::ZERO), (U256::ZERO, 0));
-        assert_eq!(nonce_to_bitmap_position(U256::from(255)), (U256::ZERO, 255));
-        assert_eq!(nonce_to_bitmap_position(U256::from(256)), (U256::from(1), 0));
-        assert_eq!(nonce_to_bitmap_position(U256::from(511)), (U256::from(1), 255));
-        assert_eq!(
-            nonce_to_bitmap_position(U256::from(0x0123456789ABCDEFu64)),
-            (U256::from(0x0123456789ABCDu64), 0xEF)
-        );
-    }
+    use super::PreflightError;
+    use alloy::primitives::uint;
+    use signet_zenith::PERMIT2_ADDRESS;
 
     #[test]
     fn test_preflight_errors() {
@@ -250,24 +228,6 @@ mod tests {
         assert!(nonce_consumed.to_string().contains("nonce already consumed"));
         assert!(nonce_consumed.to_string().contains("word_pos=1"));
         assert!(nonce_consumed.to_string().contains("bit_pos=42"));
-    }
-
-    #[test]
-    fn test_bitmap_position_edge_cases() {
-        let (word_pos, bit_pos) = nonce_to_bitmap_position(U256::ZERO);
-        assert_eq!(word_pos, U256::ZERO);
-        assert_eq!(bit_pos, 0);
-
-        let (word_pos, bit_pos) = nonce_to_bitmap_position(U256::from(u64::MAX));
-        assert_eq!(word_pos, U256::from(u64::MAX >> 8));
-        assert_eq!(bit_pos, 255);
-
-        let (word_pos_255, bit_pos_255) = nonce_to_bitmap_position(U256::from(255));
-        let (word_pos_256, bit_pos_256) = nonce_to_bitmap_position(U256::from(256));
-        assert_eq!(word_pos_255, U256::ZERO);
-        assert_eq!(bit_pos_255, 255);
-        assert_eq!(word_pos_256, U256::from(1));
-        assert_eq!(bit_pos_256, 0);
     }
 
     #[test]

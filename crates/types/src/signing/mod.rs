@@ -7,15 +7,16 @@ pub use fill::{SignedFill, UnsignedFill};
 mod error;
 pub use error::{SignedPermitError, SigningError};
 
-use alloy::primitives::{address, Address, B256, U256};
+use alloy::primitives::{Address, B256, U256};
 use alloy::sol_types::{Eip712Domain, SolStruct};
-use signet_zenith::RollupOrders::{
-    Output, PermitBatchTransferFrom, PermitBatchWitnessTransferFrom, TokenPermissions,
+use signet_zenith::{
+    RollupOrders::{
+        Output, PermitBatchTransferFrom, PermitBatchWitnessTransferFrom, TokenPermissions,
+    },
+    PERMIT2_ADDRESS,
 };
 
 const PERMIT2_CONTRACT_NAME: &str = "Permit2";
-/// The canonical Permit2 contract address deployed on all supported chains.
-pub const PERMIT2_ADDRESS: Address = address!("0x000000000022D473030F116dDEE9F6B43aC78BA3");
 
 /// Permit2 fields necessary for a [`SignedOrder`] or [`SignedFill`].
 pub(crate) struct PermitSigningInfo {
@@ -68,7 +69,7 @@ pub(crate) fn permit_signing_info(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::primitives::b256;
+    use alloy::primitives::{address, b256};
     use alloy::sol_types::SolStruct;
 
     /// EIP-712 signing hash test vector for TypeScript verification.

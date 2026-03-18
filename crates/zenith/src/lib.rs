@@ -13,7 +13,8 @@
 
 mod bindings;
 pub use bindings::{
-    mintCall, BundleHelper, HostOrders, Passage, RollupOrders, RollupPassage, Transactor, Zenith,
+    mintCall, BundleHelper, HostOrders, IPermit2, Passage, RollupOrders, RollupPassage, Transactor,
+    Zenith, IERC20, PERMIT2_ADDRESS,
 };
 
 mod block;
