@@ -22,4 +22,16 @@ jobs:
           cache-on-failure: true
 
       - name: Run Parmigiana live tests
-        run: PARMIGIANA_CARGO_PROFILE=ci-rust ./scripts/run_parmigiana_live.sh
+        env:
+          PARMIGIANA_CARGO_PROFILE: ci-rust
+          PARMIGIANA_ETH_PRIV_KEY: ${{ secrets.PARMIGIANA_ETH_PRIV_KEY }}
+        run: |
+          set -o pipefail
+          ./scripts/run_parmigiana_live.sh 2>&1 | tee parmigiana-live-tests.log
+
+      - name: Upload Parmigiana live test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parmigiana-live-tests-log
+          path: parmigiana-live-tests.log

@@ -31,4 +31,6 @@ uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 chrono.workspace = true
+serde_json.workspace = true
+signet-tx-cache.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
