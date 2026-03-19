@@ -4,3 +4,4 @@ Cargo.lock
 .idea/
 .claude/*.local.*
 CLAUDE.local.md
+docs/
