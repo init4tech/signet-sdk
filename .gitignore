@@ -6,3 +6,4 @@ Cargo.lock
 CLAUDE.local.md
 .dmux/
 .dmux-hooks/
+docs/
