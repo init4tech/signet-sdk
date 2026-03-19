@@ -42,6 +42,11 @@ impl Chain {
     pub fn execution_outcome(&self) -> &ExecutionOutcome {
         &self.execution_outcome
     }
+
+    /// Decompose the chain into its constituent parts.
+    pub fn into_parts(self) -> (Vec<RecoveredBlock>, ExecutionOutcome) {
+        (self.blocks, self.execution_outcome)
+    }
 }
 
 impl Extractable for Chain {
