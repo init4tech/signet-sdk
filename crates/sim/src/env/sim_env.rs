@@ -4,9 +4,15 @@ use core::fmt;
 use signet_bundle::{RecoveredBundle, SignetEthBundleDriver, SignetEthBundleError};
 use signet_evm::SignetInspector;
 use signet_types::constants::SignetSystemConstants;
-use std::{borrow::Cow, sync::Arc};
+use std::{
+    borrow::Cow,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+};
 use tokio::sync::{mpsc, watch};
-use tracing::{instrument, trace, trace_span};
+use tracing::{debug, instrument, trace, trace_span};
 use trevm::{
     helpers::Ctx,
     revm::{
@@ -254,19 +260,23 @@ where
         }
     }
 
+    /// Run a simulation round, returning counts of successful and failed items.
     pub(crate) fn sim_round(
         self: Arc<Self>,
         max_gas: u64,
         max_host_gas: u64,
         best_tx: watch::Sender<Option<SimOutcomeWithCache>>,
         active_sim: Vec<(u128, SimItem)>,
-    ) {
+    ) -> SimRoundCounts {
         // Create a channel to send the results back.
         let (candidates, mut candidates_rx) = mpsc::channel(self.concurrency_limit);
 
         let outer = trace_span!("sim_thread", candidates = active_sim.len()).or_current();
         let outer_ref = &outer;
         let _og = outer.enter();
+
+        let ok_count = AtomicU32::new(0);
+        let err_count = AtomicU32::new(0);
 
         // to be used in the scope
         let this_ref = self.clone();
@@ -276,6 +286,8 @@ where
             for (cache_rank, item) in active_sim.into_iter() {
                 let c = candidates.clone();
                 let this_ref = this_ref.clone();
+                let ok_ref = &ok_count;
+                let err_ref = &err_count;
                 scope.spawn(move || {
                     let identifier = item.identifier();
                     let _ig = trace_span!(parent: outer_ref, "sim_task", %identifier).entered();
@@ -285,25 +297,46 @@ where
 
                     match this_ref.simulate(cache_rank, &item) {
                         Ok(candidate) if candidate.score.is_zero() => {
-                            trace!("zero score candidate, skipping");
+                            debug!(
+                                %identifier,
+                                failure_reason = "zero score candidate",
+                                "simulation rejected",
+                            );
+                            err_ref.fetch_add(1, Ordering::Relaxed);
                         }
                         Ok(candidate) if candidate.host_gas_used > max_host_gas => {
-                            trace!(
+                            debug!(
+                                %identifier,
                                 host_gas_used = candidate.host_gas_used,
                                 max_host_gas,
-                                "Host gas limit exceeded"
+                                failure_reason = "host gas limit exceeded",
+                                "simulation rejected",
                             );
+                            err_ref.fetch_add(1, Ordering::Relaxed);
                         }
                         Ok(candidate) if candidate.gas_used > max_gas => {
-                            trace!(gas_used = candidate.gas_used, max_gas, "Gas limit exceeded");
+                            debug!(
+                                %identifier,
+                                gas_used = candidate.gas_used,
+                                max_gas,
+                                failure_reason = "gas limit exceeded",
+                                "simulation rejected",
+                            );
+                            err_ref.fetch_add(1, Ordering::Relaxed);
                         }
                         Ok(candidate) => {
+                            ok_ref.fetch_add(1, Ordering::Relaxed);
                             // shortcut return on success
                             let _ = c.blocking_send(candidate);
                             return;
                         }
-                        Err(e) => {
-                            trace!(?identifier, %e, "Simulation failed");
+                        Err(error) => {
+                            debug!(
+                                %identifier,
+                                failure_reason = %error,
+                                "simulation failed",
+                            );
+                            err_ref.fetch_add(1, Ordering::Relaxed);
                         }
                     };
                     // fall through applies to all errors, occurs if
@@ -336,5 +369,19 @@ where
                 });
             }
         });
+
+        SimRoundCounts {
+            ok: ok_count.load(Ordering::Relaxed),
+            err: err_count.load(Ordering::Relaxed),
+        }
     }
+}
+
+/// Counts of items from a simulation round.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SimRoundCounts {
+    /// Items that simulated successfully.
+    pub ok: u32,
+    /// Items that failed or were rejected.
+    pub err: u32,
 }

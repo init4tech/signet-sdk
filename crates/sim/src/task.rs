@@ -221,7 +221,12 @@ where
             }
         }
 
-        debug!(rounds = i, transactions = self.block.transactions.len(), "Building completed",);
+        debug!(
+            rounds = i,
+            transactions = self.block.transactions.len(),
+            remaining_cache_size = self.env.sim_items().len(),
+            "Building completed",
+        );
         self
     }
 

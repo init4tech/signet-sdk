@@ -6,7 +6,7 @@ use alloy::primitives::Address;
 use core::fmt;
 use std::{ops::Deref, sync::Arc};
 use tokio::{select, sync::watch};
-use tracing::{debug, trace, trace_span, warn};
+use tracing::{debug, debug_span, instrument, trace, warn, Span};
 use trevm::{
     db::TryCachingDb,
     helpers::Ctx,
@@ -27,14 +27,17 @@ struct CachedAsyncSource<'a, S> {
 impl<S: StateSource> StateSource for CachedAsyncSource<'_, S> {
     type Error = S::Error;
 
+    #[instrument(level = "trace", skip_all, fields(%address, source = tracing::field::Empty))]
     async fn account_details(&self, address: &Address) -> Result<AcctInfo, Self::Error> {
         if let Some(acct) = self.cache.accounts.get(address) {
+            Span::current().record("source", "cache_hit");
             return Ok(AcctInfo {
                 nonce: acct.info.nonce,
                 balance: acct.info.balance,
                 has_code: acct.info.code_hash() != trevm::revm::primitives::KECCAK_EMPTY,
             });
         }
+        Span::current().record("source", "rpc_fallback");
         self.fallback.account_details(address).await
     }
 }
@@ -136,7 +139,15 @@ where
         AS: StateSource,
         AH: StateSource,
     {
-        let span = trace_span!("sim_round", max_gas, max_host_gas).or_current();
+        let span = debug_span!(
+            "sim_round",
+            max_gas,
+            max_host_gas,
+            items_to_simulate = tracing::field::Empty,
+            items_simulated_ok = tracing::field::Empty,
+            items_simulated_err = tracing::field::Empty,
+        )
+        .or_current();
 
         // Overlay the sim env's committed cache so that accounts touched
         // by prior rounds (e.g. nonce bumps) are visible to the preflight
@@ -163,6 +174,8 @@ where
             }
         };
 
+        span.record("items_to_simulate", active_sim.len());
+
         if active_sim.is_empty() {
             return None;
         }
@@ -178,13 +191,20 @@ where
         });
 
         // Either simulation is done, or we time out
-        select! {
+        let sim_counts = select! {
             _ = tokio::time::sleep_until(self.finish_by()) => {
                 span.in_scope(|| trace!("Sim round timed out"));
+                None
             },
-            _ = sim_task => {
+            result = sim_task => {
                 span.in_scope(|| trace!("Sim round done"));
+                result.ok()
             },
+        };
+
+        if let Some(counts) = sim_counts {
+            span.record("items_simulated_ok", counts.ok);
+            span.record("items_simulated_err", counts.err);
         }
 
         let _guard = span.entered();

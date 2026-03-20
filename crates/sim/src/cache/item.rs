@@ -13,6 +13,7 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+use tracing::{instrument, trace, Span};
 
 /// An item that can be simulated, wrapped in an Arc for cheap cloning.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,26 +114,47 @@ impl SimItem {
         }
     }
 
+    #[instrument(level = "trace", skip_all)]
     async fn check_tx<S>(&self, source: &S) -> Result<SimItemValidity, Box<dyn std::error::Error>>
     where
         S: StateSource,
     {
         let item = self.as_tx().expect("SimItem is not a Tx");
+        let signer = item.signer();
+        let item_nonce = item.nonce();
         let total = U256::from(item.max_fee_per_gas() * item.gas_limit() as u128) + item.value();
 
         source
-            .map(&item.signer(), |info| {
+            .map(&signer, |info| {
                 // if the chain nonce is greater than the tx nonce, it is
                 // no longer valid
-                if info.nonce > item.nonce() {
+                if info.nonce > item_nonce {
+                    trace!(
+                        expected_nonce = info.nonce,
+                        item_nonce,
+                        signer = %signer,
+                        "nonce too low",
+                    );
                     return SimItemValidity::Never;
                 }
                 // if the chain nonce is less than the tx nonce, we need to wait
-                if info.nonce < item.nonce() {
+                if info.nonce < item_nonce {
+                    trace!(
+                        expected_nonce = info.nonce,
+                        item_nonce,
+                        signer = %signer,
+                        "nonce too high",
+                    );
                     return SimItemValidity::Future;
                 }
                 // if the balance is insufficient, we need to wait
                 if info.balance < total {
+                    trace!(
+                        required = %total,
+                        available = %info.balance,
+                        signer = %signer,
+                        "insufficient balance",
+                    );
                     return SimItemValidity::Future;
                 }
                 // nonce is equal and balance is sufficient
@@ -140,6 +162,28 @@ impl SimItem {
             })
             .await
             .map_err(Into::into)
+    }
+
+    #[instrument(level = "trace", skip_all)]
+    async fn check_bundle_tx_list_for_rollup<S>(
+        items: impl Iterator<Item = TxRequirement>,
+        source: &S,
+    ) -> Result<SimItemValidity, S::Error>
+    where
+        S: StateSource,
+    {
+        Self::check_bundle_tx_list(items, source).await
+    }
+
+    #[instrument(level = "trace", skip_all)]
+    async fn check_bundle_tx_list_for_host<S>(
+        items: impl Iterator<Item = TxRequirement>,
+        source: &S,
+    ) -> Result<SimItemValidity, S::Error>
+    where
+        S: StateSource,
+    {
+        Self::check_bundle_tx_list(items, source).await
     }
 
     async fn check_bundle_tx_list<S>(
@@ -164,6 +208,12 @@ impl SimItem {
 
             // check balance for the first tx is sufficient
             if first.balance > info.balance {
+                trace!(
+                    required = %first.balance,
+                    available = %info.balance,
+                    signer = %first.signer,
+                    "insufficient balance",
+                );
                 return Ok(SimItemValidity::Future);
             }
 
@@ -182,9 +232,21 @@ impl SimItem {
             };
 
             if requirement.nonce < state_nonce {
+                trace!(
+                    expected_nonce = state_nonce,
+                    item_nonce = requirement.nonce,
+                    signer = %requirement.signer,
+                    "nonce too low",
+                );
                 return Ok(SimItemValidity::Never);
             }
             if requirement.nonce > state_nonce {
+                trace!(
+                    expected_nonce = state_nonce,
+                    item_nonce = requirement.nonce,
+                    signer = %requirement.signer,
+                    "nonce too high",
+                );
                 return Ok(SimItemValidity::Future);
             }
 
@@ -209,8 +271,8 @@ impl SimItem {
     {
         let item = self.as_bundle().expect("SimItem is not a Bundle");
 
-        let ru_tx = Self::check_bundle_tx_list(item.tx_reqs(), source).await?;
-        let host_tx = Self::check_bundle_tx_list(item.host_tx_reqs(), host_source).await?;
+        let ru_tx = Self::check_bundle_tx_list_for_rollup(item.tx_reqs(), source).await?;
+        let host_tx = Self::check_bundle_tx_list_for_host(item.host_tx_reqs(), host_source).await?;
 
         // Check both the regular txs and the host txs.
         Ok(ru_tx.min(host_tx))
@@ -220,6 +282,16 @@ impl SimItem {
     ///
     /// This will check that nonces and balances are sufficient for the item to
     /// be included on the current state.
+    #[instrument(
+        level = "trace",
+        name = "preflight_check",
+        skip_all,
+        fields(
+            item_identifier = %self.identifier(),
+            item_type = if self.as_bundle().is_some() { "bundle" } else { "tx" },
+            result = tracing::field::Empty,
+        )
+    )]
     pub async fn check<S, S2>(
         &self,
         source: &S,
@@ -229,10 +301,13 @@ impl SimItem {
         S: StateSource,
         S2: StateSource,
     {
-        match self {
+        let validity = match self {
             SimItem::Bundle(_) => self.check_bundle(source, host_source).await,
             SimItem::Tx(_) => self.check_tx(source).await,
-        }
+        };
+
+        Span::current().record("result", tracing::field::debug(&validity));
+        validity
     }
 }
 
