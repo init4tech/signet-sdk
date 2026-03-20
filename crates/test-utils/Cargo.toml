@@ -16,6 +16,7 @@ signet-evm.workspace = true
 signet-extract.workspace = true
 signet-orders.workspace = true
 signet-sim.workspace = true
+signet-tx-cache.workspace = true
 signet-types.workspace = true
 signet-zenith.workspace = true
 

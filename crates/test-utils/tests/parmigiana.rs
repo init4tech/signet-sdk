@@ -1,20 +1,33 @@
 //! Integration tests for the Parmigiana test harness.
 
-use alloy::{network::Ethereum, providers::Provider};
-use signet_constants::parmigiana;
-use signet_test_utils::parmigiana_context::{
-    new_parmigiana_context, ParmigianaContext, RollupTransport,
+use std::{env, time::Duration};
+
+use alloy::{
+    consensus::{Transaction, TypedTransaction},
+    network::Ethereum,
+    primitives::{Address, U256},
+    providers::Provider,
+    signers::{k256::ecdsa::SigningKey, local::PrivateKeySigner},
 };
+use signet_constants::parmigiana;
+use signet_test_utils::{
+    parmigiana_context::{new_parmigiana_context, ParmigianaContext, RollupTransport},
+    specs::{sign_tx_with_key_pair, simple_send},
+};
+
+const DEFAULT_MIN_RU_NATIVE_BALANCE: u64 = 1_000_000_000_000_000;
+const LIVE_TEST_NAME: &str = "ci_submit_transaction_and_wait_for_confirmation";
+const LIVE_TEST_TRANSFER_AMOUNT: u64 = 1;
 
 async fn check_chain_ids<H, R>(ctx: &ParmigianaContext<H, R>)
 where
     H: Provider<Ethereum>,
     R: Provider<Ethereum>,
 {
-    let host_chain_id = ctx.host_provider.get_chain_id().await.unwrap();
+    let host_chain_id = ctx.host_chain_id().await.unwrap();
     assert_eq!(host_chain_id, parmigiana::HOST_CHAIN_ID);
 
-    let ru_chain_id = ctx.ru_provider.get_chain_id().await.unwrap();
+    let ru_chain_id = ctx.ru_chain_id().await.unwrap();
     assert_eq!(ru_chain_id, parmigiana::RU_CHAIN_ID);
 }
 
@@ -82,4 +95,120 @@ async fn test_all_signers_match_users_wss() {
 async fn test_all_signers_match_users_https() {
     let ctx = new_parmigiana_context(RollupTransport::Https).await.unwrap();
     check_all_signers_match_users(&ctx);
+}
+
+fn live_tests_enabled() -> bool {
+    env::var("PARMIGIANA_LIVE_TESTS")
+        .map(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false)
+}
+
+fn env_u64(name: &str, default: u64) -> u64 {
+    env::var(name).ok().and_then(|value| value.parse::<u64>().ok()).unwrap_or(default)
+}
+
+fn ru_receipt_timeout() -> Duration {
+    Duration::from_secs(env_u64("PARMIGIANA_RU_RECEIPT_TIMEOUT_SECS", 240))
+}
+
+fn order_cache_timeout() -> Duration {
+    Duration::from_secs(env_u64("PARMIGIANA_ORDER_CACHE_TIMEOUT_SECS", 60))
+}
+
+fn min_ru_native_balance(tx: &TypedTransaction) -> U256 {
+    let configured_min =
+        U256::from(env_u64("PARMIGIANA_MIN_RU_NATIVE_BALANCE", DEFAULT_MIN_RU_NATIVE_BALANCE));
+    let tx_max_cost = U256::from(tx.gas_limit()) * U256::from(tx.max_fee_per_gas()) + tx.value();
+    if configured_min > tx_max_cost {
+        configured_min
+    } else {
+        tx_max_cost
+    }
+}
+
+fn should_run_live(test_name: &str) -> bool {
+    if live_tests_enabled() {
+        return true;
+    }
+    eprintln!("skipping {test_name}: set PARMIGIANA_LIVE_TESTS=1 to enable live Parmigiana tests");
+    false
+}
+
+fn signer_from_env() -> Option<PrivateKeySigner> {
+    let key = env::var("PARMIGIANA_ETH_PRIV_KEY").ok()?;
+    let key = key.trim().trim_start_matches("0x");
+    if key.is_empty() {
+        return None;
+    }
+    let bytes = alloy::hex::decode(key).expect("PARMIGIANA_ETH_PRIV_KEY must be valid hex");
+    let bytes: [u8; 32] =
+        bytes.try_into().expect("PARMIGIANA_ETH_PRIV_KEY must be exactly 32 bytes");
+    Some(PrivateKeySigner::from(
+        SigningKey::from_slice(&bytes)
+            .expect("PARMIGIANA_ETH_PRIV_KEY must be a valid secp256k1 key"),
+    ))
+}
+
+fn signer_for_live_test() -> (PrivateKeySigner, Address) {
+    let signer = signer_from_env().expect(
+        "PARMIGIANA_ETH_PRIV_KEY must be set to a funded signer when PARMIGIANA_LIVE_TESTS=1",
+    );
+    let address = signer.address();
+    (signer, address)
+}
+
+async fn assert_sufficient_native_balance<H, R>(
+    ctx: &ParmigianaContext<H, R>,
+    owner: Address,
+    minimum: U256,
+    chain_label: &str,
+    test_name: &str,
+) where
+    H: Provider<Ethereum>,
+    R: Provider<Ethereum>,
+{
+    let balance = ctx.ru_native_balance_of(owner).await.unwrap();
+    assert!(
+        balance >= minimum,
+        "{test_name} requires at least {minimum} {chain_label} native balance to cover max tx cost, found {balance}"
+    );
+}
+
+fn ci_transfer(to: Address, nonce: u64, ru_chain_id: u64) -> TypedTransaction {
+    simple_send(to, U256::from(LIVE_TEST_TRANSFER_AMOUNT), nonce, ru_chain_id)
+}
+
+async fn run_submit_transaction_and_wait_for_confirmation() {
+    let ctx = new_parmigiana_context(RollupTransport::Https).await.unwrap();
+    let (signer, signer_addr) = signer_for_live_test();
+    let ru_chain_id = ctx.ru_chain_id().await.unwrap();
+    let preview_tx = ci_transfer(ctx.users[2], 0, ru_chain_id);
+    let min_balance = min_ru_native_balance(&preview_tx);
+    assert_sufficient_native_balance(&ctx, signer_addr, min_balance, "RU", LIVE_TEST_NAME).await;
+
+    let nonce = ctx.ru_transaction_count(signer_addr).await.unwrap();
+    let tx = ci_transfer(ctx.users[2], nonce, ru_chain_id);
+    let envelope = sign_tx_with_key_pair(&signer, tx);
+    let tx_hash = *envelope.hash();
+
+    let response = ctx.forward_rollup_transaction(envelope).await.unwrap();
+    assert_eq!(response.tx_hash, tx_hash, "tx-cache returned unexpected tx hash");
+    ctx.wait_for_transaction_in_cache(tx_hash, order_cache_timeout()).await.unwrap();
+    let confirmed =
+        ctx.wait_for_successful_ru_receipt(tx_hash, ru_receipt_timeout()).await.unwrap();
+    println!(
+        "PARMIGIANA_TX_ARTIFACT test={LIVE_TEST_NAME} chain=rollup tx_hash={:#x} block_number={} block_hash={:#x} transaction_index={}",
+        confirmed.tx_hash,
+        confirmed.block_number,
+        confirmed.block_hash,
+        confirmed.transaction_index
+    );
+}
+
+#[tokio::test]
+async fn ci_submit_transaction_and_wait_for_confirmation() {
+    if !should_run_live(LIVE_TEST_NAME) {
+        return;
+    }
+    run_submit_transaction_and_wait_for_confirmation().await;
 }

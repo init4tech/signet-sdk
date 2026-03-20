@@ -6,13 +6,18 @@
 
 use crate::users::{TEST_SIGNERS, TEST_USERS};
 use alloy::{
+    consensus::TxEnvelope,
+    network::ReceiptResponse,
     network::{Ethereum, EthereumWallet},
-    primitives::{Address, U256},
+    primitives::{Address, TxHash, B256, U256},
     providers::{Provider, ProviderBuilder},
     signers::local::PrivateKeySigner,
     transports::TransportError,
 };
 use signet_constants::parmigiana::{HOST_CHAIN_ID, RU_CHAIN_ID};
+use signet_tx_cache::{types::TransactionResponse, TxCache, TxCacheError};
+use std::time::Duration;
+use tokio::time::{sleep, Instant};
 
 /// Host chain RPC URL for the Parmigiana testnet.
 pub const HOST_RPC_URL: &str = "https://host-rpc.parmigiana.signet.sh";
@@ -78,6 +83,79 @@ pub enum ParmTestError {
     /// Failed to fetch a balance on the rollup chain.
     #[error("failed to fetch rollup balance: {0}")]
     RollupBalance(TransportError),
+    /// Failed to fetch a nonce on the rollup chain.
+    #[error("failed to fetch rollup transaction count: {0}")]
+    RollupTransactionCount(TransportError),
+    /// Failed to fetch a receipt on the rollup chain.
+    #[error("failed to fetch rollup receipt: {0}")]
+    RollupReceipt(TransportError),
+    /// Failed to fetch a transaction by hash on the rollup chain.
+    #[error("failed to fetch rollup transaction by hash: {0}")]
+    RollupTransactionByHash(TransportError),
+    /// Failed to fetch the current block number on the rollup chain.
+    #[error("failed to fetch rollup block number: {0}")]
+    RollupBlockNumber(TransportError),
+    /// A transaction timed out before it was mined on the rollup chain.
+    #[error(
+        "timed out waiting for receipt for tx {tx_hash:#x}; latest_block={latest_block}; seen_in_pool={seen_in_pool}"
+    )]
+    RollupReceiptTimeout {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+        /// Latest observed rollup block number.
+        latest_block: u64,
+        /// Whether the transaction was still visible in the node's mempool.
+        seen_in_pool: bool,
+    },
+    /// The transaction was mined but did not succeed.
+    #[error("rollup transaction {tx_hash:#x} failed")]
+    RollupTransactionFailed {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+    },
+    /// The mined receipt did not include a block number.
+    #[error("rollup receipt for tx {tx_hash:#x} was missing a block number")]
+    MissingReceiptBlockNumber {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+    },
+    /// The mined receipt did not include a block hash.
+    #[error("rollup receipt for tx {tx_hash:#x} was missing a block hash")]
+    MissingReceiptBlockHash {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+    },
+    /// The mined receipt did not include a transaction index.
+    #[error("rollup receipt for tx {tx_hash:#x} was missing a transaction index")]
+    MissingReceiptTransactionIndex {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+    },
+    /// Failed to submit a transaction to tx-cache.
+    #[error("failed to submit transaction to tx-cache: {0}")]
+    TxCacheSubmit(TxCacheError),
+    /// Failed to query tx-cache.
+    #[error("failed to query tx-cache: {0}")]
+    TxCacheQuery(TxCacheError),
+    /// The transaction never appeared in tx-cache before the timeout elapsed.
+    #[error("timed out waiting for tx {tx_hash:#x} to appear in tx-cache")]
+    TxCacheTimeout {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+    },
+}
+
+/// Receipt metadata for a confirmed Parmigiana rollup transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConfirmedRollupTransaction {
+    /// Submitted transaction hash.
+    pub tx_hash: TxHash,
+    /// Block number that confirmed the transaction.
+    pub block_number: u64,
+    /// Block hash that confirmed the transaction.
+    pub block_hash: B256,
+    /// Index of the transaction inside the block.
+    pub transaction_index: u64,
 }
 
 /// Test context for Parmigiana integration tests.
@@ -140,6 +218,140 @@ where
     /// Panics if `index` >= 10.
     pub async fn ru_balance(&self, index: usize) -> Result<U256, ParmTestError> {
         self.ru_provider.get_balance(self.users[index]).await.map_err(ParmTestError::RollupBalance)
+    }
+
+    /// Gets the host chain ID from the live Parmigiana node.
+    pub async fn host_chain_id(&self) -> Result<u64, ParmTestError> {
+        self.host_provider.get_chain_id().await.map_err(ParmTestError::HostChainId)
+    }
+
+    /// Gets the rollup chain ID from the live Parmigiana node.
+    pub async fn ru_chain_id(&self) -> Result<u64, ParmTestError> {
+        self.ru_provider.get_chain_id().await.map_err(ParmTestError::RollupChainId)
+    }
+
+    /// Gets the balance of any address on the rollup chain.
+    pub async fn ru_native_balance_of(&self, address: Address) -> Result<U256, ParmTestError> {
+        self.ru_provider.get_balance(address).await.map_err(ParmTestError::RollupBalance)
+    }
+
+    /// Gets the next nonce for an address on the rollup chain.
+    pub async fn ru_transaction_count(&self, address: Address) -> Result<u64, ParmTestError> {
+        self.ru_provider
+            .get_transaction_count(address)
+            .pending()
+            .await
+            .map_err(ParmTestError::RollupTransactionCount)
+    }
+
+    /// Creates a tx-cache client configured for Parmigiana.
+    pub fn tx_cache(&self) -> TxCache {
+        TxCache::parmigiana()
+    }
+
+    /// Forwards a signed rollup transaction to the Parmigiana tx-cache.
+    pub async fn forward_rollup_transaction(
+        &self,
+        tx: TxEnvelope,
+    ) -> Result<TransactionResponse, ParmTestError> {
+        self.tx_cache().forward_raw_transaction(tx).await.map_err(ParmTestError::TxCacheSubmit)
+    }
+
+    /// Waits until a transaction becomes visible in the Parmigiana tx-cache.
+    pub async fn wait_for_transaction_in_cache(
+        &self,
+        tx_hash: TxHash,
+        timeout: Duration,
+    ) -> Result<(), ParmTestError> {
+        let tx_cache = self.tx_cache();
+        let started = Instant::now();
+        loop {
+            let mut cursor = None;
+            let mut found = false;
+
+            loop {
+                let page = tx_cache
+                    .get_transactions(cursor.clone())
+                    .await
+                    .map_err(ParmTestError::TxCacheQuery)?;
+                if page.transactions.iter().any(|tx| *tx.hash() == tx_hash) {
+                    found = true;
+                    break;
+                }
+
+                let Some(next_cursor) = page.next_cursor().cloned() else {
+                    break;
+                };
+                cursor = Some(next_cursor);
+            }
+
+            if found {
+                return Ok(());
+            }
+
+            if started.elapsed() > timeout {
+                return Err(ParmTestError::TxCacheTimeout { tx_hash });
+            }
+
+            sleep(Duration::from_secs(2)).await;
+        }
+    }
+
+    /// Waits for a successful receipt on the Parmigiana rollup node.
+    pub async fn wait_for_successful_ru_receipt(
+        &self,
+        tx_hash: TxHash,
+        timeout: Duration,
+    ) -> Result<ConfirmedRollupTransaction, ParmTestError> {
+        let started = Instant::now();
+        let receipt = loop {
+            let receipt = self
+                .ru_provider
+                .get_transaction_receipt(tx_hash)
+                .await
+                .map_err(ParmTestError::RollupReceipt)?;
+            if let Some(receipt) = receipt {
+                break receipt;
+            }
+
+            if started.elapsed() > timeout {
+                let latest_block = self
+                    .ru_provider
+                    .get_block_number()
+                    .await
+                    .map_err(ParmTestError::RollupBlockNumber)?;
+                let seen_in_pool = self
+                    .ru_provider
+                    .get_transaction_by_hash(tx_hash)
+                    .await
+                    .map_err(ParmTestError::RollupTransactionByHash)?
+                    .is_some();
+                return Err(ParmTestError::RollupReceiptTimeout {
+                    tx_hash,
+                    latest_block,
+                    seen_in_pool,
+                });
+            }
+
+            sleep(Duration::from_secs(2)).await;
+        };
+
+        if !receipt.status() {
+            return Err(ParmTestError::RollupTransactionFailed { tx_hash });
+        }
+
+        Ok(ConfirmedRollupTransaction {
+            tx_hash,
+            block_number: receipt
+                .block_number()
+                .ok_or(ParmTestError::MissingReceiptBlockNumber { tx_hash })?,
+            block_hash: receipt
+                .block_hash()
+                .ok_or(ParmTestError::MissingReceiptBlockHash { tx_hash })?,
+            transaction_index: receipt
+                .transaction_index()
+                .ok_or(ParmTestError::MissingReceiptTransactionIndex { tx_hash })?,
+        })
     }
 }
 
