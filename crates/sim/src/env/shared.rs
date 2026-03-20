@@ -37,7 +37,7 @@ impl<S: StateSource> StateSource for CachedAsyncSource<'_, S> {
                 has_code: acct.info.code_hash() != trevm::revm::primitives::KECCAK_EMPTY,
             });
         }
-        Span::current().record("source", "rpc_fallback");
+        Span::current().record("source", "fallback");
         self.fallback.account_details(address).await
     }
 }

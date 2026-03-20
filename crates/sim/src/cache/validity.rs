@@ -1,3 +1,5 @@
+use core::fmt::{self, Display, Formatter};
+
 /// The validity status of a simulation item.
 ///
 /// These are ordered from least to most valid. An item that is `Never` valid
@@ -29,5 +31,15 @@ impl SimItemValidity {
     /// Returns true if the item may be valid in the future.
     pub const fn is_future_valid(&self) -> bool {
         matches!(self, SimItemValidity::Future)
+    }
+}
+
+impl Display for SimItemValidity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Never => f.write_str("never"),
+            Self::Future => f.write_str("future"),
+            Self::Now => f.write_str("now"),
+        }
     }
 }

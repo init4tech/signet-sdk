@@ -13,7 +13,7 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
-use tracing::{instrument, trace, Span};
+use tracing::{instrument, trace, trace_span};
 
 /// An item that can be simulated, wrapped in an Arc for cheap cloning.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,7 +114,6 @@ impl SimItem {
         }
     }
 
-    #[instrument(level = "trace", skip_all)]
     async fn check_tx<S>(&self, source: &S) -> Result<SimItemValidity, Box<dyn std::error::Error>>
     where
         S: StateSource,
@@ -126,25 +125,23 @@ impl SimItem {
 
         source
             .map(&signer, |info| {
+                let _guard = trace_span!(
+                    "check_tx",
+                    %signer,
+                    item_nonce,
+                    expected_nonce = info.nonce,
+                )
+                .entered();
+
                 // if the chain nonce is greater than the tx nonce, it is
                 // no longer valid
                 if info.nonce > item_nonce {
-                    trace!(
-                        expected_nonce = info.nonce,
-                        item_nonce,
-                        signer = %signer,
-                        "nonce too low",
-                    );
+                    trace!("nonce too low");
                     return SimItemValidity::Never;
                 }
                 // if the chain nonce is less than the tx nonce, we need to wait
                 if info.nonce < item_nonce {
-                    trace!(
-                        expected_nonce = info.nonce,
-                        item_nonce,
-                        signer = %signer,
-                        "nonce too high",
-                    );
+                    trace!("nonce too high");
                     return SimItemValidity::Future;
                 }
                 // if the balance is insufficient, we need to wait
@@ -152,7 +149,6 @@ impl SimItem {
                     trace!(
                         required = %total,
                         available = %info.balance,
-                        signer = %signer,
                         "insufficient balance",
                     );
                     return SimItemValidity::Future;
@@ -231,22 +227,20 @@ impl SimItem {
                 }
             };
 
+            let _guard = trace_span!(
+                "check_bundle_tx",
+                signer = %requirement.signer,
+                item_nonce = requirement.nonce,
+                expected_nonce = state_nonce,
+            )
+            .entered();
+
             if requirement.nonce < state_nonce {
-                trace!(
-                    expected_nonce = state_nonce,
-                    item_nonce = requirement.nonce,
-                    signer = %requirement.signer,
-                    "nonce too low",
-                );
+                trace!("nonce too low");
                 return Ok(SimItemValidity::Never);
             }
             if requirement.nonce > state_nonce {
-                trace!(
-                    expected_nonce = state_nonce,
-                    item_nonce = requirement.nonce,
-                    signer = %requirement.signer,
-                    "nonce too high",
-                );
+                trace!("nonce too high");
                 return Ok(SimItemValidity::Future);
             }
 
@@ -289,8 +283,9 @@ impl SimItem {
         fields(
             item_identifier = %self.identifier(),
             item_type = if self.as_bundle().is_some() { "bundle" } else { "tx" },
-            result = tracing::field::Empty,
-        )
+        ),
+        ret(level = "debug", Display),
+        err(level = "debug", Display),
     )]
     pub async fn check<S, S2>(
         &self,
@@ -301,13 +296,10 @@ impl SimItem {
         S: StateSource,
         S2: StateSource,
     {
-        let validity = match self {
+        match self {
             SimItem::Bundle(_) => self.check_bundle(source, host_source).await,
             SimItem::Tx(_) => self.check_tx(source).await,
-        };
-
-        Span::current().record("result", tracing::field::debug(&validity));
-        validity
+        }
     }
 }
 
