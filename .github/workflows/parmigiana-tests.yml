@@ -11,7 +11,7 @@ jobs:
     name: Parmigiana testnet integration
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -31,7 +31,7 @@ jobs:
 
       - name: Upload Parmigiana live test log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: parmigiana-live-tests-log
           path: parmigiana-live-tests.log
