@@ -5,7 +5,6 @@ set -euo pipefail
 #
 # Optional environment overrides:
 # - PARMIGIANA_LIVE_TESTS (default: 1)
-# - PARMIGIANA_ETH_PRIV_KEY (required funded signer for tx-confirming live tests)
 # - PARMIGIANA_TEST_FILTER (default: ci_)
 # - PARMIGIANA_INCLUDE_IGNORED (default: 0)
 # - PARMIGIANA_CARGO_PROFILE (optional, example: ci-rust)
@@ -27,11 +26,6 @@ fi
 echo "  PARMIGIANA_INCLUDE_IGNORED=$PARMIGIANA_INCLUDE_IGNORED"
 if [[ -n "${PARMIGIANA_CARGO_PROFILE:-}" ]]; then
   echo "  PARMIGIANA_CARGO_PROFILE=$PARMIGIANA_CARGO_PROFILE"
-fi
-if [[ -n "${PARMIGIANA_ETH_PRIV_KEY:-}" ]]; then
-  echo "  PARMIGIANA_ETH_PRIV_KEY is set"
-else
-  echo "  PARMIGIANA_ETH_PRIV_KEY is not set"
 fi
 
 export PARMIGIANA_LIVE_TESTS

@@ -14,10 +14,16 @@ use alloy::{
     signers::local::PrivateKeySigner,
     transports::TransportError,
 };
+use signet_bundle::SignetEthBundle;
 use signet_constants::parmigiana::{HOST_CHAIN_ID, RU_CHAIN_ID};
-use signet_tx_cache::{types::TransactionResponse, TxCache, TxCacheError};
+use signet_tx_cache::{
+    types::{BundleResponse, TransactionResponse},
+    TxCache, TxCacheError,
+};
 use std::time::Duration;
 use tokio::time::{sleep, Instant};
+
+const DEFAULT_BUNDLE_TARGET_BLOCK_OFFSET: u64 = 2;
 
 /// Host chain RPC URL for the Parmigiana testnet.
 pub const HOST_RPC_URL: &str = "https://host-rpc.parmigiana.signet.sh";
@@ -80,6 +86,36 @@ pub enum ParmTestError {
     /// Failed to fetch a balance on the host chain.
     #[error("failed to fetch host balance: {0}")]
     HostBalance(TransportError),
+    /// Failed to fetch a nonce on the host chain.
+    #[error("failed to fetch host transaction count: {0}")]
+    HostTransactionCount(TransportError),
+    /// Failed to fetch a receipt on the host chain.
+    #[error("failed to fetch host receipt: {0}")]
+    HostReceipt(TransportError),
+    /// Failed to fetch a transaction by hash on the host chain.
+    #[error("failed to fetch host transaction by hash: {0}")]
+    HostTransactionByHash(TransportError),
+    /// Failed to fetch the current block number on the host chain.
+    #[error("failed to fetch host block number: {0}")]
+    HostBlockNumber(TransportError),
+    /// A transaction timed out before it was mined on the host chain.
+    #[error(
+        "timed out waiting for host receipt for tx {tx_hash:#x}; latest_block={latest_block}; seen_in_pool={seen_in_pool}"
+    )]
+    HostReceiptTimeout {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+        /// Latest observed host block number.
+        latest_block: u64,
+        /// Whether the transaction was still visible in the node's mempool.
+        seen_in_pool: bool,
+    },
+    /// The transaction was mined on the host chain but did not succeed.
+    #[error("host transaction {tx_hash:#x} failed")]
+    HostTransactionFailed {
+        /// Transaction hash being tracked.
+        tx_hash: TxHash,
+    },
     /// Failed to fetch a balance on the rollup chain.
     #[error("failed to fetch rollup balance: {0}")]
     RollupBalance(TransportError),
@@ -143,6 +179,9 @@ pub enum ParmTestError {
         /// Transaction hash being tracked.
         tx_hash: TxHash,
     },
+    /// Failed to submit a bundle to tx-cache.
+    #[error("failed to submit bundle to tx-cache: {0}")]
+    BundleCacheSubmit(TxCacheError),
 }
 
 /// Receipt metadata for a confirmed Parmigiana rollup transaction.
@@ -193,6 +232,24 @@ where
         self.users[0]
     }
 
+    /// Returns a test signer by index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` >= 10.
+    pub fn signer(&self, index: usize) -> &PrivateKeySigner {
+        &self.signers[index]
+    }
+
+    /// Returns a test user address by index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` >= 10.
+    pub fn user(&self, index: usize) -> Address {
+        self.users[index]
+    }
+
     /// Creates an Ethereum wallet from a test signer by index.
     ///
     /// # Panics
@@ -209,6 +266,15 @@ where
     /// Panics if `index` >= 10.
     pub async fn host_balance(&self, index: usize) -> Result<U256, ParmTestError> {
         self.host_provider.get_balance(self.users[index]).await.map_err(ParmTestError::HostBalance)
+    }
+
+    /// Gets the next nonce for an address on the host chain.
+    pub async fn host_transaction_count(&self, address: Address) -> Result<u64, ParmTestError> {
+        self.host_provider
+            .get_transaction_count(address)
+            .pending()
+            .await
+            .map_err(ParmTestError::HostTransactionCount)
     }
 
     /// Gets the balance of a test user on the rollup chain.
@@ -244,9 +310,45 @@ where
             .map_err(ParmTestError::RollupTransactionCount)
     }
 
+    /// Gets the current rollup block number.
+    pub async fn ru_block_number(&self) -> Result<u64, ParmTestError> {
+        self.ru_provider.get_block_number().await.map_err(ParmTestError::RollupBlockNumber)
+    }
+
     /// Creates a tx-cache client configured for Parmigiana.
     pub fn tx_cache(&self) -> TxCache {
         TxCache::parmigiana()
+    }
+
+    /// Creates a Signet bundle targeting a future rollup block.
+    pub async fn bundle_for_target_ru_block(
+        &self,
+        txs: Vec<TxEnvelope>,
+        host_txs: Vec<TxEnvelope>,
+        block_offset: u64,
+    ) -> Result<SignetEthBundle, ParmTestError> {
+        let block_number = self.ru_block_number().await? + block_offset;
+        let mut bundle = SignetEthBundle::from_transactions(txs, host_txs, block_number);
+        bundle.bundle.replacement_uuid = Some(uuid::Uuid::new_v4().to_string());
+        Ok(bundle)
+    }
+
+    /// Creates a Signet bundle targeting the next usable rollup block window.
+    pub async fn bundle_for_next_ru_block(
+        &self,
+        txs: Vec<TxEnvelope>,
+        host_txs: Vec<TxEnvelope>,
+    ) -> Result<SignetEthBundle, ParmTestError> {
+        self.bundle_for_target_ru_block(txs, host_txs, DEFAULT_BUNDLE_TARGET_BLOCK_OFFSET).await
+    }
+
+    /// Creates a rollup-only Signet bundle targeting the next usable rollup
+    /// block window.
+    pub async fn rollup_bundle_for_next_ru_block(
+        &self,
+        txs: Vec<TxEnvelope>,
+    ) -> Result<SignetEthBundle, ParmTestError> {
+        self.bundle_for_next_ru_block(txs, vec![]).await
     }
 
     /// Forwards a signed rollup transaction to the Parmigiana tx-cache.
@@ -255,6 +357,14 @@ where
         tx: TxEnvelope,
     ) -> Result<TransactionResponse, ParmTestError> {
         self.tx_cache().forward_raw_transaction(tx).await.map_err(ParmTestError::TxCacheSubmit)
+    }
+
+    /// Forwards a Signet bundle to the Parmigiana tx-cache.
+    pub async fn forward_bundle(
+        &self,
+        bundle: SignetEthBundle,
+    ) -> Result<BundleResponse, ParmTestError> {
+        self.tx_cache().forward_bundle(bundle).await.map_err(ParmTestError::BundleCacheSubmit)
     }
 
     /// Waits until a transaction becomes visible in the Parmigiana tx-cache.
@@ -295,6 +405,63 @@ where
 
             sleep(Duration::from_secs(2)).await;
         }
+    }
+
+    /// Waits for a successful receipt on the Parmigiana host chain.
+    pub async fn wait_for_successful_host_receipt(
+        &self,
+        tx_hash: TxHash,
+        timeout: Duration,
+    ) -> Result<ConfirmedRollupTransaction, ParmTestError> {
+        let started = Instant::now();
+        let receipt = loop {
+            let receipt = self
+                .host_provider
+                .get_transaction_receipt(tx_hash)
+                .await
+                .map_err(ParmTestError::HostReceipt)?;
+            if let Some(receipt) = receipt {
+                break receipt;
+            }
+
+            if started.elapsed() > timeout {
+                let latest_block = self
+                    .host_provider
+                    .get_block_number()
+                    .await
+                    .map_err(ParmTestError::HostBlockNumber)?;
+                let seen_in_pool = self
+                    .host_provider
+                    .get_transaction_by_hash(tx_hash)
+                    .await
+                    .map_err(ParmTestError::HostTransactionByHash)?
+                    .is_some();
+                return Err(ParmTestError::HostReceiptTimeout {
+                    tx_hash,
+                    latest_block,
+                    seen_in_pool,
+                });
+            }
+
+            sleep(Duration::from_secs(2)).await;
+        };
+
+        if !receipt.status() {
+            return Err(ParmTestError::HostTransactionFailed { tx_hash });
+        }
+
+        Ok(ConfirmedRollupTransaction {
+            tx_hash,
+            block_number: receipt
+                .block_number()
+                .ok_or(ParmTestError::MissingReceiptBlockNumber { tx_hash })?,
+            block_hash: receipt
+                .block_hash()
+                .ok_or(ParmTestError::MissingReceiptBlockHash { tx_hash })?,
+            transaction_index: receipt
+                .transaction_index()
+                .ok_or(ParmTestError::MissingReceiptTransactionIndex { tx_hash })?,
+        })
     }
 
     /// Waits for a successful receipt on the Parmigiana rollup node.

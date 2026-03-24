@@ -11,9 +11,7 @@ use alloy::{
     consensus::{
         constants::GWEI_TO_WEI, SignableTransaction, TxEip1559, TxEnvelope, TypedTransaction,
     },
-    eips::Encodable2718,
     primitives::{Address, TxKind, B256, U256},
-    rpc::types::mev::EthSendBundle,
     signers::{local::PrivateKeySigner, SignerSync},
     sol_types::SolCall,
 };
@@ -101,23 +99,7 @@ pub fn simple_bundle(
     host_txs: Vec<TxEnvelope>,
     block_number: u64,
 ) -> SignetEthBundle {
-    let txs = txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
-    let host_txs = host_txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
-
-    SignetEthBundle {
-        bundle: EthSendBundle {
-            txs,
-            block_number,
-            min_timestamp: None,
-            max_timestamp: None,
-            reverting_tx_hashes: vec![],
-            replacement_uuid: Some(uuid::Uuid::new_v4().to_string()),
-            dropping_tx_hashes: vec![],
-            refund_percent: None,
-            refund_recipient: None,
-            refund_tx_hashes: vec![],
-            extra_fields: Default::default(),
-        },
-        host_txs,
-    }
+    let mut bundle = SignetEthBundle::from_transactions(txs, host_txs, block_number);
+    bundle.bundle.replacement_uuid = Some(uuid::Uuid::new_v4().to_string());
+    bundle
 }

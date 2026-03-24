@@ -4,7 +4,7 @@ use alloy::{
         transaction::{Recovered, SignerRecoverable},
         TxEnvelope,
     },
-    eips::{eip2718::Eip2718Result, Decodable2718},
+    eips::{eip2718::Eip2718Result, Decodable2718, Encodable2718},
     primitives::{Address, Bytes, TxHash, B256},
     rlp::Buf,
     rpc::types::mev::EthSendBundle,
@@ -49,6 +49,18 @@ impl SignetEthBundle {
         Self { bundle, host_txs }
     }
 
+    /// Creates a new [`SignetEthBundle`] from signed rollup and host transactions.
+    pub fn from_transactions(
+        txs: Vec<TxEnvelope>,
+        host_txs: Vec<TxEnvelope>,
+        block_number: u64,
+    ) -> Self {
+        let txs = txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
+        let host_txs = host_txs.into_iter().map(|tx| tx.encoded_2718().into()).collect();
+
+        Self::new(EthSendBundle { txs, block_number, ..Default::default() }, host_txs)
+    }
+
     /// Decomposes the [`SignetEthBundle`] into its parts.
     pub fn into_parts(self) -> (EthSendBundle, Vec<Bytes>) {
         (self.bundle, self.host_txs)
@@ -67,6 +79,16 @@ impl SignetEthBundle {
     /// Get a mutable reference to the host transactions.
     pub const fn host_txs_mut(&mut self) -> &mut Vec<Bytes> {
         &mut self.host_txs
+    }
+
+    /// Append a signed rollup transaction to this bundle.
+    pub fn push_tx(&mut self, tx: TxEnvelope) {
+        self.bundle.txs.push(tx.encoded_2718().into());
+    }
+
+    /// Append a signed host transaction to this bundle.
+    pub fn push_host_tx(&mut self, tx: TxEnvelope) {
+        self.host_txs.push(tx.encoded_2718().into());
     }
 
     /// Return an iterator over decoded transactions in this bundle.

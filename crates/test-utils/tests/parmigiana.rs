@@ -7,16 +7,17 @@ use alloy::{
     network::Ethereum,
     primitives::{Address, U256},
     providers::Provider,
-    signers::{k256::ecdsa::SigningKey, local::PrivateKeySigner},
 };
 use signet_constants::parmigiana;
 use signet_test_utils::{
     parmigiana_context::{new_parmigiana_context, ParmigianaContext, RollupTransport},
-    specs::{sign_tx_with_key_pair, simple_send},
+    specs::{sign_tx_with_key_pair, simple_call, simple_send},
 };
+use signet_zenith::RollupPassage::exitCall;
 
 const DEFAULT_MIN_RU_NATIVE_BALANCE: u64 = 1_000_000_000_000_000;
-const LIVE_TEST_NAME: &str = "ci_submit_transaction_and_wait_for_confirmation";
+const LIVE_TX_TEST_NAME: &str = "ci_submit_transaction_and_wait_for_confirmation";
+const LIVE_EXIT_BUNDLE_TEST_NAME: &str = "ci_submit_exit_bundle_and_wait_for_confirmation";
 const LIVE_TEST_TRANSFER_AMOUNT: u64 = 1;
 
 async fn check_chain_ids<H, R>(ctx: &ParmigianaContext<H, R>)
@@ -134,29 +135,6 @@ fn should_run_live(test_name: &str) -> bool {
     false
 }
 
-fn signer_from_env() -> Option<PrivateKeySigner> {
-    let key = env::var("PARMIGIANA_ETH_PRIV_KEY").ok()?;
-    let key = key.trim().trim_start_matches("0x");
-    if key.is_empty() {
-        return None;
-    }
-    let bytes = alloy::hex::decode(key).expect("PARMIGIANA_ETH_PRIV_KEY must be valid hex");
-    let bytes: [u8; 32] =
-        bytes.try_into().expect("PARMIGIANA_ETH_PRIV_KEY must be exactly 32 bytes");
-    Some(PrivateKeySigner::from(
-        SigningKey::from_slice(&bytes)
-            .expect("PARMIGIANA_ETH_PRIV_KEY must be a valid secp256k1 key"),
-    ))
-}
-
-fn signer_for_live_test() -> (PrivateKeySigner, Address) {
-    let signer = signer_from_env().expect(
-        "PARMIGIANA_ETH_PRIV_KEY must be set to a funded signer when PARMIGIANA_LIVE_TESTS=1",
-    );
-    let address = signer.address();
-    (signer, address)
-}
-
 async fn assert_sufficient_native_balance<H, R>(
     ctx: &ParmigianaContext<H, R>,
     owner: Address,
@@ -178,17 +156,28 @@ fn ci_transfer(to: Address, nonce: u64, ru_chain_id: u64) -> TypedTransaction {
     simple_send(to, U256::from(LIVE_TEST_TRANSFER_AMOUNT), nonce, ru_chain_id)
 }
 
+fn ci_exit(host_recipient: Address, nonce: u64, ru_chain_id: u64) -> TypedTransaction {
+    simple_call(
+        parmigiana::RU_PASSAGE,
+        &exitCall { hostRecipient: host_recipient },
+        U256::from(LIVE_TEST_TRANSFER_AMOUNT),
+        nonce,
+        ru_chain_id,
+    )
+}
+
 async fn run_submit_transaction_and_wait_for_confirmation() {
     let ctx = new_parmigiana_context(RollupTransport::Https).await.unwrap();
-    let (signer, signer_addr) = signer_for_live_test();
+    let signer = ctx.primary_signer();
+    let signer_addr = signer.address();
     let ru_chain_id = ctx.ru_chain_id().await.unwrap();
     let preview_tx = ci_transfer(ctx.users[2], 0, ru_chain_id);
     let min_balance = min_ru_native_balance(&preview_tx);
-    assert_sufficient_native_balance(&ctx, signer_addr, min_balance, "RU", LIVE_TEST_NAME).await;
+    assert_sufficient_native_balance(&ctx, signer_addr, min_balance, "RU", LIVE_TX_TEST_NAME).await;
 
     let nonce = ctx.ru_transaction_count(signer_addr).await.unwrap();
-    let tx = ci_transfer(ctx.users[2], nonce, ru_chain_id);
-    let envelope = sign_tx_with_key_pair(&signer, tx);
+    let tx = ci_transfer(ctx.user(2), nonce, ru_chain_id);
+    let envelope = sign_tx_with_key_pair(signer, tx);
     let tx_hash = *envelope.hash();
 
     let response = ctx.forward_rollup_transaction(envelope).await.unwrap();
@@ -197,7 +186,7 @@ async fn run_submit_transaction_and_wait_for_confirmation() {
     let confirmed =
         ctx.wait_for_successful_ru_receipt(tx_hash, ru_receipt_timeout()).await.unwrap();
     println!(
-        "PARMIGIANA_TX_ARTIFACT test={LIVE_TEST_NAME} chain=rollup tx_hash={:#x} block_number={} block_hash={:#x} transaction_index={}",
+        "PARMIGIANA_TX_ARTIFACT test={LIVE_TX_TEST_NAME} chain=rollup tx_hash={:#x} block_number={} block_hash={:#x} transaction_index={}",
         confirmed.tx_hash,
         confirmed.block_number,
         confirmed.block_hash,
@@ -207,8 +196,53 @@ async fn run_submit_transaction_and_wait_for_confirmation() {
 
 #[tokio::test]
 async fn ci_submit_transaction_and_wait_for_confirmation() {
-    if !should_run_live(LIVE_TEST_NAME) {
+    if !should_run_live(LIVE_TX_TEST_NAME) {
         return;
     }
     run_submit_transaction_and_wait_for_confirmation().await;
+}
+
+async fn run_submit_exit_bundle_and_wait_for_confirmation() {
+    let ctx = new_parmigiana_context(RollupTransport::Https).await.unwrap();
+    let signer = ctx.primary_signer();
+    let signer_addr = signer.address();
+    let host_recipient = ctx.user(2);
+    let ru_chain_id = ctx.ru_chain_id().await.unwrap();
+    let preview_tx = ci_exit(host_recipient, 0, ru_chain_id);
+    let min_balance = min_ru_native_balance(&preview_tx);
+    assert_sufficient_native_balance(
+        &ctx,
+        signer_addr,
+        min_balance,
+        "RU",
+        LIVE_EXIT_BUNDLE_TEST_NAME,
+    )
+    .await;
+
+    let nonce = ctx.ru_transaction_count(signer_addr).await.unwrap();
+    let tx = ci_exit(host_recipient, nonce, ru_chain_id);
+    let envelope = sign_tx_with_key_pair(signer, tx);
+    let tx_hash = *envelope.hash();
+
+    let bundle = ctx.rollup_bundle_for_next_ru_block(vec![envelope]).await.unwrap();
+    let response = ctx.forward_bundle(bundle).await.unwrap();
+
+    let confirmed =
+        ctx.wait_for_successful_ru_receipt(tx_hash, ru_receipt_timeout()).await.unwrap();
+    println!(
+        "PARMIGIANA_BUNDLE_ARTIFACT test={LIVE_EXIT_BUNDLE_TEST_NAME} bundle_id={} chain=rollup tx_hash={:#x} block_number={} block_hash={:#x} transaction_index={}",
+        response.id,
+        confirmed.tx_hash,
+        confirmed.block_number,
+        confirmed.block_hash,
+        confirmed.transaction_index
+    );
+}
+
+#[tokio::test]
+async fn ci_submit_exit_bundle_and_wait_for_confirmation() {
+    if !should_run_live(LIVE_EXIT_BUNDLE_TEST_NAME) {
+        return;
+    }
+    run_submit_exit_bundle_and_wait_for_confirmation().await;
 }
