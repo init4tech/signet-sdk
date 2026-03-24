@@ -333,8 +333,8 @@ where
         Ok(bundle)
     }
 
-    /// Creates a Signet bundle targeting the next usable rollup block window.
-    pub async fn bundle_for_next_ru_block(
+    /// Creates a Signet bundle targeting the default offset number of blocks in the future.
+    pub async fn bundle_for_default_offset_ru_block(
         &self,
         txs: Vec<TxEnvelope>,
         host_txs: Vec<TxEnvelope>,
@@ -342,13 +342,12 @@ where
         self.bundle_for_target_ru_block(txs, host_txs, DEFAULT_BUNDLE_TARGET_BLOCK_OFFSET).await
     }
 
-    /// Creates a rollup-only Signet bundle targeting the next usable rollup
-    /// block window.
-    pub async fn rollup_bundle_for_next_ru_block(
+    /// Creates a rollup-only Signet bundle targeting the default offset number of blocks in the future.
+    pub async fn rollup_bundle_for_default_offset_ru_block(
         &self,
         txs: Vec<TxEnvelope>,
     ) -> Result<SignetEthBundle, ParmTestError> {
-        self.bundle_for_next_ru_block(txs, vec![]).await
+        self.bundle_for_default_offset_ru_block(txs, vec![]).await
     }
 
     /// Forwards a signed rollup transaction to the Parmigiana tx-cache.
