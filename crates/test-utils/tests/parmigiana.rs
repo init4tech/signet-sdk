@@ -253,7 +253,7 @@ async fn run_submit_exit_bundle_and_wait_for_confirmation() {
     let envelope = sign_tx_with_key_pair(&signer, tx);
     let tx_hash = *envelope.hash();
 
-    let bundle = ctx.rollup_bundle_for_next_ru_block(vec![envelope]).await.unwrap();
+    let bundle = ctx.rollup_bundle_for_default_offset_ru_block(vec![envelope]).await.unwrap();
     let response = ctx.forward_bundle(bundle).await.unwrap();
 
     let confirmed =
