@@ -5,10 +5,10 @@ mod item;
 pub use item::{SimIdentifier, SimItem};
 
 mod state;
-pub use state::{AcctInfo, StateSource};
+pub use state::{AcctInfo, ProviderStateSource, StateSource};
 
 mod store;
 pub use store::SimCache;
 
 mod validity;
-pub use validity::SimItemValidity;
+pub use validity::{check_bundle_tx_list, SimItemValidity};

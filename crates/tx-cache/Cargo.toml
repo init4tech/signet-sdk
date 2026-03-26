@@ -18,7 +18,7 @@ signet-types.workspace = true
 alloy.workspace = true
 futures-util.workspace = true
 
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
 tracing.workspace = true
 uuid = { workspace = true, features = ["serde"] }
