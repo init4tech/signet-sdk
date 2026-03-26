@@ -80,8 +80,11 @@ impl<P: Provider> StateSource for ProviderStateSource<P> {
     type Error = TransportError;
 
     async fn account_details(&self, address: &Address) -> Result<AcctInfo, Self::Error> {
-        let nonce = self.0.get_transaction_count(*address).await?;
-        let balance = self.0.get_balance(*address).await?;
-        Ok(AcctInfo { nonce, balance, has_code: false })
+        let (nonce, balance, code) = tokio::join!(
+            self.0.get_transaction_count(*address),
+            self.0.get_balance(*address),
+            self.0.get_code_at(*address),
+        );
+        Ok(AcctInfo { nonce: nonce?, balance: balance?, has_code: !code?.is_empty() })
     }
 }
