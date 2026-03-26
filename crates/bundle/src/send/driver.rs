@@ -247,7 +247,7 @@ where
                         Ok(htrevm.accept_state())
                     })
                     .map_err(|err| {
-                        error!(err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
+                        debug!(err = %err.error(), err_dbg = ?err.error(), "error while running host transaction");
                         SignetEthBundleError::HostSimulation("host simulation error")
                     }),
                 trevm

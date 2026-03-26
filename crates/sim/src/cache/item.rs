@@ -1,15 +1,17 @@
-use crate::{cache::StateSource, CacheError, SimItemValidity};
+use crate::{
+    cache::{check_bundle_tx_list, StateSource},
+    CacheError, SimItemValidity,
+};
 use alloy::{
     consensus::{
         transaction::{Recovered, SignerRecoverable},
         Transaction, TxEnvelope,
     },
-    primitives::{Address, TxHash, U256},
+    primitives::{TxHash, U256},
 };
 use signet_bundle::{RecoveredBundle, SignetEthBundle, TxRequirement};
 use std::{
     borrow::{Borrow, Cow},
-    collections::BTreeMap,
     hash::Hash,
     sync::Arc,
 };
@@ -168,7 +170,7 @@ impl SimItem {
     where
         S: StateSource,
     {
-        Self::check_bundle_tx_list(items, source).await
+        check_bundle_tx_list(items, source).await
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -179,79 +181,7 @@ impl SimItem {
     where
         S: StateSource,
     {
-        Self::check_bundle_tx_list(items, source).await
-    }
-
-    async fn check_bundle_tx_list<S>(
-        items: impl Iterator<Item = TxRequirement>,
-        source: &S,
-    ) -> Result<SimItemValidity, S::Error>
-    where
-        S: StateSource,
-    {
-        // For bundles, we want to check the nonce of each transaction. To do
-        // this, we build a small in memory cache so that if the same signer
-        // appears, we can reuse the nonce info. We do not check balances after
-        // the first tx, as they may have changed due to prior txs in the
-        // bundle.
-
-        let mut nonce_cache: BTreeMap<Address, u64> = BTreeMap::new();
-        let mut items = items.peekable();
-
-        // Peek to perform the balance check for the first tx
-        if let Some(first) = items.peek() {
-            let info = source.account_details(&first.signer).await?;
-
-            // check balance for the first tx is sufficient
-            if first.balance > info.balance {
-                trace!(
-                    required = %first.balance,
-                    available = %info.balance,
-                    signer = %first.signer,
-                    "insufficient balance",
-                );
-                return Ok(SimItemValidity::Future);
-            }
-
-            // Cache the nonce. This will be used for the first tx.
-            nonce_cache.insert(first.signer, info.nonce);
-        }
-
-        for requirement in items {
-            let state_nonce = match nonce_cache.get(&requirement.signer) {
-                Some(cached_nonce) => *cached_nonce,
-                None => {
-                    let nonce = source.nonce(&requirement.signer).await?;
-                    nonce_cache.insert(requirement.signer, nonce);
-                    nonce
-                }
-            };
-
-            let _guard = trace_span!(
-                "check_bundle_tx",
-                signer = %requirement.signer,
-                item_nonce = requirement.nonce,
-                expected_nonce = state_nonce,
-            )
-            .entered();
-
-            if requirement.nonce < state_nonce {
-                trace!("nonce too low");
-                return Ok(SimItemValidity::Never);
-            }
-            if requirement.nonce > state_nonce {
-                trace!("nonce too high");
-                return Ok(SimItemValidity::Future);
-            }
-
-            // Increment the cached nonce for the next transaction from this
-            // signer. Map _must_ have the entry as we just either loaded or
-            // stored it above
-            nonce_cache.entry(requirement.signer).and_modify(|n| *n += 1);
-        }
-
-        // All transactions passed
-        Ok(SimItemValidity::Now)
+        check_bundle_tx_list(items, source).await
     }
 
     async fn check_bundle<S, S2>(

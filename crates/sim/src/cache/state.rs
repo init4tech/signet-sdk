@@ -1,4 +1,8 @@
-use alloy::primitives::{Address, U256};
+use alloy::{
+    primitives::{Address, U256},
+    providers::Provider,
+    transports::TransportError,
+};
 use core::future::Future;
 use trevm::revm::database_interface::async_db::DatabaseAsyncRef;
 
@@ -60,5 +64,27 @@ where
         let info = self.basic_async_ref(*address).await?.unwrap_or_default();
         let has_code = info.code_hash() != trevm::revm::primitives::KECCAK_EMPTY;
         Ok(AcctInfo { nonce: info.nonce, balance: info.balance, has_code })
+    }
+}
+
+/// A wrapper that implements [`StateSource`] for any alloy [`Provider`].
+///
+/// This allows using an alloy provider as a state source for bundle tx list
+/// validation via [`check_bundle_tx_list`].
+///
+/// [`check_bundle_tx_list`]: crate::check_bundle_tx_list
+#[derive(Debug, Clone)]
+pub struct ProviderStateSource<P>(pub P);
+
+impl<P: Provider> StateSource for ProviderStateSource<P> {
+    type Error = TransportError;
+
+    async fn account_details(&self, address: &Address) -> Result<AcctInfo, Self::Error> {
+        let (nonce, balance, code) = tokio::join!(
+            self.0.get_transaction_count(*address),
+            self.0.get_balance(*address),
+            self.0.get_code_at(*address),
+        );
+        Ok(AcctInfo { nonce: nonce?, balance: balance?, has_code: !code?.is_empty() })
     }
 }
