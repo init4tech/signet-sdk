@@ -419,17 +419,15 @@ impl TxCache {
 }
 
 #[cfg(feature = "sse")]
-const TRANSACTIONS_FEED: &str = "transactions/feed";
-#[cfg(feature = "sse")]
-const ORDERS_FEED: &str = "orders/feed";
-
-#[cfg(feature = "sse")]
 impl TxCache {
+    const TRANSACTIONS_FEED: &str = "transactions/feed";
+    const ORDERS_FEED: &str = "orders/feed";
+
     /// Connect to an SSE feed endpoint, returning a stream that
     /// deserializes each event's JSON data into `T`. The stream
     /// terminates on the first error, which is yielded as the final
     /// item.
-    async fn subscribe_inner<T: serde::de::DeserializeOwned + Send + 'static>(
+    async fn subscribe_inner<T: DeserializeOwned + Send + 'static>(
         &self,
         feed: &'static str,
     ) -> Result<impl Stream<Item = Result<T>> + Send> {
@@ -475,7 +473,7 @@ impl TxCache {
     pub async fn subscribe_transactions(
         &self,
     ) -> Result<impl Stream<Item = Result<TxEnvelope>> + Send> {
-        self.subscribe_inner(TRANSACTIONS_FEED).await
+        self.subscribe_inner(Self::TRANSACTIONS_FEED).await
     }
 
     /// Subscribe to real-time order events via SSE.
@@ -491,6 +489,6 @@ impl TxCache {
     /// [`stream_orders`]: TxCache::stream_orders
     #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
     pub async fn subscribe_orders(&self) -> Result<impl Stream<Item = Result<SignedOrder>> + Send> {
-        self.subscribe_inner(ORDERS_FEED).await
+        self.subscribe_inner(Self::ORDERS_FEED).await
     }
 }
