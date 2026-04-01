@@ -1,4 +1,4 @@
-use crate::cache::{CacheError, SimIdentifier, SimItem, StateSource};
+use crate::cache::{CacheError, SimIdentifier, SimItem, SimItemValidity, StateSource};
 use alloy::consensus::{transaction::Recovered, TxEnvelope};
 use core::fmt;
 use lru::LruCache;
@@ -11,6 +11,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
+use tracing::{instrument, Span};
 
 /// A cache for the simulator.
 ///
@@ -73,6 +74,17 @@ impl SimCache {
     ///
     /// The state sources are used to validate the items against the current
     /// nonce and balance, to prevent simulating invalid items.
+    #[instrument(
+        level = "debug",
+        skip_all,
+        fields(
+            candidates_total = tracing::field::Empty,
+            candidates_checked = tracing::field::Empty,
+            valid_count = tracing::field::Empty,
+            future_count = tracing::field::Empty,
+            never_count = tracing::field::Empty,
+        )
+    )]
     pub async fn read_best_valid<S, S2>(
         &self,
         n: usize,
@@ -91,23 +103,33 @@ impl SimCache {
             cache.items.iter().rev().map(|(rank, item)| (*rank, item.clone())).collect()
         };
 
+        let span = Span::current();
+        span.record("candidates_total", candidates.len());
+
         let mut valid = Vec::with_capacity(n);
         let mut never = Vec::new();
+        let mut future_count: u32 = 0;
+        let mut checked: u32 = 0;
 
         for (rank, item) in &candidates {
             if valid.len() >= n {
                 break;
             }
+            checked += 1;
 
             let validity = item.check(source, host_source).await?;
 
-            if validity.is_valid_now() {
-                valid.push((*rank, item.clone()));
-            }
-            if validity.is_never_valid() {
-                never.push(*rank);
+            match validity {
+                SimItemValidity::Now => valid.push((*rank, item.clone())),
+                SimItemValidity::Never => never.push(*rank),
+                SimItemValidity::Future => future_count += 1,
             }
         }
+
+        span.record("candidates_checked", checked);
+        span.record("valid_count", valid.len());
+        span.record("future_count", future_count);
+        span.record("never_count", never.len());
 
         // Remove never-valid items under a write lock.
         if !never.is_empty() {

@@ -16,6 +16,9 @@ Utilities for placing and filling [orders] on Signet.
 - [`Filler`] — orchestrates the order-filling pipeline: fetch pending orders
   from an `OrderSource`, sign Permit2 fills, and submit them via a
   `FillSubmitter`. Returns a stream of orders and supports batch filling.
+- [`Permit2Ext`] — extension trait on any alloy `Provider` that validates order
+  conditions before submission: token balance sufficiency, ERC20 approvals to
+  Permit2, and nonce availability.
 - [`FeePolicySubmitter`] — a `FillSubmitter` that builds fill and initiate
   transactions, wraps them in a `SignetEthBundle`, and submits via a
   `BundleSubmitter`. Handles gas pricing for both rollup and host chains.
@@ -66,6 +69,20 @@ let orders: Vec<_> = filler.get_orders().try_collect().await?;
 let response = filler.fill(orders).await?;
 ```
 
+**Preflight validation:**
+
+```rust
+use signet_orders::Permit2Ext;
+
+// Check all conditions for a signed order
+provider.check_signed_order(&signed_order).await?;
+
+// Or check individual conditions
+provider.sufficient_balance(token, user, amount).await?;
+provider.token_approved(token, user, amount).await?;
+provider.nonce_available(user, nonce).await?;
+```
+
 For a complete example of a filler service, see [signet-filler].
 
 ### Documentation
@@ -91,3 +108,4 @@ Licensed under either of [Apache License, Version 2.0](../../LICENSE-APACHE) or
 [`BundleSubmitter`]: https://docs.rs/signet-orders/latest/signet_orders/trait.BundleSubmitter.html
 [`TxBuilder`]: https://docs.rs/signet-orders/latest/signet_orders/trait.TxBuilder.html
 [`TxCache`]: https://docs.rs/signet-tx-cache/latest/signet_tx_cache/struct.TxCache.html
+[`Permit2Ext`]: https://docs.rs/signet-orders/latest/signet_orders/trait.Permit2Ext.html

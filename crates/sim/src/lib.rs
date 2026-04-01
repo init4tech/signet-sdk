@@ -20,7 +20,8 @@ pub use built::BuiltBlock;
 
 mod cache;
 pub use cache::{
-    AcctInfo, CacheError, SimCache, SimIdentifier, SimItem, SimItemValidity, StateSource,
+    check_bundle_tx_list, AcctInfo, CacheError, ProviderStateSource, SimCache, SimIdentifier,
+    SimItem, SimItemValidity, StateSource,
 };
 
 mod env;
