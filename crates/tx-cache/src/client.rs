@@ -417,3 +417,166 @@ impl TxCache {
         self.put_inner(&path, order).await
     }
 }
+
+#[cfg(feature = "sse")]
+use eventsource_stream::{Event, EventStreamError, Eventsource};
+#[cfg(feature = "sse")]
+use tracing::debug;
+
+#[cfg(feature = "sse")]
+impl TxCache {
+    const TRANSACTIONS_FEED: &str = "transactions/feed";
+    const ORDERS_FEED: &str = "orders/feed";
+
+    fn decode_sse_events<T, S>(events: S) -> impl Stream<Item = Result<T>> + Send
+    where
+        T: DeserializeOwned + Send + 'static,
+        S: Stream<Item = std::result::Result<Event, EventStreamError<reqwest::Error>>> + Send,
+    {
+        events
+            .map(|result| match result {
+                Ok(event) => serde_json::from_str::<T>(&event.data).map_err(Into::into),
+                Err(e) => Err(e.into()),
+            })
+            .scan(false, |errored, result| {
+                if *errored {
+                    return std::future::ready(None);
+                }
+                *errored = result.is_err();
+                std::future::ready(Some(result))
+            })
+    }
+
+    /// Connect to an SSE feed endpoint, returning a stream that
+    /// deserializes each event's JSON data into `T`. The stream
+    /// terminates on the first error, which is yielded as the final
+    /// item.
+    async fn subscribe_inner<T: DeserializeOwned + Send + 'static>(
+        &self,
+        feed: &'static str,
+    ) -> Result<impl Stream<Item = Result<T>> + Send> {
+        let url = self
+            .url
+            .join(feed)
+            .inspect_err(|e| warn!(%e, "Failed to join URL for SSE subscription"))?;
+
+        let es =
+            self.client.get(url).send().await?.error_for_status()?.bytes_stream().eventsource();
+
+        debug!(feed, "SSE subscription established");
+
+        Ok(Self::decode_sse_events(es))
+    }
+
+    /// Subscribe to real-time transaction events via SSE.
+    ///
+    /// Connects to the `/transactions/feed` endpoint and returns a
+    /// [`Stream`] that yields each [`TxEnvelope`] as it arrives from
+    /// the server. Unlike [`stream_transactions`], which paginates
+    /// over existing data, this receives new transactions in
+    /// real-time.
+    ///
+    /// The stream terminates on the first error, which is yielded as
+    /// the final item.
+    ///
+    /// [`stream_transactions`]: TxCache::stream_transactions
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    #[instrument(skip_all)]
+    pub async fn subscribe_transactions(
+        &self,
+    ) -> Result<impl Stream<Item = Result<TxEnvelope>> + Send> {
+        self.subscribe_inner(Self::TRANSACTIONS_FEED).await
+    }
+
+    /// Subscribe to real-time order events via SSE.
+    ///
+    /// Connects to the `/orders/feed` endpoint and returns a
+    /// [`Stream`] that yields each [`SignedOrder`] as it arrives from
+    /// the server. Unlike [`stream_orders`], which paginates over
+    /// existing data, this receives new orders in real-time.
+    ///
+    /// The stream terminates on the first error, which is yielded as
+    /// the final item.
+    ///
+    /// [`stream_orders`]: TxCache::stream_orders
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    #[instrument(skip_all)]
+    pub async fn subscribe_orders(&self) -> Result<impl Stream<Item = Result<SignedOrder>> + Send> {
+        self.subscribe_inner(Self::ORDERS_FEED).await
+    }
+}
+
+#[cfg(all(test, feature = "sse"))]
+mod tests {
+    use super::TxCache;
+    use crate::error::TxCacheError;
+    use futures_util::{stream, StreamExt};
+
+    type SseError = eventsource_stream::EventStreamError<reqwest::Error>;
+
+    fn event(data: &str) -> eventsource_stream::Event {
+        eventsource_stream::Event { data: data.to_owned(), ..Default::default() }
+    }
+
+    fn utf8_sse_error() -> SseError {
+        eventsource_stream::EventStreamError::Utf8(
+            String::from_utf8(vec![0xff]).expect_err("invalid UTF-8 should error"),
+        )
+    }
+
+    #[tokio::test]
+    async fn decode_sse_events_deserializes_json_events() {
+        let events = stream::iter([Ok::<_, SseError>(event(r#"{"ok":true}"#))]);
+
+        let decoded: Vec<_> =
+            TxCache::decode_sse_events::<serde_json::Value, _>(events).collect().await;
+
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].as_ref().unwrap()["ok"], true);
+    }
+
+    #[tokio::test]
+    async fn decode_sse_events_maps_invalid_json_to_deserialization_error() {
+        let events = stream::iter([Ok::<_, SseError>(event("not-json"))]);
+
+        let mut decoded = TxCache::decode_sse_events::<serde_json::Value, _>(events);
+
+        match decoded.next().await.expect("stream should yield an error") {
+            Err(TxCacheError::Deserialization(_)) => {}
+            other => panic!("expected deserialization error, got {other:?}"),
+        }
+        assert!(decoded.next().await.is_none(), "stream should terminate after the error");
+    }
+
+    #[tokio::test]
+    async fn decode_sse_events_maps_sse_errors() {
+        let events = stream::iter([Err::<eventsource_stream::Event, _>(utf8_sse_error())]);
+
+        let mut decoded = TxCache::decode_sse_events::<serde_json::Value, _>(events);
+
+        match decoded.next().await.expect("stream should yield an error") {
+            Err(TxCacheError::Sse(eventsource_stream::EventStreamError::Utf8(_))) => {}
+            other => panic!("expected SSE error, got {other:?}"),
+        }
+        assert!(decoded.next().await.is_none(), "stream should terminate after the error");
+    }
+
+    #[tokio::test]
+    async fn decode_sse_events_stops_after_first_error() {
+        let events = stream::iter([
+            Ok::<_, SseError>(event(r#"{"idx":1}"#)),
+            Err(utf8_sse_error()),
+            Ok(event(r#"{"idx":2}"#)),
+        ]);
+
+        let decoded: Vec<_> =
+            TxCache::decode_sse_events::<serde_json::Value, _>(events).collect().await;
+
+        assert_eq!(decoded.len(), 2);
+        assert_eq!(decoded[0].as_ref().unwrap()["idx"], 1);
+        match &decoded[1] {
+            Err(TxCacheError::Sse(eventsource_stream::EventStreamError::Utf8(_))) => {}
+            other => panic!("expected final SSE error, got {other:?}"),
+        }
+    }
+}
