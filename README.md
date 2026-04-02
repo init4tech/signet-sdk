@@ -43,11 +43,11 @@ See the [Signet docs] for more info.
 
 ### Installation
 
-Add the crate you need as a git dependency in your `Cargo.toml`:
+Add the crate you need to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-signet-types = { git = "https://github.com/init4tech/signet-sdk.git", package = "signet-types" }
+signet-types = "0.16"
 ```
 
 ### Contributing to the SDK
