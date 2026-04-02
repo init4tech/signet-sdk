@@ -1,5 +1,8 @@
 # Signet SDK
 
+[![CI](https://github.com/init4tech/signet-sdk/actions/workflows/rust.yml/badge.svg)](https://github.com/init4tech/signet-sdk/actions/workflows/rust.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
+
 A collection of libraries and tools implementing core logic for
 [Signet].
 
@@ -25,24 +28,27 @@ See the [Signet docs] for more info.
 
 ### What's in the SDK?
 
-- **signet-constants** - Constants for Signet, including chain IDs, contract
-  addresses, and other on-chain configuration.
-- **signet-zenith** - [Zenith] contract bindings and related types.
-- **signet-types** - Common types and utilities for Signet.
-- **signet-extract** - Extracts Signet blocks from an Ethereum block. Also
-  includes test utilities for specifying host and rollup blocks.
-- **signet-evm** - A wrapper around [trevm] that implements a Signet-specific
-  revm inspector for detecting orders, and Signet's block-execution logic.
-- **signet-journal** - A serializablable, unwindable journal of EVM state
-  changes.
-- **signet-bundle** - Types and utilities for simulating bundles of Signet
-  transactions, and determining what fills would be required to include them.
-- **signet-sim** - Block construction library for Signet. Produces blocks from
-  a transaction cache by scoring them according to the increase in the
-  builder's balance.
-- **signet-tx-cache** - A client for Signets tx-cache webservice.
-- **signet-test-utils** - Utilities for testing Signet libraries and
-  applications.
+| Crate | Description |
+|-------|-------------|
+| **signet-constants** | Constants for Signet, including chain IDs, contract addresses, and other on-chain configuration. |
+| **signet-zenith** | [Zenith] contract bindings and related types. |
+| **signet-types** | Common types and utilities for Signet. |
+| **signet-extract** | Extracts Signet blocks from an Ethereum block. Also includes test utilities for specifying host and rollup blocks. |
+| **signet-evm** | A wrapper around [trevm] that implements a Signet-specific revm inspector for detecting orders, and Signet's block-execution logic. |
+| **signet-journal** | A serializable, unwindable journal of EVM state changes. |
+| **signet-bundle** | Types and utilities for simulating bundles of Signet transactions, and determining what fills would be required to include them. |
+| **signet-sim** | Block construction library for Signet. Produces blocks from a transaction cache by scoring them according to the increase in the builder's balance. |
+| **signet-tx-cache** | A client for Signet's tx-cache webservice. |
+| **signet-test-utils** | Utilities for testing Signet libraries and applications. |
+
+### Installation
+
+Add the crate you need to your `Cargo.toml`:
+
+```toml
+[dependencies]
+signet-types = "0.16"
+```
 
 ### Contributing to the SDK
 
