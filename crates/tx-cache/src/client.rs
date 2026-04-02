@@ -419,6 +419,11 @@ impl TxCache {
 }
 
 #[cfg(feature = "sse")]
+use eventsource_stream::{Event, EventStreamError, Eventsource};
+#[cfg(feature = "sse")]
+use tracing::debug;
+
+#[cfg(feature = "sse")]
 impl TxCache {
     const TRANSACTIONS_FEED: &str = "transactions/feed";
     const ORDERS_FEED: &str = "orders/feed";
@@ -426,12 +431,7 @@ impl TxCache {
     fn decode_sse_events<T, S>(events: S) -> impl Stream<Item = Result<T>> + Send
     where
         T: DeserializeOwned + Send + 'static,
-        S: Stream<
-                Item = std::result::Result<
-                    eventsource_stream::Event,
-                    eventsource_stream::EventStreamError<reqwest::Error>,
-                >,
-            > + Send,
+        S: Stream<Item = std::result::Result<Event, EventStreamError<reqwest::Error>>> + Send,
     {
         events
             .map(|result| match result {
@@ -455,8 +455,6 @@ impl TxCache {
         &self,
         feed: &'static str,
     ) -> Result<impl Stream<Item = Result<T>> + Send> {
-        use eventsource_stream::Eventsource;
-
         let url = self
             .url
             .join(feed)
@@ -464,6 +462,8 @@ impl TxCache {
 
         let es =
             self.client.get(url).send().await?.error_for_status()?.bytes_stream().eventsource();
+
+        debug!(feed, "SSE subscription established");
 
         Ok(Self::decode_sse_events(es))
     }
