@@ -83,6 +83,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
         // Run the system action.
         trevm_try!(action.apply(&mut trevm), trevm);
+        // Invalidate memoized root before mutation.
+        self.unseal();
         // push receipt and transaction to the block
         self.processed.push(action.produce_transaction());
         self.output
