@@ -451,17 +451,26 @@ impl TxCache {
     /// deserializes each event's JSON data into `T`. The stream
     /// terminates on the first error, which is yielded as the final
     /// item.
-    async fn subscribe_inner<T: DeserializeOwned + Send + 'static>(
+    ///
+    /// If `secret` is provided, it is sent as a bearer token in the
+    /// request.
+    #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
+    #[instrument(skip_all)]
+    pub async fn subscribe_inner<T: DeserializeOwned + Send + 'static>(
         &self,
         feed: &'static str,
+        secret: Option<&str>,
     ) -> Result<impl Stream<Item = Result<T>> + Send> {
         let url = self
             .url
             .join(feed)
             .inspect_err(|e| warn!(%e, "Failed to join URL for SSE subscription"))?;
 
-        let es =
-            self.client.get(url).send().await?.error_for_status()?.bytes_stream().eventsource();
+        let req = match secret {
+            Some(s) => self.client.get(url).bearer_auth(s),
+            None => self.client.get(url),
+        };
+        let es = req.send().await?.error_for_status()?.bytes_stream().eventsource();
 
         debug!(feed, "SSE subscription established");
 
@@ -485,7 +494,7 @@ impl TxCache {
     pub async fn subscribe_transactions(
         &self,
     ) -> Result<impl Stream<Item = Result<TxEnvelope>> + Send> {
-        self.subscribe_inner(Self::TRANSACTIONS_FEED).await
+        self.subscribe_inner(Self::TRANSACTIONS_FEED, None).await
     }
 
     /// Subscribe to real-time order events via SSE.
@@ -502,7 +511,7 @@ impl TxCache {
     #[cfg_attr(docsrs, doc(cfg(feature = "sse")))]
     #[instrument(skip_all)]
     pub async fn subscribe_orders(&self) -> Result<impl Stream<Item = Result<SignedOrder>> + Send> {
-        self.subscribe_inner(Self::ORDERS_FEED).await
+        self.subscribe_inner(Self::ORDERS_FEED, None).await
     }
 }
 
