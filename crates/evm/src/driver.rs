@@ -312,7 +312,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     /// Consume the driver, producing the sealed block and receipts.
     pub fn finish(self) -> (RecoveredBlock, Vec<ReceiptEnvelope>) {
         let header = self.construct_sealed_header();
-        let (receipts, senders, _) = self.output.into_parts();
+        let (receipts, senders, _, _) = self.output.into_parts();
 
         let block = SealedBlock::new(header, self.processed).recover_unchecked(senders);
 
