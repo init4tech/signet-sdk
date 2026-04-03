@@ -10,7 +10,7 @@
 use alloy::{
     consensus::{constants::ETH_TO_WEI, Header, ReceiptEnvelope, TxEnvelope, TypedTransaction},
     eips::BlockNumberOrTag,
-    primitives::{keccak256, Address, U256},
+    primitives::{keccak256, Address, B256, U256},
     signers::local::PrivateKeySigner,
     uint,
 };
@@ -29,7 +29,7 @@ use signet_test_utils::{
     users::{TEST_SIGNERS, TEST_USERS},
 };
 use signet_types::{
-    primitives::{SealedHeader, TransactionSigned},
+    primitives::{SignetHeaderV1, TransactionSigned},
     AggregateFills,
 };
 use signet_zenith::HostOrders::{initiateCall, Filled, Input, Output};
@@ -436,12 +436,18 @@ mod block_driver {
             extracts: &'a mut Extracts<'b, C>,
             txns: Vec<TransactionSigned>,
         ) -> SignetDriver<'a, 'b, C> {
-            let header = Header { gas_limit: 30_000_000, ..Default::default() };
+            let header = Header {
+                gas_limit: 30_000_000,
+                transactions_root: B256::ZERO,
+                receipts_root: B256::ZERO,
+                ..Default::default()
+            };
+            let v1 = SignetHeaderV1::try_from(header).expect("test header is valid V1");
             SignetDriver::new(
                 extracts,
                 Default::default(),
                 txns.into(),
-                SealedHeader::new(header),
+                v1,
                 SignetSystemConstants::test(),
             )
         }
