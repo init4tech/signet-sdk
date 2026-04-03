@@ -7,7 +7,7 @@ use alloy::{
         constants::GWEI_TO_WEI, BlobTransactionSidecar, Header, Receipt, ReceiptEnvelope,
         TxEip1559, TxEip4844,
     },
-    primitives::{Address, Bytes, Log, LogData, B256, U256},
+    primitives::{Address, Bytes, Log, LogData, U256},
     signers::Signature,
 };
 use signet_evm::ExecutionOutcome;
@@ -318,13 +318,8 @@ impl HostBlockSpec {
 
     /// Make a header
     pub fn header(&self) -> SignetHeaderV1 {
-        let header = Header {
-            number: self.block_number(),
-            timestamp: 1716555576,
-            transactions_root: B256::ZERO,
-            receipts_root: B256::ZERO,
-            ..Default::default()
-        };
+        let header =
+            Header { number: self.block_number(), timestamp: 1716555576, ..Default::default() };
         SignetHeaderV1::try_from(header).expect("test header is valid V1")
     }
 

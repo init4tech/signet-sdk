@@ -5,7 +5,7 @@
 //! cache the block hash.
 
 use alloy::{
-    consensus::{BlockHeader, Header},
+    consensus::{constants::EMPTY_ROOT_HASH, BlockHeader, Header},
     primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256},
 };
 use std::ops::Deref;
@@ -48,26 +48,26 @@ pub(crate) fn check_shared_defaults(header: &Header) -> Vec<&'static str> {
     bad
 }
 
-/// Check that `transactions_root` and `receipts_root` are `B256::ZERO`.
-pub(crate) fn check_roots_default(header: &Header) -> Vec<&'static str> {
+/// Check that `transactions_root` and `receipts_root` are `EMPTY_ROOT_HASH`.
+pub(crate) fn check_roots_empty(header: &Header) -> Vec<&'static str> {
     let mut bad = Vec::new();
-    if header.transactions_root() != B256::ZERO {
+    if header.transactions_root() != EMPTY_ROOT_HASH {
         bad.push("transactions_root");
     }
-    if header.receipts_root() != B256::ZERO {
+    if header.receipts_root() != EMPTY_ROOT_HASH {
         bad.push("receipts_root");
     }
     bad
 }
 
-/// Check that `transactions_root` and `receipts_root` are NOT `B256::ZERO`.
+/// Check that `transactions_root` and `receipts_root` are NOT `EMPTY_ROOT_HASH`.
 #[allow(dead_code)]
-pub(crate) fn check_roots_non_default(header: &Header) -> Vec<&'static str> {
+pub(crate) fn check_roots_non_empty(header: &Header) -> Vec<&'static str> {
     let mut bad = Vec::new();
-    if header.transactions_root() == B256::ZERO {
+    if header.transactions_root() == EMPTY_ROOT_HASH {
         bad.push("transactions_root");
     }
-    if header.receipts_root() == B256::ZERO {
+    if header.receipts_root() == EMPTY_ROOT_HASH {
         bad.push("receipts_root");
     }
     bad
@@ -98,7 +98,7 @@ impl TryFrom<Header> for SignetHeaderV1 {
 
     fn try_from(header: Header) -> Result<Self, Self::Error> {
         let mut must_be_default = check_shared_defaults(&header);
-        must_be_default.extend(check_roots_default(&header));
+        must_be_default.extend(check_roots_empty(&header));
 
         if must_be_default.is_empty() {
             Ok(Self(Sealed::new(header)))
@@ -221,7 +221,7 @@ impl TryFrom<Header> for SignetHeaderV2 {
 
     fn try_from(header: Header) -> Result<Self, Self::Error> {
         let must_be_default = check_shared_defaults(&header);
-        let must_not_be_default = check_roots_non_default(&header);
+        let must_not_be_default = check_roots_non_empty(&header);
 
         if must_be_default.is_empty() && must_not_be_default.is_empty() {
             Ok(Self(Sealed::new(header)))
@@ -321,9 +321,9 @@ impl BlockHeader for SignetHeaderV2 {
 mod tests {
     use super::*;
 
-    /// Create a valid V1 header (transaction/receipt roots zeroed, rest default).
+    /// Create a valid V1 header (roots are EMPTY_ROOT_HASH from default).
     fn valid_v1_header() -> Header {
-        Header { transactions_root: B256::ZERO, receipts_root: B256::ZERO, ..Default::default() }
+        Header::default()
     }
 
     #[test]
@@ -414,9 +414,9 @@ mod tests {
 
         #[allow(deprecated)]
         #[test]
-        fn v2_rejects_zero_transactions_root() {
+        fn v2_rejects_empty_root_transactions_root() {
             let header = Header {
-                transactions_root: B256::ZERO,
+                // transactions_root left as EMPTY_ROOT_HASH from default
                 receipts_root: B256::repeat_byte(0x01),
                 ..Default::default()
             };
@@ -426,10 +426,10 @@ mod tests {
 
         #[allow(deprecated)]
         #[test]
-        fn v2_rejects_zero_receipts_root() {
+        fn v2_rejects_empty_root_receipts_root() {
             let header = Header {
                 transactions_root: B256::repeat_byte(0x01),
-                receipts_root: B256::ZERO,
+                // receipts_root left as EMPTY_ROOT_HASH from default
                 ..Default::default()
             };
             let err = SignetHeaderV2::try_from(header).unwrap_err();
@@ -452,12 +452,8 @@ mod tests {
         #[allow(deprecated)]
         #[test]
         fn v2_reports_both_violation_kinds() {
-            let header = Header {
-                state_root: B256::repeat_byte(0x01),
-                transactions_root: B256::ZERO,
-                receipts_root: B256::ZERO,
-                ..Default::default()
-            };
+            // state_root is non-default, roots are EMPTY_ROOT_HASH (default)
+            let header = Header { state_root: B256::repeat_byte(0x01), ..Default::default() };
             let err = SignetHeaderV2::try_from(header).unwrap_err();
             assert!(!err.must_be_default.is_empty());
             assert!(!err.must_not_be_default.is_empty());

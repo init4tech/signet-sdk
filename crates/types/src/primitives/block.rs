@@ -38,12 +38,7 @@ impl<T> SealedBlock<T> {
     /// Create a new empty sealed block for testing.
     #[doc(hidden)]
     pub fn blank_for_testing() -> Self {
-        let header = Header {
-            transactions_root: B256::ZERO,
-            receipts_root: B256::ZERO,
-            ..Default::default()
-        };
-        let v1 = SignetHeaderV1::try_from(header).expect("default header is valid V1");
+        let v1 = SignetHeaderV1::try_from(Header::default()).expect("default header is valid V1");
         Self { header: v1, transactions: Vec::new() }
     }
 
@@ -113,12 +108,7 @@ pub type RecoveredBlock = SealedBlock<Recovered<TransactionSigned>>;
 
 impl Default for RecoveredBlock {
     fn default() -> Self {
-        let header = Header {
-            transactions_root: B256::ZERO,
-            receipts_root: B256::ZERO,
-            ..Default::default()
-        };
-        let v1 = SignetHeaderV1::try_from(header).expect("default header is valid V1");
+        let v1 = SignetHeaderV1::try_from(Header::default()).expect("default header is valid V1");
         Self { header: v1, transactions: Vec::new() }
     }
 }

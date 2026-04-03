@@ -43,12 +43,7 @@ impl TestEnv {
         extracts: &'a mut Extracts<'b, C>,
         txns: Vec<TransactionSigned>,
     ) -> SignetDriver<'a, 'b, C> {
-        let header = Header {
-            gas_limit: 30_000_000,
-            transactions_root: alloy::primitives::B256::ZERO,
-            receipts_root: alloy::primitives::B256::ZERO,
-            ..Default::default()
-        };
+        let header = Header { gas_limit: 30_000_000, ..Default::default() };
         let v1 = SignetHeaderV1::try_from(header).expect("test header is valid V1");
         SignetDriver::new(
             extracts,

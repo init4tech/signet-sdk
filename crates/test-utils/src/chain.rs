@@ -1,5 +1,4 @@
 use alloy::consensus::{BlockHeader, Header, ReceiptEnvelope};
-use alloy::primitives::B256;
 pub use signet_constants::test_utils::*;
 use signet_evm::ExecutionOutcome;
 use signet_extract::{BlockAndReceipts, Extractable};
@@ -91,8 +90,6 @@ pub fn fake_block(number: u64) -> RecoveredBlock {
     let header = Header {
         number,
         timestamp: 1716555576, // no particular significance other than divisible by 12
-        transactions_root: B256::ZERO,
-        receipts_root: B256::ZERO,
         ..Default::default()
     };
     let v1 = SignetHeaderV1::try_from(header).expect("fake header is valid V1");

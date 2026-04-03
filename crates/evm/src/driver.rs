@@ -382,7 +382,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
     /// Build the shared header fields (everything except roots).
     ///
-    /// Roots are explicitly zeroed — callers set them as needed.
+    /// Roots default to `EMPTY_ROOT_HASH` via `..Default::default()`.
     fn base_header(&self) -> Header {
         Header {
             parent_hash: self.parent.hash(),
@@ -400,9 +400,6 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             mix_hash: self.extracts.host_block.mix_hash().unwrap_or_default(),
             nonce: self.extracts.host_block.nonce().unwrap_or_default(),
             parent_beacon_block_root: self.extracts.host_block.parent_beacon_block_root(),
-
-            transactions_root: B256::ZERO,
-            receipts_root: B256::ZERO,
 
             ..Default::default()
         }
