@@ -13,7 +13,7 @@ use alloy::{
 use signet_extract::{Extractable, Extracts};
 use signet_types::{
     constants::SignetSystemConstants,
-    primitives::{RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
+    primitives::{RecoveredBlock, SealedBlock, SignetHeaderV1, TransactionSigned},
     AggregateFills, MarketError,
 };
 #[cfg(doc)]
@@ -203,7 +203,7 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     pub(crate) to_alias: HashSet<Address>,
 
     /// Parent rollup block.
-    parent: SealedHeader,
+    parent: SignetHeaderV1,
 
     /// Rollup constants, including pre-deploys
     pub(crate) constants: SignetSystemConstants,
@@ -234,7 +234,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         extracts: &'a Extracts<'b, C>,
         to_alias: HashSet<Address>,
         to_process: VecDeque<TransactionSigned>,
-        parent: SealedHeader,
+        parent: SignetHeaderV1,
         constants: SignetSystemConstants,
     ) -> Self {
         let cap = to_process.len()
@@ -286,7 +286,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     }
 
     /// Get the parent header.
-    pub const fn parent(&self) -> &SealedHeader {
+    pub const fn parent(&self) -> &SignetHeaderV1 {
         &self.parent
     }
 
@@ -341,7 +341,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
     /// Consume the driver, producing the sealed block and receipts.
     pub fn finish(self) -> (RecoveredBlock, Vec<ReceiptEnvelope>) {
-        let header = self.construct_sealed_header();
+        let header = self.construct_header_v1();
         let (receipts, senders, _, _) = self.output.into_parts();
 
         let block = SealedBlock::new(header, self.processed).recover_unchecked(senders);
@@ -380,8 +380,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         }
     }
 
-    /// Construct a block header for DB and evm execution.
-    fn construct_header(&self) -> Header {
+    /// Build the shared header fields (everything except roots).
+    fn base_header(&self) -> Header {
         Header {
             parent_hash: self.parent.hash(),
             number: self.ru_height(),
@@ -399,17 +399,25 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             nonce: self.extracts.host_block.nonce().unwrap_or_default(),
             parent_beacon_block_root: self.extracts.host_block.parent_beacon_block_root(),
 
-            transactions_root: self.transactions_root(),
-            receipts_root: self.output.receipt_root(),
-
             ..Default::default()
         }
     }
 
-    /// Construct a sealed header for DB and evm execution.
-    fn construct_sealed_header(&self) -> SealedHeader {
-        let header = self.construct_header();
-        SealedHeader::new(header)
+    /// Construct a V1 block header (without roots).
+    fn construct_header_v1(&self) -> SignetHeaderV1 {
+        SignetHeaderV1::try_from(self.base_header())
+            .expect("constructed header violates V1 invariants")
+    }
+
+    /// Construct a V2 block header (with computed roots).
+    #[cfg(feature = "experimental")]
+    #[allow(deprecated)]
+    fn construct_header_v2(&self) -> signet_types::primitives::SignetHeaderV2 {
+        let mut header = self.base_header();
+        header.transactions_root = self.transactions_root();
+        header.receipts_root = self.output.receipt_root();
+        signet_types::primitives::SignetHeaderV2::try_from(header)
+            .expect("constructed header violates V2 invariants")
     }
 
     /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate

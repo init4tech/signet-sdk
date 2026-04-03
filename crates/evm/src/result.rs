@@ -34,8 +34,8 @@ impl BlockResult {
     }
 
     /// Get the rollup block header.
-    pub const fn header(&self) -> &Header {
-        self.sealed_block.header.inner()
+    pub fn header(&self) -> &Header {
+        self.sealed_block.header.as_ref()
     }
 
     /// Get the sealed block.
@@ -56,7 +56,7 @@ impl BlockResult {
         BundleStateIndex::from(self.execution_outcome.bundle())
     }
 
-    const fn journal_meta(&self, prev_journal_hash: B256) -> JournalMeta<'_> {
+    fn journal_meta(&self, prev_journal_hash: B256) -> JournalMeta<'_> {
         JournalMeta::new(self.host_height, prev_journal_hash, Cow::Borrowed(self.header()))
     }
 
