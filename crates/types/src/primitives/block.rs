@@ -4,6 +4,7 @@
 //! representation for the signet rollup. Unlike Ethereum blocks, signet
 //! blocks have no ommers or withdrawals.
 
+use super::header::SignetHeaderV1;
 use alloy::{
     consensus::crypto::RecoveryError,
     consensus::{
@@ -11,16 +12,10 @@ use alloy::{
         Block as AlloyBlock, BlockHeader, EthereumTxEnvelope, EthereumTypedTransaction, Header,
         TxEip4844,
     },
-    primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256},
+    primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256},
 };
 
-/// A sealed header with a cached block hash.
-///
-/// This is a type alias for [`Sealed<Header>`], which eagerly computes and
-/// stores the header hash on construction.
-pub(super) type SealedHeader = Sealed<Header>;
-
-/// Ethereum sealed block type.
+/// Signet sealed block type.
 ///
 /// Parameterized on the transaction type `T`:
 /// - `SealedBlock<TransactionSigned>` — a block with signed transactions
@@ -28,28 +23,34 @@ pub(super) type SealedHeader = Sealed<Header>;
 ///   transactions (see [`RecoveredBlock`])
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SealedBlock<T = TransactionSigned> {
-    /// The sealed header of the block.
-    pub header: SealedHeader,
+    /// The validated signet header.
+    pub header: SignetHeaderV1,
     /// The transactions in the block.
     pub transactions: Vec<T>,
 }
 
 impl<T> SealedBlock<T> {
     /// Create a new sealed block.
-    pub const fn new(header: SealedHeader, transactions: Vec<T>) -> Self {
+    pub const fn new(header: SignetHeaderV1, transactions: Vec<T>) -> Self {
         Self { header, transactions }
     }
 
     /// Create a new empty sealed block for testing.
     #[doc(hidden)]
     pub fn blank_for_testing() -> Self {
-        Self { header: Sealed::new(Header::default()), transactions: Vec::new() }
+        let header = Header {
+            transactions_root: B256::ZERO,
+            receipts_root: B256::ZERO,
+            ..Default::default()
+        };
+        let v1 = SignetHeaderV1::try_from(header).expect("default header is valid V1");
+        Self { header: v1, transactions: Vec::new() }
     }
 
-    /// Create a new empty sealed block with the given header for testing.
+    /// Create a new empty sealed block with the given V1 header for testing.
     #[doc(hidden)]
-    pub fn blank_with_header(header: Header) -> Self {
-        Self { header: Sealed::new(header), transactions: Vec::new() }
+    pub fn blank_with_header(header: SignetHeaderV1) -> Self {
+        Self { header, transactions: Vec::new() }
     }
 
     /// Get the transactions in the block.
@@ -112,7 +113,13 @@ pub type RecoveredBlock = SealedBlock<Recovered<TransactionSigned>>;
 
 impl Default for RecoveredBlock {
     fn default() -> Self {
-        Self { header: Sealed::new(Header::default()), transactions: Vec::new() }
+        let header = Header {
+            transactions_root: B256::ZERO,
+            receipts_root: B256::ZERO,
+            ..Default::default()
+        };
+        let v1 = SignetHeaderV1::try_from(header).expect("default header is valid V1");
+        Self { header: v1, transactions: Vec::new() }
     }
 }
 
