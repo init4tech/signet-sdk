@@ -261,10 +261,17 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             .get_or_init(|| alloy::consensus::proofs::calculate_transaction_root(&self.processed));
     }
 
-    /// Clear the memoized transactions root. Call at the top of any method
+    /// Clear the memoized transactions root. Called at the top of any method
     /// that mutates `self.processed`.
-    pub(crate) fn unseal(&mut self) {
+    fn unseal(&mut self) {
         self.transactions_root.take();
+    }
+
+    /// Get a mutable reference to the processed transactions, clearing the
+    /// memoized transactions root.
+    pub(crate) fn processed_mut(&mut self) -> &mut Vec<TransactionSigned> {
+        self.unseal();
+        &mut self.processed
     }
 
     /// Get the transactions root, computing it if necessary.
