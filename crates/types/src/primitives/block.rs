@@ -44,7 +44,7 @@ impl<T> SealedBlock<T> {
 
     /// Create a new empty sealed block with the given V1 header for testing.
     #[doc(hidden)]
-    pub fn blank_with_header(header: SignetHeaderV1) -> Self {
+    pub const fn blank_with_header(header: SignetHeaderV1) -> Self {
         Self { header, transactions: Vec::new() }
     }
 

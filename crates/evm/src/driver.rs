@@ -413,7 +413,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
     /// Construct a V2 block header (with computed roots).
     #[cfg(feature = "experimental")]
-    #[allow(deprecated)]
+    #[allow(deprecated, dead_code)]
     fn construct_header_v2(&self) -> signet_types::primitives::SignetHeaderV2 {
         let mut header = self.base_header();
         header.transactions_root = self.transactions_root();
