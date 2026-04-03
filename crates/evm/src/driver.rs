@@ -216,7 +216,7 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     to_process: VecDeque<TransactionSigned>,
 
     /// Transactions that have been processed.
-    pub(crate) processed: Vec<TransactionSigned>,
+    processed: Vec<TransactionSigned>,
 
     /// Memoized transactions root. Populated by `seal()`, cleared by `unseal()`.
     transactions_root: OnceLock<B256>,
