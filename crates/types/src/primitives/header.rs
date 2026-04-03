@@ -1,7 +1,8 @@
 //! Validated signet header newtypes.
 //!
 //! Signet headers have stricter invariants than standard Ethereum headers.
-//! These newtypes enforce those invariants at construction time.
+//! These newtypes enforce those invariants at construction time and eagerly
+//! cache the block hash.
 
 use alloy::{
     consensus::{BlockHeader, Header},
@@ -72,30 +73,23 @@ pub(crate) fn check_roots_non_default(header: &Header) -> Vec<&'static str> {
     bad
 }
 
-/// A validated signet header (V1) with roots required to be default (zero).
+/// A validated signet header (V1) wrapping a [`Sealed<Header>`].
 ///
 /// V1 headers have all shared fields at their defaults and both
 /// `transactions_root` and `receipts_root` set to `B256::ZERO`.
+/// The block hash is eagerly cached on construction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignetHeaderV1(Header);
-
-/// A sealed [`SignetHeaderV1`] with a cached block hash.
-pub type SealedSignetHeaderV1 = Sealed<SignetHeaderV1>;
+pub struct SignetHeaderV1(Sealed<Header>);
 
 impl SignetHeaderV1 {
-    /// Consume the wrapper, returning the inner [`Header`].
-    pub fn into_inner(self) -> Header {
+    /// Consume the wrapper, returning the inner [`Sealed<Header>`].
+    pub fn into_inner(self) -> Sealed<Header> {
         self.0
     }
 
-    /// Consume the wrapper, sealing the inner [`Header`].
-    pub fn into_sealed_header(self) -> Sealed<Header> {
-        Sealed::new(self.0)
-    }
-
-    /// Borrow the inner header and seal the reference.
-    pub fn sealed_ref(&self) -> Sealed<&Header> {
-        Sealed::new_ref(&self.0)
+    /// Get the cached block hash.
+    pub const fn hash(&self) -> B256 {
+        self.0.hash()
     }
 }
 
@@ -103,23 +97,19 @@ impl TryFrom<Header> for SignetHeaderV1 {
     type Error = SignetHeaderError;
 
     fn try_from(header: Header) -> Result<Self, Self::Error> {
-        let must_be_default = {
-            let mut v = check_shared_defaults(&header);
-            v.extend(check_roots_default(&header));
-            v
-        };
-        let must_not_be_default = Vec::new();
+        let mut must_be_default = check_shared_defaults(&header);
+        must_be_default.extend(check_roots_default(&header));
 
-        if must_be_default.is_empty() && must_not_be_default.is_empty() {
-            Ok(Self(header))
+        if must_be_default.is_empty() {
+            Ok(Self(Sealed::new(header)))
         } else {
-            Err(SignetHeaderError { must_be_default, must_not_be_default })
+            Err(SignetHeaderError { must_be_default, must_not_be_default: Vec::new() })
         }
     }
 }
 
 impl Deref for SignetHeaderV1 {
-    type Target = Header;
+    type Target = Sealed<Header>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -252,10 +242,19 @@ mod tests {
     }
 
     #[test]
-    fn v1_into_inner_roundtrips() {
+    fn v1_into_inner_returns_sealed() {
         let header = valid_v1_header();
-        let v1 = SignetHeaderV1::try_from(header.clone()).unwrap();
-        assert_eq!(v1.into_inner(), header);
+        let v1 = SignetHeaderV1::try_from(header).unwrap();
+        let sealed = v1.into_inner();
+        // Sealed<Header> has a cached hash
+        let _ = sealed.hash();
+    }
+
+    #[test]
+    fn v1_hash_is_accessible() {
+        let v1 = SignetHeaderV1::try_from(valid_v1_header()).unwrap();
+        // hash() should not panic
+        let _ = v1.hash();
     }
 
     #[test]
