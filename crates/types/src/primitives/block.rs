@@ -18,7 +18,7 @@ use alloy::{
 ///
 /// This is a type alias for [`Sealed<Header>`], which eagerly computes and
 /// stores the header hash on construction.
-pub type SealedHeader = Sealed<Header>;
+pub(super) type SealedHeader = Sealed<Header>;
 
 /// Ethereum sealed block type.
 ///
