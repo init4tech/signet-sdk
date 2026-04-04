@@ -14,6 +14,10 @@ mod v2;
 pub use v2::SignetHeaderV2;
 
 use alloy::consensus::{constants::EMPTY_ROOT_HASH, BlockHeader, Header};
+use std::sync::LazyLock;
+
+/// Default header used for comparison in validation checks, allocated once.
+static DEFAULT_HEADER: LazyLock<Header> = LazyLock::new(Header::default);
 
 /// Error returned when a [`Header`] violates signet header invariants.
 #[derive(Debug, thiserror::Error)]
@@ -27,7 +31,7 @@ pub struct SignetHeaderError {
 
 /// Check that shared fields equal their defaults.
 pub(crate) fn check_shared_defaults(header: &Header) -> Vec<&'static str> {
-    let d = Header::default();
+    let d = &*DEFAULT_HEADER;
     let mut bad = Vec::new();
     if header.ommers_hash() != d.ommers_hash() {
         bad.push("ommers_hash");
@@ -66,6 +70,7 @@ pub(crate) fn check_roots_empty(header: &Header) -> Vec<&'static str> {
 }
 
 /// Check that `transactions_root` and `receipts_root` are NOT `EMPTY_ROOT_HASH`.
+#[cfg(feature = "experimental")]
 pub(crate) fn check_roots_non_empty(header: &Header) -> Vec<&'static str> {
     let mut bad = Vec::new();
     if header.transactions_root() == EMPTY_ROOT_HASH {
