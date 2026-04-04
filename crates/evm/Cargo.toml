@@ -28,3 +28,4 @@ trevm = { workspace = true, features = ["test-utils"] }
 
 [features]
 default = []
+experimental = ["signet-types/experimental"]

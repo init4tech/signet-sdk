@@ -8,17 +8,18 @@ use alloy::{
         TxType,
     },
     eips::eip1559::{BaseFeeParams, INITIAL_BASE_FEE as EIP1559_INITIAL_BASE_FEE},
-    primitives::{map::HashSet, Address, Bloom, U256},
+    primitives::{map::HashSet, Address, Bloom, B256, U256},
 };
 use signet_extract::{Extractable, Extracts};
 use signet_types::{
     constants::SignetSystemConstants,
-    primitives::{RecoveredBlock, SealedBlock, SealedHeader, TransactionSigned},
+    primitives::{RecoveredBlock, SealedBlock, SignetHeaderV1, TransactionSigned},
     AggregateFills, MarketError,
 };
 #[cfg(doc)]
 use signet_zenith::Transactor;
 use std::collections::VecDeque;
+use std::sync::OnceLock;
 use tracing::{debug, debug_span, info_span, warn};
 use trevm::{
     helpers::Ctx,
@@ -202,7 +203,7 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     pub(crate) to_alias: HashSet<Address>,
 
     /// Parent rollup block.
-    parent: SealedHeader,
+    parent: SignetHeaderV1,
 
     /// Rollup constants, including pre-deploys
     pub(crate) constants: SignetSystemConstants,
@@ -215,7 +216,10 @@ pub struct SignetDriver<'a, 'b, C: Extractable> {
     to_process: VecDeque<TransactionSigned>,
 
     /// Transactions that have been processed.
-    pub(crate) processed: Vec<TransactionSigned>,
+    processed: Vec<TransactionSigned>,
+
+    /// Memoized transactions root. Populated by `seal()`, cleared by `unseal()`.
+    transactions_root: OnceLock<B256>,
 
     /// Receipts and senders.
     pub(crate) output: BlockOutput,
@@ -230,7 +234,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         extracts: &'a Extracts<'b, C>,
         to_alias: HashSet<Address>,
         to_process: VecDeque<TransactionSigned>,
-        parent: SealedHeader,
+        parent: SignetHeaderV1,
         constants: SignetSystemConstants,
     ) -> Self {
         let cap = to_process.len()
@@ -245,9 +249,35 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
             working_context: extracts.aggregate_fills(),
             to_process,
             processed: Vec::with_capacity(cap),
+            transactions_root: OnceLock::new(),
             output: BlockOutput::with_capacity(cap),
             payable_gas_used: 0,
         }
+    }
+
+    /// Populate the memoized transactions root.
+    fn seal(&self) {
+        self.transactions_root
+            .get_or_init(|| alloy::consensus::proofs::calculate_transaction_root(&self.processed));
+    }
+
+    /// Clear the memoized transactions root. Called at the top of any method
+    /// that mutates `self.processed`.
+    fn unseal(&mut self) {
+        self.transactions_root.take();
+    }
+
+    /// Get a mutable reference to the processed transactions, clearing the
+    /// memoized transactions root.
+    pub(crate) fn processed_mut(&mut self) -> &mut Vec<TransactionSigned> {
+        self.unseal();
+        &mut self.processed
+    }
+
+    /// Get the transactions root, computing it if necessary.
+    pub fn transactions_root(&self) -> B256 {
+        self.seal();
+        *self.transactions_root.get().unwrap()
     }
 
     /// Get the extracts being executed by the driver.
@@ -256,7 +286,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
     }
 
     /// Get the parent header.
-    pub const fn parent(&self) -> &SealedHeader {
+    pub const fn parent(&self) -> &SignetHeaderV1 {
         &self.parent
     }
 
@@ -311,7 +341,7 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
 
     /// Consume the driver, producing the sealed block and receipts.
     pub fn finish(self) -> (RecoveredBlock, Vec<ReceiptEnvelope>) {
-        let header = self.construct_sealed_header();
+        let header = self.construct_header_v1();
         let (receipts, senders, _, _) = self.output.into_parts();
 
         let block = SealedBlock::new(header, self.processed).recover_unchecked(senders);
@@ -350,8 +380,10 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         }
     }
 
-    /// Construct a block header for DB and evm execution.
-    fn construct_header(&self) -> Header {
+    /// Build the shared header fields (everything except roots).
+    ///
+    /// Roots default to `EMPTY_ROOT_HASH` via `..Default::default()`.
+    fn base_header(&self) -> Header {
         Header {
             parent_hash: self.parent.hash(),
             number: self.ru_height(),
@@ -373,10 +405,21 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         }
     }
 
-    /// Construct a sealed header for DB and evm execution.
-    fn construct_sealed_header(&self) -> SealedHeader {
-        let header = self.construct_header();
-        SealedHeader::new(header)
+    /// Construct a V1 block header (without roots).
+    fn construct_header_v1(&self) -> SignetHeaderV1 {
+        SignetHeaderV1::try_from(self.base_header())
+            .expect("constructed header violates V1 invariants")
+    }
+
+    /// Construct a V2 block header (with computed roots).
+    #[cfg(feature = "experimental")]
+    #[allow(deprecated, dead_code)]
+    fn construct_header_v2(&self) -> signet_types::primitives::SignetHeaderV2 {
+        let mut header = self.base_header();
+        header.transactions_root = self.transactions_root();
+        header.receipts_root = self.output.receipt_root();
+        signet_types::primitives::SignetHeaderV2::try_from(header)
+            .expect("constructed header violates V2 invariants")
     }
 
     /// Check the [`AggregateFills`], discard if invalid, otherwise accumulate
@@ -432,6 +475,8 @@ impl<'a, 'b, C: Extractable> SignetDriver<'a, 'b, C> {
         Db: Database + DatabaseCommit,
         Insp: Inspector<Ctx<Db>>,
     {
+        // Invalidate memoized root before mutation.
+        self.unseal();
         // Push the transaction to the block.
         self.processed.push(tx);
         // Accept the result.
@@ -651,5 +696,34 @@ impl<C: Extractable> Block for SignetDriver<'_, '_, C> {
         *prevrandao = self.extracts.host_block.mix_hash();
         *blob_excess_gas_and_price =
             Some(BlobExcessGasAndPrice { excess_blob_gas: 0, blob_gasprice: 0 });
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloy::{
+        consensus::proofs::calculate_transaction_root, eips::eip2718::Decodable2718, hex,
+        primitives::b256,
+    };
+    use signet_types::primitives::TransactionSigned;
+
+    /// Test vector from reth (`crates/ethereum/primitives/src/receipt.rs`).
+    ///
+    /// Single legacy transaction: nonce 0, gas_price 10, gas_limit 100_000_000,
+    /// to 0x1000…0000, value 0.
+    ///
+    /// Expected root from the block header:
+    /// `0x8151d548273f6683169524b66ca9fe338b9ce42bc3540046c828fd939ae23bcb`
+    #[test]
+    fn transaction_root_reth_vector() {
+        let tx_rlp = hex!(
+            "f861800a8405f5e10094100000000000000000000000000000000000000080801b"
+            "a07e09e26678ed4fac08a249ebe8ed680bf9051a5e14ad223e4b2b9d26e0208f37"
+            "a05f6e3f188e3e6eab7d7d3b6568f5eac7d687b08d307d3154ccd8c87b4630509b"
+        );
+        let tx = TransactionSigned::decode_2718(&mut tx_rlp.as_ref()).unwrap();
+
+        let root = calculate_transaction_root(&[tx]);
+        assert_eq!(root, b256!("8151d548273f6683169524b66ca9fe338b9ce42bc3540046c828fd939ae23bcb"),);
     }
 }

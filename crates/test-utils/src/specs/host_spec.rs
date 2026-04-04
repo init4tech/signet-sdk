@@ -7,13 +7,13 @@ use alloy::{
         constants::GWEI_TO_WEI, BlobTransactionSidecar, Header, Receipt, ReceiptEnvelope,
         TxEip1559, TxEip4844,
     },
-    primitives::{Address, Bytes, FixedBytes, Log, LogData, B256, U256},
+    primitives::{Address, Bytes, Log, LogData, U256},
     signers::Signature,
 };
 use signet_evm::ExecutionOutcome;
 use signet_extract::{Events, Extractable, Extracts};
 use signet_types::primitives::{
-    RecoveredBlock, SealedBlock, SealedHeader, Transaction, TransactionSigned,
+    RecoveredBlock, SealedBlock, SignetHeaderV1, Transaction, TransactionSigned,
 };
 use signet_types::{
     constants::{KnownChains, ParseChainError, SignetSystemConstants},
@@ -317,20 +317,10 @@ impl HostBlockSpec {
     }
 
     /// Make a header
-    ///
-    /// This function is a little weird because reth @ 1.2.0 rejiggered the
-    /// block structs in odd ways.
-    pub fn header(&self) -> SealedHeader {
-        let header = Header {
-            difficulty: U256::from(0x4000_0000),
-            number: self.block_number(),
-            mix_hash: B256::repeat_byte(0xed),
-            nonce: FixedBytes::repeat_byte(0xbe),
-            timestamp: 1716555576,
-            excess_blob_gas: Some(0),
-            ..Default::default()
-        };
-        SealedHeader::new(header)
+    pub fn header(&self) -> SignetHeaderV1 {
+        let header =
+            Header { number: self.block_number(), timestamp: 1716555576, ..Default::default() };
+        SignetHeaderV1::try_from(header).expect("test header is valid V1")
     }
 
     /// Make a block

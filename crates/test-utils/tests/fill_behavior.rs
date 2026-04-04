@@ -29,7 +29,7 @@ use signet_test_utils::{
     users::{TEST_SIGNERS, TEST_USERS},
 };
 use signet_types::{
-    primitives::{SealedHeader, TransactionSigned},
+    primitives::{SignetHeaderV1, TransactionSigned},
     AggregateFills,
 };
 use signet_zenith::HostOrders::{initiateCall, Filled, Input, Output};
@@ -437,11 +437,12 @@ mod block_driver {
             txns: Vec<TransactionSigned>,
         ) -> SignetDriver<'a, 'b, C> {
             let header = Header { gas_limit: 30_000_000, ..Default::default() };
+            let v1 = SignetHeaderV1::try_from(header).expect("test header is valid V1");
             SignetDriver::new(
                 extracts,
                 Default::default(),
                 txns.into(),
-                SealedHeader::new(header),
+                v1,
                 SignetSystemConstants::test(),
             )
         }

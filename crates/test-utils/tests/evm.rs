@@ -21,7 +21,7 @@ use signet_test_utils::{
     evm::test_signet_evm,
     specs::{make_wallet, sign_tx_with_key_pair, simple_send},
 };
-use signet_types::primitives::{RecoveredBlock, SealedHeader, TransactionSigned};
+use signet_types::primitives::{RecoveredBlock, SignetHeaderV1, TransactionSigned};
 use signet_zenith::MINTER_ADDRESS;
 use trevm::revm::database::in_memory_db::InMemoryDB;
 
@@ -44,11 +44,12 @@ impl TestEnv {
         txns: Vec<TransactionSigned>,
     ) -> SignetDriver<'a, 'b, C> {
         let header = Header { gas_limit: 30_000_000, ..Default::default() };
+        let v1 = SignetHeaderV1::try_from(header).expect("test header is valid V1");
         SignetDriver::new(
             extracts,
             Default::default(),
             txns.into(),
-            SealedHeader::new(header),
+            v1,
             SignetSystemConstants::test(),
         )
     }

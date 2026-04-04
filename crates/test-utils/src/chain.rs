@@ -1,11 +1,8 @@
-use alloy::{
-    consensus::{BlockHeader, Header, ReceiptEnvelope},
-    primitives::{B256, B64, U256},
-};
+use alloy::consensus::{BlockHeader, Header, ReceiptEnvelope};
 pub use signet_constants::test_utils::*;
 use signet_evm::ExecutionOutcome;
 use signet_extract::{BlockAndReceipts, Extractable};
-use signet_types::primitives::{RecoveredBlock, SealedBlock, SealedHeader};
+use signet_types::primitives::{RecoveredBlock, SealedBlock, SignetHeaderV1};
 
 /// A simple, non-empty chain of blocks with receipts.
 #[derive(Clone, PartialEq, Eq)]
@@ -91,16 +88,12 @@ pub fn fake_chain(count: u64) -> Chain {
 /// Make a fake block with a specific number.
 pub fn fake_block(number: u64) -> RecoveredBlock {
     let header = Header {
-        difficulty: U256::from(0x4000_0000),
         number,
-        mix_hash: B256::repeat_byte(0xed),
-        nonce: B64::repeat_byte(0xbe),
         timestamp: 1716555576, // no particular significance other than divisible by 12
-        excess_blob_gas: Some(0),
         ..Default::default()
     };
-    let sealed = SealedHeader::new(header);
-    SealedBlock::new(sealed, vec![]).recover_unchecked(vec![])
+    let v1 = SignetHeaderV1::try_from(header).expect("fake header is valid V1");
+    SealedBlock::new(v1, vec![]).recover_unchecked(vec![])
 }
 
 #[cfg(test)]
