@@ -1,3 +1,4 @@
+pub mod bundle_submitter;
 pub mod chain;
 pub mod contracts;
 pub mod evm;
