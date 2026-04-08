@@ -193,7 +193,7 @@ where
     /// submitted to target the next `target_block_count` blocks.
     ///
     /// Returns an error if `orders` is empty, or if signing or submission fails.
-    #[instrument(skip_all, fields(order_count = orders.len(), target_block_count))]
+    #[instrument(skip(self, orders), fields(order_count = orders.len()))]
     pub async fn fill(
         &self,
         orders: Vec<SignedOrder>,
