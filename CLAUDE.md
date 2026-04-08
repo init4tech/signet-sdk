@@ -10,6 +10,18 @@
 Pre-push: clippy (both feature sets) + fmt. Never use `cargo check/build`.
 These checks apply before any push — new commits, rebases, cherry-picks, etc.
 
+### Pre-push Checks (enforced by Claude hook)
+
+A Claude hook in `.claude/settings.json` runs `.claude/hooks/pre-push.sh`
+before every `git push`. The push is blocked if any check fails. The checks:
+
+- `cargo +nightly fmt -- --check`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo clippy --workspace --all-targets --no-default-features -- -D warnings`
+- `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`
+
+Clippy and doc warnings are hard failures.
+
 Release: creating a release includes publishing all crates to crates.io
 via `cargo publish` (in dependency order).
 
