@@ -119,7 +119,7 @@ where
     ///
     /// This function runs the simulation in a separate thread and waits for
     /// the result or the deadline to expire.
-    #[instrument(skip_all, fields(cache_rank, tx_hash = %transaction.hash()))]
+    #[instrument(skip(self, transaction), fields(tx_hash = %transaction.hash()))]
     fn simulate_tx(
         &self,
         cache_rank: u128,
@@ -194,7 +194,7 @@ where
     }
 
     /// Simulates a bundle on the current environment.
-    #[instrument(skip_all, fields(cache_rank, uuid = bundle.replacement_uuid()))]
+    #[instrument(skip(self, bundle), fields(uuid = bundle.replacement_uuid()))]
     fn simulate_bundle(
         &self,
         cache_rank: u128,

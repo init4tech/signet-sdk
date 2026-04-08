@@ -105,8 +105,8 @@ where
     type Error = FeePolicyError;
 
     #[instrument(
-        skip_all,
-        fields(order_count = orders.len(), fill_count = fills.len(), target_block_count)
+        skip(self, orders, fills, signer_address),
+        fields(order_count = orders.len(), fill_count = fills.len())
     )]
     async fn submit_fills(
         &self,
