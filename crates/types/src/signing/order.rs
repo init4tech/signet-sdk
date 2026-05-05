@@ -62,13 +62,22 @@ impl SignedOrder {
         (self.permit, self.outputs)
     }
 
+    /// Returns whether the order is expired as of `timestamp`.
+    ///
+    /// An order is expired when `timestamp` is strictly greater than the permit deadline; a
+    /// `timestamp` equal to the deadline is **not** expired. A `U256` deadline above `u64::MAX`
+    /// saturates to `u64::MAX`, so such an order is never expired against any `u64` timestamp.
+    pub fn is_expired_at(&self, timestamp: u64) -> bool {
+        timestamp > self.permit.permit.deadline.saturating_to::<u64>()
+    }
+
     /// Check that this can be syntactically used to initiate an order.
     ///
     /// For it to be valid:
     /// - Deadline must be in the future.
     pub fn validate(&self, timestamp: u64) -> Result<(), SignedPermitError> {
-        let deadline = self.permit.permit.deadline.saturating_to::<u64>();
-        if timestamp > deadline {
+        if self.is_expired_at(timestamp) {
+            let deadline = self.permit.permit.deadline.saturating_to::<u64>();
             return Err(SignedPermitError::DeadlinePassed { current: timestamp, deadline });
         }
 

@@ -22,3 +22,6 @@ chrono.workspace = true
 futures-util.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

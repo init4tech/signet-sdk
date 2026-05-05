@@ -30,5 +30,8 @@ pub use order_sender::{OrderSender, OrderSenderError};
 mod preflight;
 pub use preflight::{Permit2Ext, PreflightError};
 
+pub mod stream;
+pub use stream::OrderStreamExt;
+
 mod traits;
 pub use traits::{BundleSubmitter, FillSubmitter, OrderSource, OrderSubmitter, TxBuilder};
