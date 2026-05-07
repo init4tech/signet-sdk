@@ -5,9 +5,10 @@
 //!
 //! Predicates that scan a multi-element field (`has_output_*`, `has_input_token`) match if
 //! *any* element satisfies the condition. An order whose outputs span multiple chains is
-//! therefore retained when filtering by any one of those chain IDs; the same applies to tokens
-//! and recipients. They are "has any matching element" filters, not "every element matches"
-//! filters.
+//! therefore retained when filtering by any one of those chain IDs, and likewise for
+//! recipients. They are "has any matching element" filters, not "every element matches"
+//! filters. `has_output_token` additionally requires the chain ID to match on the same
+//! output, since an `Address` can refer to entirely different ERC20 contracts across chains.
 //!
 //! Compose them by capturing the predicates once and combining the results in a closure - e.g.
 //!
@@ -17,13 +18,14 @@
 //! # use signet_orders::OrderStreamExt;
 //! # use signet_orders::stream::predicates::{not_expired_at, has_input_token, has_output_token};
 //! # use signet_types::SignedOrder;
+//! # let host_chain = 1u32;
 //! # let usdc = Address::repeat_byte(0xaa);
 //! # let weth = Address::repeat_byte(0xbb);
 //! # let now = 1_700_000_000;
 //! # let stream = stream::empty::<Result<SignedOrder, &'static str>>();
 //! let alive = not_expired_at(move || now);
 //! let from_usdc = has_input_token(usdc);
-//! let to_weth = has_output_token(weth);
+//! let to_weth = has_output_token(host_chain, weth);
 //! let _filtered = stream.filter_orders(move |order| {
 //!     alive(order) && from_usdc(order) && to_weth(order)
 //! });
@@ -55,9 +57,14 @@ pub fn has_output_chain(chain_id: u32) -> impl Fn(&SignedOrder) -> bool {
     move |order| order.outputs().iter().any(|output| output.chainId == chain_id)
 }
 
-/// Match orders that have at least one [`Output`] paying `token`.
-pub fn has_output_token(token: Address) -> impl Fn(&SignedOrder) -> bool {
-    move |order| order.outputs().iter().any(|output| output.token == token)
+/// Match orders that have at least one [`Output`] paying `token` on `chain_id`.
+///
+/// The chain ID is part of the match because the same `Address` can refer to entirely
+/// different ERC20 contracts on host and rollup.
+pub fn has_output_token(chain_id: u32, token: Address) -> impl Fn(&SignedOrder) -> bool {
+    move |order| {
+        order.outputs().iter().any(|output| output.chainId == chain_id && output.token == token)
+    }
 }
 
 /// Match orders that have at least one [`Output`] going to `recipient`.
@@ -158,9 +165,11 @@ mod tests {
         assert!(has_output_chain(1)(&order));
         assert!(!has_output_chain(2)(&order));
 
-        assert!(has_output_token(token_a)(&order));
-        assert!(has_output_token(token_b)(&order));
-        assert!(!has_output_token(Address::ZERO)(&order));
+        assert!(has_output_token(17001, token_a)(&order));
+        assert!(has_output_token(1, token_b)(&order));
+        assert!(!has_output_token(1, token_a)(&order), "right token, wrong chain");
+        assert!(!has_output_token(17001, token_b)(&order), "right token, wrong chain");
+        assert!(!has_output_token(17001, Address::ZERO)(&order));
 
         assert!(has_output_recipient(recipient)(&order));
         assert!(has_output_recipient(Address::ZERO)(&order));
@@ -199,7 +208,7 @@ mod tests {
         let order = order_with(Address::ZERO, 1, vec![], vec![]);
         assert!(!has_output_chain(0)(&order));
         assert!(!has_output_chain(1)(&order));
-        assert!(!has_output_token(Address::ZERO)(&order));
+        assert!(!has_output_token(0, Address::ZERO)(&order));
         assert!(!has_output_recipient(Address::ZERO)(&order));
     }
 
