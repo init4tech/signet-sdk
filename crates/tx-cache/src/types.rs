@@ -418,15 +418,18 @@ pub struct TxKey {
 }
 
 /// The query object keys for the bundle GET endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// Cursor for the `block_number_index` GSI: paginates bundles for a given
+/// target block in score-descending order.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct BundleKey {
-    /// The bundle id
+    /// The bundle id.
     pub id: Uuid,
-    /// The bundle score
+    /// The bundle score.
     pub score: u64,
-    /// The global bundle score key
-    pub global_bundle_score_key: String,
+    /// The bundle's target block number.
+    pub target_block_number: u64,
 }
 
 /// The query object keys for the order GET endpoint.
@@ -586,9 +589,9 @@ mod tests {
 
         let cache_response = CacheResponse::paginated(
             BundleList { bundles: vec![dummy_bundle_with_id(uuid)] },
-            BundleKey { id: uuid, score: 100, global_bundle_score_key: "gbsk".to_string() },
+            BundleKey { id: uuid, score: 100, target_block_number: 42 },
         );
-        let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}],"nextCursor":{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","score":100,"globalBundleScoreKey":"gbsk"}}"#;
+        let expected_json = r#"{"bundles":[{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","bundle":{"txs":[],"blockNumber":"0x0","replacementUuid":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33"}}],"nextCursor":{"id":"5932d4bb-58d9-41a9-851d-8dd7f04ccc33","score":100,"targetBlockNumber":42}}"#;
         let serialized = serde_json::to_string(&cache_response).unwrap();
         assert_eq!(serialized, expected_json);
         let deserialized =
