@@ -23,6 +23,20 @@ pub struct SignetHeaderV2(Sealed<Header>);
 
 #[allow(deprecated)]
 impl SignetHeaderV2 {
+    /// Construct a [`SignetHeaderV2`] without validating signet header invariants.
+    ///
+    /// # Safety (logical)
+    ///
+    /// The caller must ensure the header satisfies V2 invariants: all shared
+    /// fields at their defaults and both roots **not** equal to
+    /// [`EMPTY_ROOT_HASH`]. Passing an invalid header will not cause UB but
+    /// will violate type-level expectations that downstream code relies on.
+    ///
+    /// [`EMPTY_ROOT_HASH`]: alloy::consensus::constants::EMPTY_ROOT_HASH
+    pub fn new_unchecked(header: Header) -> Self {
+        Self(Sealed::new(header))
+    }
+
     /// Consume the wrapper, returning the inner [`Sealed<Header>`].
     pub fn into_inner(self) -> Sealed<Header> {
         self.0
