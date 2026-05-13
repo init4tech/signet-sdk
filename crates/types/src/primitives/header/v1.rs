@@ -1,6 +1,6 @@
 //! [`SignetHeaderV1`] — validated signet header without computed roots.
 
-use super::{check_roots_empty, check_shared_defaults, SignetHeaderError};
+use crate::primitives::header::{check_roots_empty, check_shared_defaults, SignetHeaderError};
 use alloy::{
     consensus::{BlockHeader, Header},
     primitives::{Address, BlockNumber, Bloom, Bytes, Sealed, B256, B64, U256},
@@ -18,7 +18,8 @@ use std::ops::Deref;
 pub struct SignetHeaderV1(Sealed<Header>);
 
 impl SignetHeaderV1 {
-    /// Construct a [`SignetHeaderV1`] without validating signet header invariants.
+    /// Construct a [`SignetHeaderV1`] without validating signet header
+    /// invariants.
     ///
     /// # Safety (logical)
     ///
@@ -30,6 +31,33 @@ impl SignetHeaderV1 {
     /// [`EMPTY_ROOT_HASH`]: alloy::consensus::constants::EMPTY_ROOT_HASH
     pub fn new_unchecked(header: Header) -> Self {
         Self(Sealed::new(header))
+    }
+
+    /// Construct A [`SignetHeaderV1`] by validating header invariants. This
+    /// function recomputes the header hash. If the header hash is already
+    /// known, consider using [`SignetHeaderV1::from_sealed`].
+    pub fn new(header: Header) -> Result<Self, SignetHeaderError> {
+        Self::try_from(header)
+    }
+
+    /// Construct a [`SignetHeaderV1`] without validating signet header
+    /// invariants.
+    ///
+    /// # Safety (logical)
+    ///
+    /// The caller must ensure the header satisfies V1 invariants: all shared
+    /// fields at their defaults and both roots equal to [`EMPTY_ROOT_HASH`].
+    /// Passing an invalid header will not cause UB but will violate type-level
+    /// expectations that downstream code relies on.
+    ///
+    /// [`EMPTY_ROOT_HASH`]: alloy::consensus::constants::EMPTY_ROOT_HASH
+    pub const fn from_sealed_unchecked(sealed: Sealed<Header>) -> Self {
+        Self(sealed)
+    }
+
+    /// Construct a [`SignetHeaderV1`] by validating header invariants.
+    pub fn from_sealed(sealed: Sealed<Header>) -> Result<Self, SignetHeaderError> {
+        Self::try_from(sealed)
     }
 
     /// Consume the wrapper, returning the inner [`Sealed<Header>`].
@@ -52,6 +80,21 @@ impl TryFrom<Header> for SignetHeaderV1 {
 
         if must_be_default.is_empty() {
             Ok(Self(Sealed::new(header)))
+        } else {
+            Err(SignetHeaderError { must_be_default, must_not_be_default: Vec::new() })
+        }
+    }
+}
+
+impl TryFrom<Sealed<Header>> for SignetHeaderV1 {
+    type Error = SignetHeaderError;
+
+    fn try_from(header: Sealed<Header>) -> Result<Self, Self::Error> {
+        let mut must_be_default = check_shared_defaults(&header);
+        must_be_default.extend(check_roots_empty(&header));
+
+        if must_be_default.is_empty() {
+            Ok(Self(header))
         } else {
             Err(SignetHeaderError { must_be_default, must_not_be_default: Vec::new() })
         }
