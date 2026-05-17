@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 /// The list of known chains as a string.
-const KNOWN_CHAINS: &str = "mainnet, parmigiana, pecorino, test";
+const KNOWN_CHAINS: &str = "mainnet, parmigiana, pecorino, test, gouda";
 
 /// Error type for parsing struct from a chain name.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -18,6 +18,8 @@ pub enum KnownChains {
     Mainnet,
     /// Parmigiana chain.
     Parmigiana,
+    /// Gouda chain.
+    Gouda,
     /// Pecorino chain.
     #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
     Pecorino,
@@ -33,10 +35,35 @@ impl FromStr for KnownChains {
         match s.as_str() {
             "mainnet" => Ok(Self::Mainnet),
             "parmigiana" => Ok(Self::Parmigiana),
+            "gouda" => Ok(Self::Gouda),
             #[allow(deprecated)]
             "pecorino" => Ok(Self::Pecorino),
             "test" => Ok(Self::Test),
             _ => Err(ParseChainError::ChainNotSupported(s)),
         }
+    }
+}
+
+#[cfg(test)]
+mod gouda_tests {
+    use super::*;
+
+    #[test]
+    fn parses_gouda_chain_name() {
+        let parsed = KnownChains::from_str("gouda").expect("gouda should parse");
+        assert_eq!(parsed, KnownChains::Gouda);
+    }
+
+    #[test]
+    fn parses_gouda_case_insensitive() {
+        let parsed = KnownChains::from_str("GoUdA").expect("gouda should parse case-insensitive");
+        assert_eq!(parsed, KnownChains::Gouda);
+    }
+
+    #[test]
+    fn gouda_listed_in_known_chains_error() {
+        let err = KnownChains::from_str("notachain").unwrap_err();
+        let msg = format!("{err}");
+        assert!(msg.contains("gouda"), "error message should list gouda: {msg}");
     }
 }

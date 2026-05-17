@@ -32,6 +32,11 @@ impl SignetEnvironmentConstants {
         crate::chains::parmigiana::PARMIGIANA_ENV
     }
 
+    /// Get the hard-coded Gouda environment constants.
+    pub const fn gouda() -> Self {
+        crate::chains::parmigiana::PARMIGIANA_ENV
+    }
+
     /// Get the hard-coded Pecorino environment constants.
     #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
     #[allow(deprecated)]
@@ -67,6 +72,7 @@ impl TryFrom<KnownChains> for SignetEnvironmentConstants {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            KnownChains::Gouda => Ok(Self::gouda()),
             #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
