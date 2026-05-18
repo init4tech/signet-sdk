@@ -45,8 +45,11 @@ pub const HOST_USD_RECORDS: UsdRecords = {
 /// Host system tokens for gouda.
 pub const HOST_TOKENS: HostTokens = HostTokens::new(HOST_USD_RECORDS, HOST_WBTC, HOST_WETH);
 
-/// Start timestamp for the gouda host slot calculator (matches parmigiana host start).
-pub const HOST_START_TIMESTAMP: u64 = 1779051536;
+/// Start timestamp for the gouda host slot calculator.
+/// Inherited from the parmigiana host chain — gouda runs on the parmigiana host,
+/// so slot-calc math anchors to the parmigiana host genesis timestamp, NOT the
+/// gouda deploy-on-host timestamp (which is tracked separately via DEPLOY_HEIGHT).
+pub const HOST_START_TIMESTAMP: u64 = 1765226348;
 /// Slot offset for the gouda host slot calculator.
 pub const HOST_SLOT_OFFSET: u64 = 0;
 /// Slot duration for the gouda host slot calculator.
