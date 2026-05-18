@@ -1,6 +1,9 @@
 /// Mainnet chain constants.
 pub mod mainnet;
 
+/// Gouda testnet chain constants.
+pub mod gouda;
+
 /// Parmigiana testnet chain constants.
 pub mod parmigiana;
 

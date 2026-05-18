@@ -59,7 +59,7 @@ impl SignetSystemConstants {
 
     /// Get the hard-coded Gouda constants.
     pub const fn gouda() -> Self {
-        crate::chains::parmigiana::PARMIGIANA_SYS
+        crate::chains::gouda::GOUDA_SYS
     }
 
     /// Get the hard-coded Pecorino constants.
@@ -290,7 +290,7 @@ impl SignetConstants {
 
     /// Get the hard-coded Gouda rollup constants.
     pub const fn gouda() -> Self {
-        crate::chains::parmigiana::PARMIGIANA
+        crate::chains::gouda::GOUDA
     }
 
     /// Get the hard-coded Pecorino rollup constants.

@@ -19,7 +19,7 @@
 mod chains;
 #[allow(deprecated)]
 pub use chains::pecorino;
-pub use chains::{mainnet, parmigiana, test_utils};
+pub use chains::{gouda, mainnet, parmigiana, test_utils};
 
 mod types;
 pub use types::{

@@ -34,7 +34,7 @@ impl SignetEnvironmentConstants {
 
     /// Get the hard-coded Gouda environment constants.
     pub const fn gouda() -> Self {
-        crate::chains::parmigiana::PARMIGIANA_ENV
+        crate::chains::gouda::GOUDA_ENV
     }
 
     /// Get the hard-coded Pecorino environment constants.

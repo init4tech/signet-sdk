@@ -55,7 +55,7 @@ impl RollupConstants {
 
     /// Get the hard-coded Gouda rollup constants.
     pub const fn gouda() -> Self {
-        crate::chains::parmigiana::ROLLUP
+        crate::chains::gouda::ROLLUP
     }
 
     /// Get the hard-coded Pecorino rollup constants.

@@ -92,7 +92,7 @@ impl HostConstants {
 
     /// Get the hard-coded Gouda host constants.
     pub const fn gouda() -> Self {
-        crate::chains::parmigiana::HOST
+        crate::chains::gouda::HOST
     }
 
     /// Get the hard-coded Pecorino host constants.
