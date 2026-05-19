@@ -57,6 +57,11 @@ impl SignetSystemConstants {
         crate::chains::parmigiana::PARMIGIANA_SYS
     }
 
+    /// Get the hard-coded Gouda constants.
+    pub const fn gouda() -> Self {
+        crate::chains::gouda::GOUDA_SYS
+    }
+
     /// Get the hard-coded Pecorino constants.
     #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
     #[allow(deprecated)]
@@ -239,6 +244,7 @@ impl TryFrom<KnownChains> for SignetSystemConstants {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            KnownChains::Gouda => Ok(Self::gouda()),
             #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
@@ -282,6 +288,11 @@ impl SignetConstants {
         crate::chains::parmigiana::PARMIGIANA
     }
 
+    /// Get the hard-coded Gouda rollup constants.
+    pub const fn gouda() -> Self {
+        crate::chains::gouda::GOUDA
+    }
+
     /// Get the hard-coded Pecorino rollup constants.
     #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
     #[allow(deprecated)]
@@ -322,6 +333,7 @@ impl TryFrom<KnownChains> for SignetConstants {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            KnownChains::Gouda => Ok(Self::gouda()),
             #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),

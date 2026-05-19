@@ -50,6 +50,11 @@ impl RuBlockSpec {
         Self::new(SignetSystemConstants::parmigiana())
     }
 
+    /// Create a new empty RU block spec with the Gouda constants.
+    pub const fn gouda() -> Self {
+        Self::new(SignetSystemConstants::gouda())
+    }
+
     /// Create a new empty RU block spec with the Pecorino constants.
     #[deprecated(note = "Pecorino is being deprecated in favor of Parmigiana")]
     #[allow(deprecated)]
@@ -162,6 +167,7 @@ impl TryFrom<KnownChains> for RuBlockSpec {
         match chain {
             KnownChains::Mainnet => Ok(Self::mainnet()),
             KnownChains::Parmigiana => Ok(Self::parmigiana()),
+            KnownChains::Gouda => Ok(Self::gouda()),
             #[allow(deprecated)]
             KnownChains::Pecorino => Ok(Self::pecorino()),
             KnownChains::Test => Ok(Self::test()),
