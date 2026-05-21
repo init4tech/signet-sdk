@@ -64,7 +64,7 @@ mod tests {
         permitted: Vec<TokenPermissions>,
         outputs: Vec<Output>,
     ) -> SignedOrder {
-        SignedOrder::new(
+        SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: PermitBatchTransferFrom {
                     permitted,

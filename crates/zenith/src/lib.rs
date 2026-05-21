@@ -20,6 +20,8 @@ pub use bindings::{
 mod block;
 pub use block::{decode_txns, encode_txns, Alloy2718Coder, Coder, ZenithBlock, ZenithTransaction};
 
+pub mod serde_helpers;
+
 mod trevm;
 
 use alloy::{

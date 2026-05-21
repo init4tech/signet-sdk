@@ -122,6 +122,12 @@ impl AggregateOrders {
                         token: *token,
                         amount: U256::from(*amount),
                         recipient: *recipient,
+                        // SAFETY: signet chain IDs are protocol-defined to
+                        // fit in `u32`; the on-chain `Output.chainId`
+                        // field is itself `uint32`. A future protocol
+                        // change permitting chain IDs above `u32::MAX`
+                        // would require revisiting this cast and the
+                        // contract type together.
                         chainId: ru_chain_id as u32,
                     });
                 }

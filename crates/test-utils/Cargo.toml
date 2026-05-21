@@ -31,4 +31,7 @@ uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 chrono.workspace = true
+proptest = "1.6"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }

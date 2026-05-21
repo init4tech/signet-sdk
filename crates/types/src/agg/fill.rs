@@ -212,6 +212,13 @@ impl AggregateFills {
     ) -> Result<(), MarketError> {
         self.check_aggregate(aggregate)?;
 
+        // SAFETY: the `check_aggregate` call above proves, for every
+        // `(output_asset, recipient)` pair in `aggregate`, that the entry
+        // exists in `self.fills` and that `filled >= amount`. We hold
+        // `&mut self` for the duration, so neither the map nor the
+        // recipient balances can change between the check and the
+        // mutation. The `get_mut`/`unwrap` and `checked_sub`/`unwrap`
+        // below are therefore infallible by construction.
         for (output_asset, recipients) in aggregate.outputs.iter() {
             let context_recipients =
                 self.fills.get_mut(output_asset).expect("checked in check_aggregate");
