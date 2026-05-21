@@ -100,9 +100,9 @@ mod tests {
         assert!(!not_expired_at(|| 101)(&order));
 
         // Cross-check against `SignedOrder::validate` to lock in the matching boundary.
-        order.validate(99).unwrap();
-        order.validate(100).unwrap();
-        order.validate(101).unwrap_err();
+        order.validate_at(99).unwrap();
+        order.validate_at(100).unwrap();
+        order.validate_at(101).unwrap_err();
     }
 
     #[test]
@@ -127,7 +127,7 @@ mod tests {
         // A deadline that overflows u64 must saturate to u64::MAX, so the order is always
         // considered alive against any u64 cutoff. This mirrors `SignedOrder::validate`, which
         // uses `saturating_to::<u64>()`.
-        let order = SignedOrder::new(
+        let order = SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: PermitBatchTransferFrom {
                     permitted: vec![],
@@ -142,8 +142,8 @@ mod tests {
 
         assert!(not_expired_at(|| 0)(&order));
         assert!(not_expired_at(|| u64::MAX)(&order));
-        order.validate(0).unwrap();
-        order.validate(u64::MAX).unwrap();
+        order.validate_at(0).unwrap();
+        order.validate_at(u64::MAX).unwrap();
     }
 
     #[test]

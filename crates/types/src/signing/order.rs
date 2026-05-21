@@ -7,10 +7,12 @@ use alloy::{
     sol_types::{SolCall, SolValue},
 };
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use signet_constants::SignetSystemConstants;
-use signet_zenith::RollupOrders::{
-    initiatePermit2Call, Input, Order, Output, Permit2Batch, TokenPermissions,
+use signet_zenith::{
+    serde_helpers::{deserialize_non_empty_vec, deserialize_signature_bytes},
+    HostOrders::PermitBatchTransferFrom,
+    RollupOrders::{initiatePermit2Call, Input, Order, Output, Permit2Batch, TokenPermissions},
 };
 use std::{borrow::Cow, sync::OnceLock};
 
@@ -27,7 +29,7 @@ use std::{borrow::Cow, sync::OnceLock};
 /// Inputs cannot be transferred until the Order Outputs have already been filled.
 ///
 /// TODO: Link to docs.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct SignedOrder {
     /// The permit batch.
     #[serde(flatten)]
@@ -41,9 +43,62 @@ pub struct SignedOrder {
     order_hash_pre_image: OnceLock<Bytes>,
 }
 
+/// Wire-shape mirror of [`PermitBatchTransferFrom`] that enforces a
+/// non-empty `permitted` list during deserialization.
+#[derive(Deserialize)]
+struct PermitBatchTransferFromRepr {
+    #[serde(deserialize_with = "deserialize_non_empty_vec")]
+    permitted: Vec<TokenPermissions>,
+    nonce: U256,
+    deadline: U256,
+}
+
+impl From<PermitBatchTransferFromRepr> for PermitBatchTransferFrom {
+    fn from(r: PermitBatchTransferFromRepr) -> Self {
+        Self { permitted: r.permitted, nonce: r.nonce, deadline: r.deadline }
+    }
+}
+
+/// Wire-shape mirror of [`SignedOrder`] that enforces the structural
+/// invariants required by [`SignedOrder::order_hash`] and the
+/// `initiatePermit2` contract entrypoint: a 65-byte signature, a non-empty
+/// `permitted` list, and a non-empty `outputs` list.
+#[derive(Deserialize)]
+struct SignedOrderRepr {
+    permit: PermitBatchTransferFromRepr,
+    owner: Address,
+    #[serde(deserialize_with = "deserialize_signature_bytes")]
+    signature: Bytes,
+    #[serde(deserialize_with = "deserialize_non_empty_vec")]
+    outputs: Vec<Output>,
+}
+
+impl<'de> Deserialize<'de> for SignedOrder {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let SignedOrderRepr { permit, owner, signature, outputs } =
+            SignedOrderRepr::deserialize(deserializer)?;
+        Ok(Self::new_unchecked(Permit2Batch { permit: permit.into(), owner, signature }, outputs))
+    }
+}
+
 impl SignedOrder {
-    /// Creates a new signed order.
-    pub const fn new(permit: Permit2Batch, outputs: Vec<Output>) -> Self {
+    /// Construct a `SignedOrder` without validating structural invariants.
+    ///
+    /// # Invariants
+    ///
+    /// The caller must ensure all of:
+    /// - `permit.signature` is exactly 65 bytes (canonical secp256k1
+    ///   `(r, s, v)` encoding).
+    /// - `permit.permit.permitted` is non-empty.
+    /// - `outputs` is non-empty.
+    ///
+    /// These invariants are required by [`SignedOrder::order_hash`] (which
+    /// would otherwise panic on a non-65-byte signature) and by the
+    /// `initiatePermit2` contract entrypoint. Values obtained via
+    /// [`UnsignedOrder::sign`] or [`serde::Deserialize`] always satisfy
+    /// them; consumers that build a `SignedOrder` from raw parts should
+    /// prefer one of those construction paths.
+    pub const fn new_unchecked(permit: Permit2Batch, outputs: Vec<Output>) -> Self {
         Self { permit, outputs, order_hash: OnceLock::new(), order_hash_pre_image: OnceLock::new() }
     }
 
@@ -71,17 +126,27 @@ impl SignedOrder {
         timestamp > self.permit.permit.deadline.saturating_to::<u64>()
     }
 
-    /// Check that this can be syntactically used to initiate an order.
+    /// Check that this order is usable at `timestamp`.
+    ///
+    /// Structural invariants (signature length, non-empty input/output
+    /// vectors) are enforced at construction time — see
+    /// [`Self::new_unchecked`]. This method covers the time/state-dependent
+    /// checks; presently that is only the deadline.
     ///
     /// For it to be valid:
     /// - Deadline must be in the future.
-    pub fn validate(&self, timestamp: u64) -> Result<(), SignedPermitError> {
+    pub fn validate_at(&self, timestamp: u64) -> Result<(), SignedPermitError> {
         if self.is_expired_at(timestamp) {
             let deadline = self.permit.permit.deadline.saturating_to::<u64>();
             return Err(SignedPermitError::DeadlinePassed { current: timestamp, deadline });
         }
 
         Ok(())
+    }
+
+    /// Returns `true` iff [`Self::validate_at`] would return `Ok`.
+    pub fn is_valid_at(&self, timestamp: u64) -> bool {
+        self.validate_at(timestamp).is_ok()
     }
 
     /// Generate a TransactionRequest to `initiate` the SignedOrder.
@@ -135,7 +200,12 @@ impl SignedOrder {
         buf.extend_from_slice(keccak256(self.permit.owner.abi_encode()).as_slice());
         buf.extend_from_slice(keccak256(self.outputs.abi_encode()).as_slice());
 
-        // Normalize the signature.
+        // SAFETY: `self.permit.signature` is exactly 65 bytes by the
+        // invariants documented on `SignedOrder::new_unchecked`, which are
+        // enforced for every construction path: `UnsignedOrder::sign`
+        // produces a fresh 65-byte signature, and `<SignedOrder as
+        // Deserialize>` rejects any other length via
+        // `signet_zenith::serde_helpers::deserialize_signature_bytes`.
         let signature =
             alloy::primitives::Signature::from_raw(&self.permit.signature).unwrap().normalized_s();
         buf.extend_from_slice(keccak256(signature.as_bytes()).as_slice());
@@ -287,7 +357,7 @@ impl<'a> UnsignedOrder<'a> {
         let signature = signer.sign_hash(&permit.signing_hash).await?;
 
         // return as a SignedOrder
-        Ok(SignedOrder::new(
+        Ok(SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: permit.permit,
                 owner: signer.address(),
@@ -306,7 +376,7 @@ mod tests {
     use super::*;
 
     fn basic_order() -> SignedOrder {
-        SignedOrder::new(
+        SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: PermitBatchTransferFrom {
                     permitted: vec![TokenPermissions { token: Address::ZERO, amount: U256::ZERO }],
@@ -365,7 +435,7 @@ mod tests {
         vec![
             // 1. Minimal order - single input/output with zero values
             {
-                let order = SignedOrder::new(
+                let order = SignedOrder::new_unchecked(
                     Permit2Batch {
                         permit: PermitBatchTransferFrom {
                             permitted: vec![TokenPermissions {
@@ -401,7 +471,7 @@ mod tests {
                 let token_c = address!("0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"); // WBTC
                 let recipient = address!("0x1234567890123456789012345678901234567890");
 
-                let order = SignedOrder::new(
+                let order = SignedOrder::new_unchecked(
                     Permit2Batch {
                         permit: PermitBatchTransferFrom {
                             permitted: vec![
@@ -448,7 +518,7 @@ mod tests {
                 let recipient_b = address!("0x2222222222222222222222222222222222222222");
                 let recipient_c = address!("0x3333333333333333333333333333333333333333");
 
-                let order = SignedOrder::new(
+                let order = SignedOrder::new_unchecked(
                     Permit2Batch {
                         permit: PermitBatchTransferFrom {
                             permitted: vec![TokenPermissions {
@@ -497,7 +567,7 @@ mod tests {
                 let owner = address!("0xCafeBabeCafeBabeCafeBabeCafeBabeCafeBabe");
                 let recipient = address!("0x4444444444444444444444444444444444444444");
 
-                let order = SignedOrder::new(
+                let order = SignedOrder::new_unchecked(
                     Permit2Batch {
                         permit: PermitBatchTransferFrom {
                             permitted: vec![TokenPermissions {
@@ -543,7 +613,7 @@ mod tests {
                 // Amount larger than JS Number.MAX_SAFE_INTEGER (2^53 - 1 = 9007199254740991)
                 let large_amount = U256::from(10_000_000_000_000_000_000_000u128); // 10,000 ETH
 
-                let order = SignedOrder::new(
+                let order = SignedOrder::new_unchecked(
                     Permit2Batch {
                         permit: PermitBatchTransferFrom {
                             permitted: vec![TokenPermissions { token, amount: large_amount }],
@@ -572,7 +642,7 @@ mod tests {
                 let owner = address!("0x7777777777777777777777777777777777777777");
                 let recipient = address!("0x8888888888888888888888888888888888888888");
 
-                let order = SignedOrder::new(
+                let order = SignedOrder::new_unchecked(
                     Permit2Batch {
                         permit: PermitBatchTransferFrom {
                             permitted: vec![TokenPermissions {
@@ -653,7 +723,7 @@ mod tests {
     /// Test that verifies the minimal order matches expected hash.
     #[test]
     fn minimal_order_hash() {
-        let order = SignedOrder::new(
+        let order = SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: PermitBatchTransferFrom {
                     permitted: vec![TokenPermissions { token: Address::ZERO, amount: U256::ZERO }],
@@ -686,7 +756,7 @@ mod tests {
         let token_c = address!("0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599");
         let recipient = address!("0x1234567890123456789012345678901234567890");
 
-        let order = SignedOrder::new(
+        let order = SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: PermitBatchTransferFrom {
                     permitted: vec![
@@ -722,7 +792,7 @@ mod tests {
         let recipient = address!("0x6666666666666666666666666666666666666666");
         let large_amount = U256::from(10_000_000_000_000_000_000_000u128);
 
-        let order = SignedOrder::new(
+        let order = SignedOrder::new_unchecked(
             Permit2Batch {
                 permit: PermitBatchTransferFrom {
                     permitted: vec![TokenPermissions { token, amount: large_amount }],
@@ -739,6 +809,84 @@ mod tests {
             order.order_hash(),
             &b256!("0x7401ff93a0f4d16b66cc5a51109808f6bb29560cce8d0d3e1fce44edc8474e27")
         );
+    }
+
+    /// Regression test for ENG-2288: a `SignedOrder` JSON with a malformed
+    /// `signature` (any length other than 65 bytes) must be rejected at
+    /// deserialize time, so downstream callers of [`SignedOrder::order_hash`]
+    /// can rely on the type-system invariant.
+    #[test]
+    fn malformed_deserialized_signature_rejected() {
+        let json = r#"{
+            "permit": {
+                "permitted": [
+                    { "token": "0x0000000000000000000000000000000000000000", "amount": "0x01" }
+                ],
+                "nonce": "0x00",
+                "deadline": "0xffffffffffffffff"
+            },
+            "owner": "0x0000000000000000000000000000000000000000",
+            "signature": "0x01",
+            "outputs": [
+                {
+                    "token": "0x0000000000000000000000000000000000000000",
+                    "amount": "0x01",
+                    "recipient": "0x0000000000000000000000000000000000000000",
+                    "chainId": 88888
+                }
+            ]
+        }"#;
+        let err = serde_json::from_str::<SignedOrder>(json).unwrap_err();
+        assert!(err.to_string().contains("65 bytes"), "{err}");
+    }
+
+    #[test]
+    fn empty_permitted_rejected() {
+        let json = r#"{
+            "permit": {
+                "permitted": [],
+                "nonce": "0x00",
+                "deadline": "0xffffffffffffffff"
+            },
+            "owner": "0x0000000000000000000000000000000000000000",
+            "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "outputs": [
+                {
+                    "token": "0x0000000000000000000000000000000000000000",
+                    "amount": "0x01",
+                    "recipient": "0x0000000000000000000000000000000000000000",
+                    "chainId": 88888
+                }
+            ]
+        }"#;
+        let err = serde_json::from_str::<SignedOrder>(json).unwrap_err();
+        assert!(err.to_string().contains("at least one element"), "{err}");
+    }
+
+    #[test]
+    fn empty_outputs_rejected() {
+        let json = r#"{
+            "permit": {
+                "permitted": [
+                    { "token": "0x0000000000000000000000000000000000000000", "amount": "0x01" }
+                ],
+                "nonce": "0x00",
+                "deadline": "0xffffffffffffffff"
+            },
+            "owner": "0x0000000000000000000000000000000000000000",
+            "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "outputs": []
+        }"#;
+        let err = serde_json::from_str::<SignedOrder>(json).unwrap_err();
+        assert!(err.to_string().contains("at least one element"), "{err}");
+    }
+
+    #[test]
+    fn well_formed_roundtrip() {
+        let order = basic_order();
+        let json = serde_json::to_string(&order).unwrap();
+        let decoded: SignedOrder = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.order_hash(), order.order_hash());
     }
 
     #[test]
